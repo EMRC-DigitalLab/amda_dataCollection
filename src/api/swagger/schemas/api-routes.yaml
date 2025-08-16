@@ -1,0 +1,73 @@
+# src/api/swagger/api-routes.yaml
+paths:
+  /ping:
+    get:
+      tags:
+        - System
+      summary: API Health Check
+      description: Simple endpoint to check if the API is working
+      operationId: pingApi
+      responses:
+        '200':
+          description: API is working correctly
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                success: true
+                message: "API is working"
+                timestamp: "2024-12-14T10:30:00.000Z"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /health:
+    get:
+      tags:
+        - System
+      summary: Application Health Check
+      description: Detailed health check including database and external services status
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Application health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "AMDA Collection API is running"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  environment:
+                    type: string
+                    example: "development"
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: "connected"
+                      redis:
+                        type: string
+                        example: "connected"
+              example:
+                success: true
+                message: "AMDA Collection API is running"
+                timestamp: "2024-12-14T10:30:00.000Z"
+                environment: "development"
+                version: "1.0.0"
+                services:
+                  database: "connected"
+                  redis: "connected"
+        '500':
+          $ref: '#/components/responses/InternalServerError'

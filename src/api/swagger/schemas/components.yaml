@@ -1,0 +1,255 @@
+# src/api/swagger/schemas/components.yaml
+components:
+  schemas:
+    # ========== Common Response Schemas ==========
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Indicates if the request was successful
+          example: true
+        message:
+          type: string
+          description: Human readable message
+          example: "Operation successful"
+        data:
+          description: Response data (varies by endpoint)
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+      required:
+        - success
+        - message
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          description: Error message
+          example: "An error occurred"
+        error:
+          type: string
+          description: Detailed error information
+          example: "Invalid input data"
+        code:
+          type: string
+          description: Error code
+          example: "VALIDATION_ERROR"
+      required:
+        - success
+        - message
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Validation failed"
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: Field that failed validation
+                example: "email"
+              message:
+                type: string
+                description: Validation error message
+                example: "Email is required"
+              value:
+                description: Value that failed validation
+                example: ""
+      required:
+        - success
+        - message
+        - errors
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          description: Current page number
+          example: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Number of items per page
+          example: 10
+        total:
+          type: integer
+          minimum: 0
+          description: Total number of items
+          example: 100
+        totalPages:
+          type: integer
+          minimum: 0
+          description: Total number of pages
+          example: 10
+      required:
+        - page
+        - limit
+        - total
+        - totalPages
+
+    # ========== Health Check Schema ==========
+    HealthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "API is working"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-12-14T10:30:00.000Z"
+        environment:
+          type: string
+          example: "development"
+        version:
+          type: string
+          example: "1.0.0"
+      required:
+        - success
+        - message
+        - timestamp
+
+  # ========== Security Schemes ==========
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Enter your JWT token in the format: Bearer {token}"
+
+  # ========== Common Parameters ==========
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number for pagination
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+        example: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      description: Number of items per page
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+        example: 10
+
+    SortByParam:
+      name: sortBy
+      in: query
+      description: Field to sort by
+      required: false
+      schema:
+        type: string
+        example: "createdAt"
+
+    SortOrderParam:
+      name: sortOrder
+      in: query
+      description: Sort order
+      required: false
+      schema:
+        type: string
+        enum: [ASC, DESC]
+        default: DESC
+        example: "DESC"
+
+    SearchParam:
+      name: search
+      in: query
+      description: Search term
+      required: false
+      schema:
+        type: string
+        example: "john"
+
+  # ========== Common Responses ==========
+  responses:
+    UnauthorizedError:
+      description: Access token is missing or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: "Unauthorized"
+            error: "Invalid or missing token"
+            code: "UNAUTHORIZED"
+
+    ForbiddenError:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: "Forbidden"
+            error: "Insufficient permissions"
+            code: "FORBIDDEN"
+
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+          example:
+            success: false
+            message: "Validation failed"
+            errors:
+              - field: "email"
+                message: "Email is required"
+                value: ""
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: "Resource not found"
+            error: "The requested resource could not be found"
+            code: "NOT_FOUND"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: "Internal server error"
+            error: "An unexpected error occurred"
+            code: "INTERNAL_SERVER_ERROR"

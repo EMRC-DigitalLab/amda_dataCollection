@@ -1,0 +1,81 @@
+﻿# docker/docker-compose.dev.yml (Development)
+version: '3.8'
+
+services:
+  amda-api-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+    container_name: amda-collection-api-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_HOST=amda-postgres-dev  # Match container names
+      - REDIS_HOST=amda-redis-dev        # Match container names
+    env_file:
+      - ../.env.development
+    volumes:
+      - ../src:/app/src
+      - ../package.json:/app/package.json
+      - ../package-lock.json:/app/package-lock.json
+      - ../tsconfig.json:/app/tsconfig.json
+      - /app/node_modules
+    depends_on:
+      amda-postgres-dev:  # Use the actual container name
+        condition: service_healthy
+      amda-redis-dev:     # Use the actual container name
+        condition: service_healthy
+    networks:
+      - amda-dev-network
+
+  amda-postgres-dev:  # Changed to match container_name
+    image: postgres:15-alpine
+    container_name: amda-postgres-dev
+    environment:
+      POSTGRES_DB: amda_collection_dev
+      POSTGRES_USER: amda_user
+      POSTGRES_PASSWORD: amda_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    networks:
+      - amda-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U amda_user -d amda_collection_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  amda-redis-dev:  # Changed to match container_name
+    image: redis:7-alpine
+    container_name: amda-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - amda-dev-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  amda-mailhog:  # Added prefix for consistency
+    image: mailhog/mailhog:latest
+    container_name: amda-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - amda-dev-network
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+
+networks:
+  amda-dev-network:
+    driver: bridge

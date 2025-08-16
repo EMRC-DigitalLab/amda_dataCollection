@@ -1,0 +1,30 @@
+# docker/Dockerfile.dev
+FROM node:18-alpine
+
+# Install development dependencies
+RUN apk add --no-cache python3 make g++
+
+# Set working directory
+WORKDIR /app
+
+# Install nodemon globally
+RUN npm install -g nodemon ts-node
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
+
+# Install all dependencies (including dev)
+RUN npm install
+
+# Create directories
+RUN mkdir -p logs uploads
+
+# Copy source code (will be overridden by volume in docker-compose)
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Start development server
+CMD ["npm", "run", "start:dev"]
