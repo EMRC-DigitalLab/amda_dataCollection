@@ -1,14 +1,11 @@
 // src/database/entities/user.entity.ts
 import { Entity, Column, Index, BeforeInsert, BeforeUpdate } from 'typeorm';
 import { BaseEntity } from './base.entity';
-// import { Customer } from './customer.entity';
 import * as bcrypt from 'bcryptjs';
 
 export enum UserRole {
   ADMIN = 'admin',
-  MANAGER = 'manager',
-  AGENT = 'agent',
-  VIEWER = 'viewer',
+  MEMBER = 'member',
 }
 
 export enum UserStatus {
@@ -41,7 +38,7 @@ export class User extends BaseEntity {
   @Column({
     type: 'enum',
     enum: UserRole,
-    default: UserRole.AGENT,
+    default: UserRole.MEMBER,
   })
   role!: UserRole;
 
@@ -70,9 +67,12 @@ export class User extends BaseEntity {
   @Column({ type: 'json', nullable: true })
   preferences?: Record<string, any>;
 
-  // Relations
-  // @OneToMany(() => Customer, (customer:any) => customer.assignedAgent)
-  // assignedCustomers!: Customer[];
+  // Admin-specific fields for member onboarding
+  @Column({ type: 'uuid', nullable: true })
+  createdByAdminId?: string;
+
+  @Column({ type: 'boolean', default: false })
+  isFirstLogin?: boolean;
 
   // Methods
   @BeforeInsert()
@@ -98,5 +98,14 @@ export class User extends BaseEntity {
 
   get isAdmin(): boolean {
     return this.role === UserRole.ADMIN;
+  }
+
+  get isMember(): boolean {
+    return this.role === UserRole.MEMBER;
+  }
+
+  // Check if user needs to change password on first login
+  get requiresPasswordChange(): boolean {
+    return (this.isFirstLogin ?? false) && this.isMember;
   }
 }

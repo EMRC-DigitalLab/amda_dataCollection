@@ -65,6 +65,10 @@ const envVarsSchema = joi
 
     // Swagger
     SWAGGER_ENABLED: joi.boolean().default(true),
+
+    // Migration settings
+    AUTO_GENERATE_MIGRATIONS: joi.boolean().default(false),
+    RUN_MIGRATIONS_ON_STARTUP: joi.boolean().default(false),
   })
   .unknown();
 
@@ -88,6 +92,8 @@ export const config = {
     synchronize: envVars.DATABASE_SYNC,
     logging: envVars.DATABASE_LOGGING,
     ssl: envVars.DATABASE_SSL,
+    autoGenerateMigrations: envVars.AUTO_GENERATE_MIGRATIONS,
+    runMigrationsOnStartup: envVars.RUN_MIGRATIONS_ON_STARTUP,
   },
 
   redis: {

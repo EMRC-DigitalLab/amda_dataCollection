@@ -11,6 +11,7 @@ export interface LoginResponse {
     firstName: string;
     lastName: string;
     role: string;
+    isFirstLogin?: boolean;
   };
   accessToken: string;
   refreshToken: string;
@@ -26,4 +27,18 @@ export interface RegisterRequest {
 
 export interface RefreshTokenRequest {
   refreshToken: string;
+}
+
+export interface ChangePasswordRequest {
+  oldPassword?: string; // Optional for first-time login
+  newPassword: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
 }

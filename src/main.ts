@@ -9,6 +9,7 @@ import swaggerUi from 'swagger-ui-express';
 
 import { config } from '@/config';
 import { connectDatabase, connectRedis } from '@/config';
+import { AppDataSource } from '@/config/database';
 import { logger } from '@/shared/utils/logger';
 import { errorHandler, notFoundHandler } from '@/shared/middleware/error.middleware';
 import { generalRateLimit } from '@/shared/middleware/rate-limit.middleware';
@@ -229,6 +230,21 @@ class Application {
     try {
       // Connect to database
       await connectDatabase();
+
+      if (config.environment === 'development' && config.database.autoGenerateMigrations) {
+        await AppDataSource.synchronize();
+        logger.info('Database synchronized with entities');
+      } else if (config.database.runMigrationsOnStartup) {
+        await AppDataSource.runMigrations();
+        logger.info('Database migrations completed');
+      }
+
+      // Run migrations if configured
+      if (config.database.runMigrationsOnStartup) {
+        // const dataSource = await import('@/database/connection');
+        await AppDataSource.runMigrations();
+        logger.info('Database migrations completed');
+      }
 
       // Connect to Redis
       await connectRedis();

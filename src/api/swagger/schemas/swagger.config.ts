@@ -142,7 +142,14 @@ class SwaggerMerger {
   }
 
   private scanModules(): void {
-    const modulesPath = path.join(__dirname, '../../modules');
+    const modulesPath = path.join(__dirname, '../modules');
+    console.log('Debug - Looking for modules at:', modulesPath);
+    console.log('Debug - Directory exists:', fs.existsSync(modulesPath));
+
+    if (fs.existsSync(modulesPath)) {
+      const items = fs.readdirSync(modulesPath);
+      console.log('Debug - Found items:', items);
+    }
 
     if (!fs.existsSync(modulesPath)) {
       console.log('📁 Modules directory not found, skipping module scanning');
@@ -155,19 +162,49 @@ class SwaggerMerger {
     modules.forEach(module => {
       if (module.isDirectory()) {
         // Skip auth module for now as requested
-        if (module.name === 'auth') {
-          console.log('⏭️  Skipping auth module as requested');
-          return;
-        }
+        // if (module.name === 'auth') {
+        //   console.log('⏭️  Skipping auth module as requested');
+        //   return;
+        // }
 
-        // Scan for swagger YAML files in module
-        const swaggerPath = path.join(modulesPath, module.name, 'swagger');
-        if (fs.existsSync(swaggerPath)) {
-          const swaggerFiles = fs.readdirSync(swaggerPath);
+        // Look directly in the module directory
+        const moduleSwaggerPath = path.join(modulesPath, module.name);
+        if (fs.existsSync(moduleSwaggerPath)) {
+          const swaggerFiles = fs.readdirSync(moduleSwaggerPath);
           swaggerFiles.forEach(file => {
             if (file.endsWith('.yaml') || file.endsWith('.yml')) {
-              this.modulePaths.push(path.join(swaggerPath, file));
-              moduleCount++;
+              const filePath = path.join(moduleSwaggerPath, file);
+
+              // Load and merge the YAML content
+              try {
+                const yamlContent = fs.readFileSync(filePath, 'utf8');
+                const yamlData = yaml.load(yamlContent) as any;
+
+                // Merge paths
+                if (yamlData.paths) {
+                  this.paths = { ...this.paths, ...yamlData.paths };
+                }
+
+                // Merge components
+                if (yamlData.components) {
+                  if (yamlData.components.schemas) {
+                    this.components.schemas = {
+                      ...this.components.schemas,
+                      ...yamlData.components.schemas,
+                    };
+                  }
+                  if (yamlData.components.responses) {
+                    this.components.responses = {
+                      ...this.components.responses,
+                      ...yamlData.components.responses,
+                    };
+                  }
+                }
+
+                moduleCount++;
+              } catch (error) {
+                console.warn(`⚠️  Error loading ${file}:`, error);
+              }
             }
           });
         }

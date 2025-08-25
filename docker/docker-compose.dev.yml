@@ -28,6 +28,7 @@ services:
         condition: service_healthy
     networks:
       - amda-dev-network
+    restart: "no"  # Run once and exit
 
   amda-postgres-dev:  # Changed to match container_name
     image: postgres:15-alpine
