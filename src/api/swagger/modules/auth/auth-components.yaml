@@ -1,0 +1,237 @@
+# src/api/swagger/modules/auth/auth-components.yaml
+components:
+  schemas:
+    # ========== Request Schemas ==========
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: "admin@amda.com"
+        password:
+          type: string
+          minLength: 6
+          description: User password
+          example: "SecurePass123!"
+      required:
+        - email
+        - password
+
+    RegisterRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          maxLength: 100
+          description: User first name
+          example: "John"
+        lastName:
+          type: string
+          maxLength: 100
+          description: User last name
+          example: "Doe"
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: "john.doe@amda.com"
+        phoneNumber:
+          type: string
+          pattern: '^(\+?234|0)[789]\d{9}$|^(\+?233|0)[2459]\d{8}$|^(\+?254|0)[17]\d{8}$|^(\+?256|0)[37]\d{8}$|^(\+?27|0)[1-9]\d{8}$'
+          description: African phone number
+          example: "+2348012345678"
+        password:
+          type: string
+          minLength: 8
+          pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]'
+          description: Strong password with uppercase, lowercase, number and special character
+          example: "SecurePass123!"
+      required:
+        - firstName
+        - lastName
+        - email
+        - phoneNumber
+        - password
+
+    RefreshTokenRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          description: Valid refresh token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      required:
+        - refreshToken
+
+    ChangePasswordRequest:
+      type: object
+      properties:
+        oldPassword:
+          type: string
+          description: Current password (optional for first-time login)
+          example: "OldPass123!"
+        newPassword:
+          type: string
+          minLength: 8
+          pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]'
+          description: New strong password
+          example: "NewSecurePass123!"
+      required:
+        - newPassword
+
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: "user@amda.com"
+      required:
+        - email
+
+    ResetPasswordRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Password reset token
+          example: "a1b2c3d4e5f6..."
+        newPassword:
+          type: string
+          minLength: 8
+          pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]'
+          description: New strong password
+          example: "NewSecurePass123!"
+      required:
+        - token
+        - newPassword
+
+    # ========== Response Schemas ==========
+    LoginResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserInfo'
+        accessToken:
+          type: string
+          description: JWT access token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        refreshToken:
+          type: string
+          description: JWT refresh token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      required:
+        - user
+        - accessToken
+        - refreshToken
+
+    TokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: New JWT access token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        refreshToken:
+          type: string
+          description: New JWT refresh token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      required:
+        - accessToken
+        - refreshToken
+
+    UserInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: User unique identifier
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: "user@amda.com"
+        firstName:
+          type: string
+          description: User first name
+          example: "John"
+        lastName:
+          type: string
+          description: User last name
+          example: "Doe"
+        role:
+          type: string
+          enum: [admin, member]
+          description: User role
+          example: "member"
+        isFirstLogin:
+          type: boolean
+          description: Whether user needs to change password
+          example: false
+      required:
+        - id
+        - email
+        - firstName
+        - lastName
+        - role
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        email:
+          type: string
+          format: email
+          example: "user@amda.com"
+        firstName:
+          type: string
+          example: "John"
+        lastName:
+          type: string
+          example: "Doe"
+        phoneNumber:
+          type: string
+          example: "+2348012345678"
+        role:
+          type: string
+          enum: [admin, member]
+          example: "member"
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+          example: "active"
+        avatar:
+          type: string
+          nullable: true
+          example: "https://example.com/avatar.jpg"
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-12-14T10:30:00.000Z"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-12-14T10:30:00.000Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2024-12-14T10:30:00.000Z"
+      required:
+        - id
+        - email
+        - firstName
+        - lastName
+        - phoneNumber
+        - role
+        - status
+        - createdAt
+        - updatedAt

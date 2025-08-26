@@ -858,7 +858,7 @@ npm run build
 
 This project is proprietary software owned by AMDA. All rights reserved. Unauthorized copying, distribution, or modification is strictly prohibited.
 
-**© 2024 AMDA - Energy Management Research Centre (EMRC)**
+**© 2025 AMDA - Energy Management Research Centre (EMRC)**
 
 ## 🆘 Support
 
@@ -867,6 +867,8 @@ This project is proprietary software owned by AMDA. All rights reserved. Unautho
 - Create internal tickets for bugs or feature requests
 - Check internal documentation and knowledge base
 - Reach out via internal communication channels
+
+- npx prettier --write scripts/seed-admin.ts --end-of-line lf    command for widows to linux formatting
 
 ### Useful Resources
 - [Node.js Documentation](https://nodejs.org/docs/)

@@ -1,20 +1,22 @@
 // src/api/routes/index.ts
 // src/api/routes/index.ts (UPDATED)
 import { Router } from 'express';
-import authRoutes from '@/modules/auth/routes/auth.routes';
+import { createAuthRoutes } from '@/modules/auth/routes/auth.routes';
+import { AppDataSource } from '@/config/database';
 
-const router = Router();
+export function createApiRouter(): Router {
+  const router = Router();
 
-// Mount module routes
-router.use('/auth', authRoutes);
+  // register all modules here
+  const modules = [
+    { path: '/auth', factory: createAuthRoutes },
+    // { path: '/users', factory: createUserRoutes },
+    // { path: '/orders', factory: createOrderRoutes },
+  ];
 
-// Health check route for API
-router.get('/ping', (req, res) => {
-  res.json({
-    success: true,
-    message: 'API is working',
-    timestamp: new Date().toISOString(),
-  });
-});
+  for (const { path, factory } of modules) {
+    router.use(path, factory(AppDataSource));
+  }
 
-export default router;
+  return router;
+}

@@ -9,11 +9,12 @@ import swaggerUi from 'swagger-ui-express';
 
 import { config } from '@/config';
 import { connectDatabase, connectRedis } from '@/config';
+import { AppDataSource } from '@/config/database';
 import { logger } from '@/shared/utils/logger';
 import { errorHandler, notFoundHandler } from '@/shared/middleware/error.middleware';
 import { generalRateLimit } from '@/shared/middleware/rate-limit.middleware';
 import { swaggerSpec, getSwaggerInfo } from '@/api/swagger/schemas/swagger.config';
-import apiRoutes from '@/api/routes';
+import { createApiRouter } from '@/api/routes';
 
 class Application {
   public app: express.Application;
@@ -161,8 +162,17 @@ class Application {
       });
     });
 
+    // API root welcome endpoint
+    this.app.get(config.apiPrefix, (_req, res) => {
+      res.status(200).json({
+        success: true,
+        message: 'Welcome to AMDA backend server',
+        timestamp: new Date().toISOString(),
+      });
+    });
+
     // API routes
-    this.app.use(config.apiPrefix, apiRoutes);
+    this.app.use(config.apiPrefix, createApiRouter());
   }
 
   private initializeSwagger(): void {
@@ -229,6 +239,21 @@ class Application {
     try {
       // Connect to database
       await connectDatabase();
+
+      if (config.environment === 'development' && config.database.autoGenerateMigrations) {
+        await AppDataSource.synchronize();
+        logger.info('Database synchronized with entities');
+      } else if (config.database.runMigrationsOnStartup) {
+        await AppDataSource.runMigrations();
+        logger.info('Database migrations completed');
+      }
+
+      // Run migrations if configured
+      if (config.database.runMigrationsOnStartup) {
+        // const dataSource = await import('@/database/connection');
+        await AppDataSource.runMigrations();
+        logger.info('Database migrations completed');
+      }
 
       // Connect to Redis
       await connectRedis();
