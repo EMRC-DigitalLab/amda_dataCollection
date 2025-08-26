@@ -47,11 +47,11 @@ const swaggerOptions: swaggerJSDoc.Options = {
         },
       },
     },
-    security: [
-      {
-        bearerAuth: [],
-      },
-    ],
+    // security: [
+    //   {
+    //     bearerAuth: [],
+    //   },
+    // ],
   },
   apis: [], // Will be populated by merger
 };
@@ -143,16 +143,8 @@ class SwaggerMerger {
 
   private scanModules(): void {
     const modulesPath = path.join(__dirname, '../modules');
-    console.log('Debug - Looking for modules at:', modulesPath);
-    console.log('Debug - Directory exists:', fs.existsSync(modulesPath));
-
-    if (fs.existsSync(modulesPath)) {
-      const items = fs.readdirSync(modulesPath);
-      console.log('Debug - Found items:', items);
-    }
-
     if (!fs.existsSync(modulesPath)) {
-      console.log('📁 Modules directory not found, skipping module scanning');
+      console.log('Modules directory not found, skipping module scanning');
       return;
     }
 
@@ -161,13 +153,6 @@ class SwaggerMerger {
 
     modules.forEach(module => {
       if (module.isDirectory()) {
-        // Skip auth module for now as requested
-        // if (module.name === 'auth') {
-        //   console.log('⏭️  Skipping auth module as requested');
-        //   return;
-        // }
-
-        // Look directly in the module directory
         const moduleSwaggerPath = path.join(modulesPath, module.name);
         if (fs.existsSync(moduleSwaggerPath)) {
           const swaggerFiles = fs.readdirSync(moduleSwaggerPath);
@@ -175,7 +160,6 @@ class SwaggerMerger {
             if (file.endsWith('.yaml') || file.endsWith('.yml')) {
               const filePath = path.join(moduleSwaggerPath, file);
 
-              // Load and merge the YAML content
               try {
                 const yamlContent = fs.readFileSync(filePath, 'utf8');
                 const yamlData = yaml.load(yamlContent) as any;
@@ -183,27 +167,27 @@ class SwaggerMerger {
                 // Merge paths
                 if (yamlData.paths) {
                   this.paths = { ...this.paths, ...yamlData.paths };
+                  console.log(`Loaded paths from ${file}`);
                 }
 
-                // Merge components
+                // Merge ALL component types
                 if (yamlData.components) {
-                  if (yamlData.components.schemas) {
-                    this.components.schemas = {
-                      ...this.components.schemas,
-                      ...yamlData.components.schemas,
-                    };
-                  }
-                  if (yamlData.components.responses) {
-                    this.components.responses = {
-                      ...this.components.responses,
-                      ...yamlData.components.responses,
-                    };
-                  }
+                  ['schemas', 'responses', 'parameters', 'securitySchemes'].forEach(
+                    componentType => {
+                      if (yamlData.components[componentType]) {
+                        this.components[componentType] = {
+                          ...this.components[componentType],
+                          ...yamlData.components[componentType],
+                        };
+                        console.log(`Loaded ${componentType} from ${file}`);
+                      }
+                    }
+                  );
                 }
 
                 moduleCount++;
               } catch (error) {
-                console.warn(`⚠️  Error loading ${file}:`, error);
+                console.warn(`Error loading ${file}:`, error);
               }
             }
           });
@@ -211,7 +195,7 @@ class SwaggerMerger {
       }
     });
 
-    console.log(`📚 Found ${moduleCount} module swagger files`);
+    console.log(`Found ${moduleCount} module swagger files`);
   }
 
   private loadComponents(): void {
@@ -302,6 +286,76 @@ class SwaggerMerger {
             },
           },
         },
+        ValidationError: {
+          description: 'Validation error',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success: { type: 'boolean', example: false },
+                  message: { type: 'string', example: 'Validation failed' },
+                  errors: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        field: { type: 'string' },
+                        message: { type: 'string' },
+                        value: {},
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        UnauthorizedError: {
+          description: 'Access token is missing or invalid',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success: { type: 'boolean', example: false },
+                  message: { type: 'string', example: 'Unauthorized' },
+                  error: { type: 'string', example: 'Invalid or missing token' },
+                },
+              },
+            },
+          },
+        },
+        ForbiddenError: {
+          description: 'Insufficient permissions',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success: { type: 'boolean', example: false },
+                  message: { type: 'string', example: 'Forbidden' },
+                  error: { type: 'string', example: 'Insufficient permissions' },
+                },
+              },
+            },
+          },
+        },
+        NotFoundError: {
+          description: 'Resource not found',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success: { type: 'boolean', example: false },
+                  message: { type: 'string', example: 'Resource not found' },
+                  error: { type: 'string', example: 'The requested resource could not be found' },
+                },
+              },
+            },
+          },
+        },
       },
     };
 
@@ -311,7 +365,7 @@ class SwaggerMerger {
     };
     fs.writeFileSync(componentsPath, yaml.dump(yamlContent));
     this.components = defaultComponents;
-    console.log('📝 Created default Swagger components');
+    console.log('Created default Swagger components');
   }
 
   public generateSpec(): object {

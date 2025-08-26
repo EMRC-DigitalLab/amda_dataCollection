@@ -1,8 +1,9 @@
+# src/api/swagger/modules/auth/auth-routes.yaml
 paths:
   /auth/login:
     post:
       tags:
-        # - Authentication
+        - Authentication
       summary: User Login
       description: Login for both admin and member users
       operationId: loginUser
@@ -57,7 +58,78 @@ paths:
                         $ref: '#/components/schemas/LoginResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
-    # Protected: Admin registration, accessible only by admins
+
+  /auth/refresh-token:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh Token
+      description: Refresh access token using refresh token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /auth/forgot-password:
+    post:
+      tags:
+        - Authentication
+      summary: Forgot Password
+      description: Request password reset
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Reset link sent if email exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /auth/reset-password:
+    post:
+      tags:
+        - Authentication
+      summary: Reset Password
+      description: Reset password using token
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
 
   /auth/admin/create-member:
     post:
@@ -93,36 +165,6 @@ paths:
           $ref: '#/components/responses/ForbiddenError'
         '400':
           $ref: '#/components/responses/ValidationError'
-    # Protected: Admin-only action to create new members
-
-  /auth/refresh-token:
-    post:
-      tags:
-        - Authentication
-      summary: Refresh Token
-      description: Refresh access token using refresh token
-      operationId: refreshToken
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RefreshTokenRequest'
-      responses:
-        '200':
-          description: Token refreshed successfully
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/TokenResponse'
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
-    # Protected: Requires authentication to refresh token
 
   /auth/logout:
     post:
@@ -142,7 +184,6 @@ paths:
                 $ref: '#/components/schemas/ApiResponse'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
-    # Protected: Requires authentication to log out
 
   /auth/profile:
     get:
@@ -169,7 +210,6 @@ paths:
           $ref: '#/components/responses/UnauthorizedError'
         '404':
           $ref: '#/components/responses/NotFoundError'
-    # Protected: Requires authentication to retrieve the user profile
 
   /auth/change-password:
     put:
@@ -197,50 +237,3 @@ paths:
           $ref: '#/components/responses/UnauthorizedError'
         '400':
           $ref: '#/components/responses/ValidationError'
-    # Protected: Requires authentication to change password
-
-  /auth/forgot-password:
-    post:
-      tags:
-        - Authentication
-      summary: Forgot Password
-      description: Request password reset
-      operationId: forgotPassword
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ForgotPasswordRequest'
-      responses:
-        '200':
-          description: Reset link sent if email exists
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-    # Public: Allows anyone to request password reset
-
-  /auth/reset-password:
-    post:
-      tags:
-        - Authentication
-      summary: Reset Password
-      description: Reset password using token
-      operationId: resetPassword
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ResetPasswordRequest'
-      responses:
-        '200':
-          description: Password reset successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-        '400':
-          $ref: '#/components/responses/ValidationError'
-    # Public: Allows anyone to reset password using the token
