@@ -14,7 +14,7 @@ import { logger } from '@/shared/utils/logger';
 import { errorHandler, notFoundHandler } from '@/shared/middleware/error.middleware';
 import { generalRateLimit } from '@/shared/middleware/rate-limit.middleware';
 import { swaggerSpec, getSwaggerInfo } from '@/api/swagger/schemas/swagger.config';
-import apiRoutes from '@/api/routes';
+import { createApiRouter } from '@/api/routes';
 
 class Application {
   public app: express.Application;
@@ -162,8 +162,17 @@ class Application {
       });
     });
 
+    // API root welcome endpoint
+    this.app.get(config.apiPrefix, (_req, res) => {
+      res.status(200).json({
+        success: true,
+        message: 'Welcome to AMDA backend server',
+        timestamp: new Date().toISOString(),
+      });
+    });
+
     // API routes
-    this.app.use(config.apiPrefix, apiRoutes);
+    this.app.use(config.apiPrefix, createApiRouter());
   }
 
   private initializeSwagger(): void {
