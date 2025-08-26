@@ -1,18 +1,18 @@
 // src/modules/auth/services/auth.service.ts
-import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
-import { UserRepository } from '../../../database/repositories/auth/user.repository';
-import { User, UserRole, UserStatus } from '../../../database/entities/user.entity';
-import { DataSource } from 'typeorm';
 import { config } from '@/config';
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import { DataSource } from 'typeorm';
+import { User, UserRole, UserStatus } from '../../../database/entities/user.entity';
+import { UserRepository } from '../../../database/repositories/auth/user.repository';
 import {
+  ChangePasswordRequest,
+  ForgotPasswordRequest,
   LoginRequest,
   LoginResponse,
-  RegisterRequest,
   RefreshTokenRequest,
-  ChangePasswordRequest,
+  RegisterRequest,
   ResetPasswordRequest,
-  ForgotPasswordRequest,
 } from '../interfaces/auth.interface';
 
 export class AuthService {
