@@ -869,6 +869,7 @@ This project is proprietary software owned by AMDA. All rights reserved. Unautho
 - Reach out via internal communication channels
 
 - npx prettier --write scripts/seed-admin.ts --end-of-line lf    command for widows to linux formatting
+- docker-compose -f docker/docker-compose.dev.yml --profile seed up amda-seed-admin
 
 ### Useful Resources
 - [Node.js Documentation](https://nodejs.org/docs/)
