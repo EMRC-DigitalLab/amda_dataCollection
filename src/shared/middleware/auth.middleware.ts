@@ -8,7 +8,11 @@ import { ResponseHelper } from '../utils/response';
 import { ERROR_MESSAGES } from '../constants/error-messages';
 
 export interface AuthenticatedRequest extends Request {
-  user?: User;
+  user?: {
+    userId: string;
+    email: string;
+    role: string;
+  };
 }
 
 export const authMiddleware = async (
@@ -53,7 +57,11 @@ export const authMiddleware = async (
       return;
     }
 
-    req.user = user;
+    req.user = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    };
     next();
   } catch (error) {
     next(error);
