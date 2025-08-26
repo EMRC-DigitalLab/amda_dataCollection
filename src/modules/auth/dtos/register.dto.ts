@@ -14,7 +14,13 @@ export class RegisterDto {
   email!: string;
 
   @IsString()
-  @Matches(/^\+?234[789]\d{9}$/, { message: 'Invalid Nigerian phone number' })
+  @Matches(
+    /^(\+?234|0)[789]\d{9}$|^(\+?233|0)[2459]\d{8}$|^(\+?254|0)[17]\d{8}$|^(\+?256|0)[37]\d{8}$|^(\+?27|0)[1-9]\d{8}$/,
+    {
+      message:
+        'Invalid African phone number format. Supported: Nigeria, Ghana, Kenya, Uganda, South Africa',
+    }
+  )
   phoneNumber!: string;
 
   @IsString()
