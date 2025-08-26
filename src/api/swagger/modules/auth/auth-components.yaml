@@ -235,3 +235,79 @@ components:
         - status
         - createdAt
         - updatedAt
+
+  responses:
+    ValidationError:
+      description: 'Validation error'
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: 'Validation failed'
+              errors:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    field:
+                      type: string
+                    message:
+                      type: string
+                    value: {}
+
+    UnauthorizedError:
+      description: 'Access token is missing or invalid'
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: 'Unauthorized'
+              error:
+                type: string
+                example: 'Invalid or missing token'
+
+    ForbiddenError:
+      description: 'Insufficient permissions'
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: 'Forbidden'
+              error:
+                type: string
+                example: 'Insufficient permissions'
+
+    NotFoundError:
+      description: 'Resource not found'
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: 'Resource not found'
+              error:
+                type: string
+                example: 'The requested resource could not be found'
