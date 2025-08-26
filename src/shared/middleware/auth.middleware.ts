@@ -1,11 +1,11 @@
 // src/shared/middleware/auth.middleware.ts
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import { config } from '@/config';
 import { AppDataSource } from '@/config/database';
 import { User, UserStatus } from '@/database/entities/user.entity';
-import { ResponseHelper } from '../utils/response';
+import { NextFunction, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import { ERROR_MESSAGES } from '../constants/error-messages';
+import { ResponseHelper } from '../utils/response';
 
 export interface AuthenticatedRequest extends Request {
   user?: User;
@@ -17,6 +17,8 @@ export const authMiddleware = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+
+    
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

@@ -7,8 +7,9 @@ import { FormService } from '../services/form.service';
 
 export class FormController {
   private service: FormService;
-  constructor(private readonly dataSource:DataSource) {
-    this.service = new FormService(new FormRepository())
+
+  constructor(private readonly dataSource: DataSource) {
+    this.service = new FormService(new FormRepository(dataSource));
   }
 
   create = async (req: Request, res: Response, next: NextFunction) => {

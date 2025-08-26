@@ -7,24 +7,22 @@ export type QuestionType =
   | 'multiselect'
   | 'boolean';
 
-
-  export class CreateFormDto {
-    title!: string;
-    slug!: string;
-    questions!: CreateQuestionDto[];
-  }
-  export class UpdateFormDto {
-    id!: string;
-    title?: string;
-    slug?: string;
-    questions?: CreateQuestionDto[];
-  }
-  export class CreateQuestionDto {
-    kpi!: string;
-    description!: string;
-    slug!: string;
-    required!: boolean;
-    type!: string;
-    options?: Record<string, any>;
-  }
-  
+export class CreateFormDto {
+  title!: string;
+  slug!: string;
+  questions?: CreateQuestionDto[];
+}
+export class UpdateFormDto {
+  id!: string;
+  title?: string;
+  slug?: string;
+  questions?: CreateQuestionDto[];
+}
+export class CreateQuestionDto {
+  kpi!: string;
+  description!: string;
+  slug!: string;
+  required!: boolean;
+  type!: string;
+  options?: Record<string, any>;
+}

@@ -1,20 +1,19 @@
 // src/main.ts (Updated with enhanced Swagger setup and Secure CORS)
-import 'reflect-metadata';
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
 import compression from 'compression';
+import cors from 'cors';
+import express from 'express';
+import helmet from 'helmet';
 import morgan from 'morgan';
+import 'reflect-metadata';
 import swaggerUi from 'swagger-ui-express';
 
-import { config } from '@/config';
-import { connectDatabase, connectRedis } from '@/config';
+import { createApiRouter } from '@/api/routes';
+import { getSwaggerInfo, swaggerSpec } from '@/api/swagger/schemas/swagger.config';
+import { config, connectDatabase, connectRedis } from '@/config';
 import { AppDataSource } from '@/config/database';
-import { logger } from '@/shared/utils/logger';
 import { errorHandler, notFoundHandler } from '@/shared/middleware/error.middleware';
 import { generalRateLimit } from '@/shared/middleware/rate-limit.middleware';
-import { swaggerSpec, getSwaggerInfo } from '@/api/swagger/schemas/swagger.config';
-import { createApiRouter } from '@/api/routes';
+import { logger } from '@/shared/utils/logger';
 
 class Application {
   public app: express.Application;
@@ -307,8 +306,12 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-// Start the application
+// Start the applicationd
 const app = new Application();
+
+// (function (){
+//   seedAdmin()
+// })()
 app.start();
 
 export default app;
