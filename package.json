@@ -32,7 +32,7 @@
     "lint": "eslint src/**/*.{ts,js} --fix",
     "lint:check": "eslint src/**/*.{ts,js}",
     "precommit": "npm run format && npm run lint && npm test",
-    "prepare": "husky"
+    "prepare": "command -v husky >/dev/null 2>&1 && husky || true"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
