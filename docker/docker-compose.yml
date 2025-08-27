@@ -64,13 +64,14 @@ services:
       POSTGRES_USER: ${DATABASE_USERNAME:-amda_user}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-amda_password}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
-    ports:
-      - "${DATABASE_PORT:-5432}:5432"
+-    ports:
+-      - "${DATABASE_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ../scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     networks:
       - amda-network
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-amda_user} -d ${DATABASE_NAME:-amda_collection}"]
       interval: 10s
