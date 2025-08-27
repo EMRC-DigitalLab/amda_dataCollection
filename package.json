@@ -103,6 +103,12 @@
       "prettier --write"
     ]
   },
+  "_moduleAliases": {
+    "@": "./dist",
+    "@/config": "./dist/config",
+    "@/shared": "./dist/shared",
+    "@/database": "./dist/database"
+  },
   "keywords": [
     "nodejs",
     "typescript",
