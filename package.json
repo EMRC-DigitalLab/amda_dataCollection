@@ -19,7 +19,7 @@
     "docker:dev:down": "docker-compose -f docker/docker-compose.dev.yml down",
     "docker:dev:restart": "docker-compose -f docker/docker-compose.dev.yml restart",
     "docker:dev:logs": "docker-compose -f docker/docker-compose.dev.yml logs -f",
-    "docker:prod": "docker compose -f docker/docker-compose.yml up --build -d",
+    "docker:prod": "docker compose -f docker/docker-compose.yml up amda-api --build -d --no-deps",
     "docker:prod:down": "docker compose -f docker/docker-compose.yml down",
     "docker:clean": "docker compose -f docker/docker-compose.dev.yml down -v",
     "docker:build": "docker build -t amda-collection-api .",
