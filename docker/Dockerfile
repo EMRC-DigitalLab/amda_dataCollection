@@ -1,63 +1,58 @@
 ﻿# docker/Dockerfile
-# Multi-stage build for production
+# ------------------ Builder ------------------
 FROM node:18-alpine AS builder
-
-# Set working directory
 WORKDIR /app
 
-# Install build dependencies
+# Native build tools if any package needs them
 RUN apk add --no-cache python3 make g++
 
-# Copy package files
+# Copy manifests first for better cache
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install ALL deps (incl. dev) to build TypeScript
+RUN npm ci
 
-# Copy source code
+# Copy source and build
 COPY src/ ./src/
-
-# Build the application
 RUN npm run build
 
-# ================================
-# Production stage
+
+# ------------------ Production ------------------
 FROM node:18-alpine AS production
-
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
-
-# Create app directory
 WORKDIR /app
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S amda -u 1001
+# Proper signal handling
+RUN apk add --no-cache dumb-init
 
-# Copy package files
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs \
+ && adduser -S amda -u 1001
+
+# Prevent husky (prepare) from running in container installs
+ENV HUSKY=0
+ENV NODE_ENV=production
+
+# Copy manifests
 COPY package*.json ./
 
-# Install production dependencies only
-RUN npm ci --only=production && npm cache clean --force
+# Install ONLY production deps (npm v10+ syntax)
+RUN npm ci --omit=dev && npm cache clean --force
 
-# Copy built application from builder stage
+# Copy built artifacts from builder
 COPY --from=builder /app/dist ./dist
 
-# Create necessary directories
-RUN mkdir -p logs uploads && \
-    chown -R amda:nodejs /app
+# App dirs & permissions
+RUN mkdir -p logs uploads \
+ && chown -R amda:nodejs /app
 
-# Switch to non-root user
 USER amda
 
-# Expose port
 EXPOSE 3000
 
-# Health check
+# Health check (uses Node HTTP request; no curl/wget needed)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
-# Start the application
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/main.js"]
