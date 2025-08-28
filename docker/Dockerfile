@@ -42,6 +42,10 @@ RUN npm ci --omit=dev && npm cache clean --force
 # Copy built artifacts from builder
 COPY --from=builder /app/dist ./dist
 
+# 1. Copy tsconfig.json so tsconfig-paths can resolve @ aliases
+COPY tsconfig.json /app/tsconfig.json
+ENV NODE_PATH=/app/dist
+
 # App dirs & permissions
 RUN mkdir -p logs uploads \
  && chown -R amda:nodejs /app
