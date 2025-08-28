@@ -105,10 +105,10 @@
     ]
   },
   "_moduleAliases": {
-    "@": "./dist",
-    "@/config": "./dist/config",
-    "@/shared": "./dist/shared",
-    "@/database": "./dist/database"
+    "@": "./dist/src",
+    "@/config": "./dist/src/config",
+    "@/shared": "./dist/src/shared",
+    "@/database": "./dist/src/database"
   },
   "keywords": [
     "nodejs",
