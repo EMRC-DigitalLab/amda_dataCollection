@@ -1,4 +1,4 @@
-# docker/docker-compose.yml (Production)
+# docker/docker-compose.yml (Production - External DB/Redis)
 version: '3.8'
 
 services:
@@ -12,19 +12,12 @@ services:
       - "${PORT:-3000}:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_HOST=postgres
-      - REDIS_HOST=redis
     env_file:
       - ../.env.production
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     volumes:
       - uploads_data:/app/uploads
       - logs_data:/app/logs
-      - ../scripts:/app/scripts  # Added from dev
+      - ../scripts:/app/scripts
     networks:
       - amda-network
     healthcheck:
@@ -33,66 +26,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  # Added seed service for production (optional - use when needed)
-  amda-seed-admin:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    container_name: amda-seed-admin-prod
-    environment:
-      - NODE_ENV=production
-      - DATABASE_HOST=postgres
-    env_file:
-      - ../.env.production
-    command: npm run seed:admin
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - amda-network
-    restart: "no"
-    profiles:
-      - seed
-
-  postgres:
-    image: postgres:15-alpine
-    container_name: amda-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${DATABASE_NAME:-amda_collection}
-      POSTGRES_USER: ${DATABASE_USERNAME:-amda_user}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-amda_password}
-      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
-    ports:
-      - "${DATABASE_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ../scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
-    networks:
-      - amda-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-amda_user} -d ${DATABASE_NAME:-amda_collection}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    container_name: amda-redis
-    restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD:-} --maxmemory 512mb --maxmemory-policy allkeys-lru  # Increased memory
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - amda-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "--no-auth-warning", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   nginx:
     image: nginx:alpine
@@ -110,10 +43,6 @@ services:
       - amda-network
 
 volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
   uploads_data:
     driver: local
   logs_data:
