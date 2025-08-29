@@ -1,4 +1,3 @@
-// src/modules/forms/routes/form.routes.ts
 import { adminMiddleware } from '@/shared/middleware/admin.middleware';
 import { authMiddleware } from '@/shared/middleware/auth.middleware';
 import { validationMiddleware } from '@/shared/middleware/validation.middleware';
