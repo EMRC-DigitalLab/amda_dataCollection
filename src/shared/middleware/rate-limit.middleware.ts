@@ -1,7 +1,7 @@
 // src/shared/middleware/rate-limit.middleware.ts
 import rateLimit from 'express-rate-limit';
-import { ResponseHelper } from '../utils/response';
 import { ERROR_MESSAGES } from '../constants/error-messages';
+import { ResponseHelper } from '../utils/response';
 
 export const createRateLimit = (windowMs: number, max: number, message?: string) => {
   return rateLimit({
@@ -17,6 +17,6 @@ export const createRateLimit = (windowMs: number, max: number, message?: string)
 };
 
 // Common rate limits
-export const generalRateLimit = createRateLimit(15 * 60 * 1000, 100); // 100 requests per 15 minutes
-export const authRateLimit = createRateLimit(15 * 60 * 1000, 5); // 5 login attempts per 15 minutes
-export const apiRateLimit = createRateLimit(60 * 1000, 60); // 60 requests per minute
+export const generalRateLimit = createRateLimit(15 * 60 * 1000, 5000); // 100 requests per 15 minutes
+export const authRateLimit = createRateLimit(15 * 60 * 1000, 1000); // 5 login attempts per 15 minutes
+export const apiRateLimit = createRateLimit(60 * 1000, 1000); // 60 requests per minute

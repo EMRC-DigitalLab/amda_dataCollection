@@ -1,4 +1,4 @@
-﻿# docker/docker-compose.dev.yml (Development)
+﻿# docker/docker-compose.dev.yml (Development with Watch)
 version: '3.8'
 
 services:
@@ -9,20 +9,25 @@ services:
     container_name: amda-collection-api-dev
     ports:
       - "5000:5000"
+      - "9229:9229" # Debug port for Node.js inspector
     environment:
       - NODE_ENV=development
-      - DATABASE_HOST=amda-postgres-dev
+      - DATABASE_HOST=31.97.56.29
       - REDIS_HOST=amda-redis-dev
+      - CHOKIDAR_USEPOLLING=true # Enable polling for file watching in Docker
+      - WATCHPACK_POLLING=true
     env_file:
       - ../.env.development
     command: sh -c "cd /app && npm run start:dev"
     volumes:
-      - ../src:/app/src
-      - ../scripts:/app/scripts
-      - ../package.json:/app/package.json
-      - ../package-lock.json:/app/package-lock.json
-      - ../tsconfig.json:/app/tsconfig.json
-      - /app/node_modules
+      - ../src:/app/src:cached # Use cached for better performance
+      - ../scripts:/app/scripts:cached
+      - ../package.json:/app/package.json:delegated
+      - ../package-lock.json:/app/package-lock.json:delegated
+      - ../tsconfig.json:/app/tsconfig.json:delegated
+      - ../nodemon.json:/app/nodemon.json:delegated # If you have nodemon config
+      - ../.env.development:/app/.env.development:delegated
+      - /app/node_modules # Anonymous volume to preserve node_modules
     depends_on:
       amda-postgres-dev:
         condition: service_healthy
@@ -30,6 +35,33 @@ services:
         condition: service_healthy
     networks:
       - amda-dev-network
+    # Docker Compose Watch configuration (requires Docker Compose v2.22+)
+    develop:
+      watch:
+        - action: sync
+          path: ../src
+          target: /app/src
+          ignore:
+            - node_modules/
+            - "*.log"
+            - "*.tmp"
+        - action: sync
+          path: ../package.json
+          target: /app/package.json
+        - action: rebuild
+          path: ../package-lock.json
+        - action: sync
+          path: ../tsconfig.json
+          target: /app/tsconfig.json
+    # Restart policy for development
+    restart: unless-stopped
+    # Resource limits for development
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
   amda-seed-admin:
     build:
@@ -42,6 +74,9 @@ services:
     env_file:
       - ../.env.development
     command: npm run seed:admin
+    volumes:
+      - ../src:/app/src:cached
+      - ../scripts:/app/scripts:cached
     depends_on:
       amda-postgres-dev:
         condition: service_healthy
@@ -62,6 +97,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
+      - ../database/init:/docker-entrypoint-initdb.d:ro # Optional: for init scripts
     networks:
       - amda-dev-network
     healthcheck:
@@ -69,6 +105,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    # PostgreSQL configuration for development
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.max=10000
+      -c pg_stat_statements.track=all
+      -c log_statement=all
+      -c log_min_duration_statement=0
+    restart: unless-stopped
 
   amda-redis-dev:
     image: redis:7-alpine
@@ -77,6 +122,7 @@ services:
       - "6379:6379"
     volumes:
       - redis_dev_data:/data
+      - ../redis/redis-dev.conf:/usr/local/etc/redis/redis.conf:ro # Optional: custom config
     networks:
       - amda-dev-network
     healthcheck:
@@ -84,20 +130,69 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    # Redis configuration for development
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
 
   amda-mailhog:
     image: mailhog/mailhog:latest
     container_name: amda-mailhog
     ports:
-      - "1025:1025"
-      - "8025:8025"
+      - "1025:1025"  # SMTP port
+      - "8025:8025"  # Web UI port
     networks:
       - amda-dev-network
+    restart: unless-stopped
+
+  # Optional: Database management tool
+  amda-pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: amda-pgadmin-dev
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@amda.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_LISTEN_PORT: 5050
+    ports:
+      - "5050:5050"
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+    depends_on:
+      - amda-postgres-dev
+    networks:
+      - amda-dev-network
+    restart: unless-stopped
+    profiles:
+      - tools
+
+  # Optional: Redis management tool
+  amda-redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: amda-redis-commander
+    environment:
+      REDIS_HOSTS: local:amda-redis-dev:6379
+      HTTP_USER: admin
+      HTTP_PASSWORD: admin
+    ports:
+      - "8081:8081"
+    depends_on:
+      - amda-redis-dev
+    networks:
+      - amda-dev-network
+    restart: unless-stopped
+    profiles:
+      - tools
 
 volumes:
   postgres_dev_data:
+    driver: local
   redis_dev_data:
+    driver: local
+  pgadmin_dev_data:
+    driver: local
 
 networks:
   amda-dev-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

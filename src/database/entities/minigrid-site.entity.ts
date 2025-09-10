@@ -2,246 +2,174 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  OneToMany,
+  JoinColumn,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Form } from './form.entity';
+import { User } from './user.entity';
 
 @Entity('minigrid_sites')
 export class MinigridSite {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
+  // Site Identification
   @Column({
     type: 'varchar',
-    length: 255,
+    length: 90,
+    unique: true,
+    nullable: false,
+    default: () => `CONCAT('MGS-', SUBSTRING(MD5(RANDOM()::TEXT), 1, 6))`,
+  })
+  siteId!: string;
+
+  @Column({
+    type: 'varchar',
+    length: 100,
+    default: '',
   })
   name!: string;
 
+  // Location Information
   @Column({
     type: 'varchar',
-    length: 255,
-    nullable: true,
+    length: 100,
+    default: 'Tanzania',
   })
-  location?: string;
-
-  @Column({
-    type: 'text',
-    nullable: true,
-  })
-  description?: string;
-
-  @Column({
-    type: 'boolean',
-    default: true,
-  })
-  isActive!: boolean;
-
-  // Company Information
-  @Column({
-    type: 'varchar',
-    length: 255,
-    nullable: true,
-  })
-  companyName?: string;
+  country!: string;
 
   @Column({
     type: 'varchar',
     length: 100,
-    nullable: true,
+    default: 'Tanzania',
   })
-  companyType?: string;
+  region!: string;
 
   @Column({
     type: 'varchar',
     length: 100,
-    nullable: true,
+    default: '',
   })
-  registrationNumber?: string;
-
-  @Column({
-    type: 'varchar',
-    length: 4,
-    nullable: true,
-  })
-  yearEstablished?: string;
-
-  @Column({
-    type: 'varchar',
-    length: 255,
-    nullable: true,
-  })
-  website?: string;
-
-  // Primary Contact Information
-  @Column({
-    type: 'varchar',
-    length: 255,
-    nullable: true,
-  })
-  primaryContactName?: string;
+  district!: string;
 
   @Column({
     type: 'varchar',
     length: 100,
-    nullable: true,
+    default: '',
   })
-  primaryContactTitle?: string;
+  village!: string;
 
+  // GPS Coordinates
   @Column({
     type: 'varchar',
-    length: 255,
-    nullable: true,
+    length: 50,
+    default: '00000',
   })
-  primaryContactEmail?: string;
+  lat!: string;
 
   @Column({
     type: 'varchar',
     length: 50,
-    nullable: true,
+    default: '00000',
   })
-  primaryContactPhone?: string;
+  lon!: string;
 
-  // Company Address
+  // Technical Information s
   @Column({
-    type: 'text',
-    nullable: true,
+    type: 'date',
+    default: () => 'CURRENT_DATE',
   })
-  headOfficeAddress?: string;
-
-  @Column({
-    type: 'varchar',
-    length: 100,
-    nullable: true,
-  })
-  city?: string;
+  commissioningDate!: Date;
 
   @Column({
-    type: 'varchar',
-    length: 100,
-    nullable: true,
+    type: 'enum',
+
+    enum: ['Operational', 'Under Construction', 'Planned', 'Maintenance', 'Decommissioned'],
+    default: 'Planned',
   })
-  state?: string;
+  status!: 'Operational' | 'Under Construction' | 'Planned' | 'Maintenance' | 'Decommissioned';
 
   @Column({
     type: 'varchar',
     length: 100,
-    nullable: true,
+    default: '',
   })
-  country?: string;
+  generationType!: string;
 
   @Column({
     type: 'varchar',
     length: 20,
-    nullable: true,
+    default: '0',
   })
-  postalCode?: string;
-
-  // AMDA Membership Details
-  @Column({
-    type: 'varchar',
-    length: 100,
-    nullable: true,
-  })
-  membershipType?: string;
+  installedCapacityKw!: string;
 
   @Column({
     type: 'varchar',
-    length: 50,
-    nullable: true,
+    length: 20,
+    default: '0',
   })
-  membershipStartDate?: string;
+  peakLoadKw!: string;
 
   @Column({
     type: 'varchar',
-    length: 50,
-    nullable: true,
+    length: 20,
+    default: '0',
   })
-  membershipStatus?: string;
+  connectedCustomers!: string;
+
+  // Customer Mix - storing as separate columns for easier querying
+  @Column({
+    type: 'varchar',
+    length: 10,
+    default: '0',
+  })
+  customerMixResidential!: string;
 
   @Column({
     type: 'varchar',
-    length: 100,
-    nullable: true,
+    length: 10,
+    default: '0',
   })
-  annualDues?: string;
+  customerMixCommercial!: string;
 
   @Column({
-    type: 'text',
-    nullable: true,
+    type: 'varchar',
+    length: 10,
+    default: '0',
   })
-  countriesOfOperation?: string;
+  customerMixProductive!: string;
 
   // Business Information
   @Column({
     type: 'text',
-    nullable: true,
+    default: '',
   })
-  businessModel?: string;
-
-  @Column({
-    type: 'text',
-    nullable: true,
-  })
-  targetMarkets?: string;
-
-  @Column({
-    type: 'varchar',
-    length: 255,
-    nullable: true,
-  })
-  primaryTechnology?: string;
+  tariffModel!: string;
 
   @Column({
     type: 'varchar',
     length: 50,
-    nullable: true,
+    default: '00000',
   })
-  minigridCount?: string;
+  licenseNo!: string;
 
   @Column({
     type: 'varchar',
     length: 100,
-    nullable: true,
+    default: '',
   })
-  totalCapacityInstalled?: string;
+  developer!: string;
 
+  // User Relationship
   @Column({
-    type: 'varchar',
-    length: 100,
-    nullable: true,
+    type: 'uuid',
+    nullable: false,
+    default: '550e8400-e29b-41d4-a716-446655440000',
   })
-  customerConnections?: string;
+  userId!: string; // This is thge memberId, the member who had created this minigridSite
 
-  // Additional Information
-  @Column({
-    type: 'text',
-    nullable: true,
-  })
-  companyMission?: string;
-
-  @Column({
-    type: 'text',
-    nullable: true,
-  })
-  keyProjects?: string;
-
-  @Column({
-    type: 'text',
-    nullable: true,
-  })
-  partnerships?: string;
-
-  @Column({
-    type: 'text',
-    nullable: true,
-  })
-  certifications?: string;
-
-  // Relations
-  @OneToMany(() => Form, form => form.minigridSiteId)
-  forms!: Form[];
+  @JoinColumn({ name: 'userId' })
+  user!: User;
 
   @CreateDateColumn({
     name: 'created_at',

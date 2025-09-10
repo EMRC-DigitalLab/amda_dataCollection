@@ -1,90 +1,842 @@
-// src/forms/repos/TypeORMFormRepository.ts
+// @ts-nocheck
 import { Injectable } from 'injection-js';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, QueryRunner, Repository } from 'typeorm';
 
 import { IFormRepository } from '../../../modules/forms/interfaces/form.interface';
-import { CreateFormDto, UpdateFormDto } from '../../../shared/types/form.types';
-import { Form } from '../../entities/form.entity';
+import { CreateCategoryDto, CreateFormDto, UpdateFormDto } from '../../../shared/types/form.types';
+import { Category } from '../../entities/category.entity';
+import { Form, FormStatus } from '../../entities/form.entity';
 import { Question } from '../../entities/question.entity';
 
 @Injectable()
-export class FormRepository extends Repository<any> implements IFormRepository {
-  private readonly questionRepo: Repository<any>;
+export class FormRepository extends Repository<Form> implements IFormRepository {
+  private readonly categoryRepo: Repository<Category>;
+  private readonly questionRepo: Repository<Question>;
+  private readonly dataSource: DataSource;
 
   constructor(dataSource: DataSource) {
     super(Form, dataSource.manager);
+    this.categoryRepo = dataSource.getRepository(Category);
     this.questionRepo = dataSource.getRepository(Question);
+    this.dataSource = dataSource;
   }
 
   /* -------------------------------------------------- */
   /*  IFormRepository implementation                    */
   /* -------------------------------------------------- */
-  async createForm(dto: CreateFormDto): Promise<any> {
+
+  async createForm(dto: CreateFormDto): Promise<Form> {
     await this.assertSlugUnique(dto.slug);
 
-    const form = super.create({ title: dto.title, slug: dto.slug });
-    const savedForm = await this.save(form);
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    const questions = dto.questions!.map(q => this.questionRepo.create({ ...q, form: savedForm }));
-    await this.questionRepo.save(questions);
+    try {
+      // Create form
+      const form = this.create({
+        title: dto.title,
+        slug: dto.slug,
+        description: dto.description,
+        formType: dto.formType,
+        status: dto.status || FormStatus.DRAFT,
+        adminId: dto.adminId,
+        parentId: dto.parentId,
+      });
 
-    return (await this.findFormById(savedForm.id))!;
+      const savedForm = await queryRunner.manager.save(Form, form);
+
+      // Create categories and questions if provided
+      if (dto.categories && dto.categories.length > 0) {
+        await this.createCategoriesWithQuestions(queryRunner, savedForm, dto.categories);
+      }
+
+      await queryRunner.commitTransaction();
+      return (await this.findFormById(savedForm.id)) as Form;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
-  // @ts-nocheck
-  async updateForm({ id, ...changes }: UpdateFormDto): Promise<any> {
+  async updateForm({ id, ...changes }: UpdateFormDto): Promise<Form> {
     const form = await this.findFormByIdOrFail(id);
+    console.log(form, changes, 'this are updates')
 
     if (changes.slug && changes.slug !== form.slug) {
       await this.assertSlugUnique(changes.slug);
     }
-    Object.assign(form, changes);
-    await this.save(form);
 
-    if (changes.questions) {
-      await this.questionRepo.delete({ form: { id } });
-      const questions = changes.questions.map(q =>
-        this.questionRepo.create({ ...q, form: { id } as any })
-      );
-      await this.questionRepo.save(questions);
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Update form basic info
+      Object.assign(form, {
+        title: changes.title ?? form.title,
+        slug: changes.slug ?? form.slug,
+        description: changes.description ?? form.description,
+        status: changes.status ?? form.status,
+        formType: changes.formType ?? form.formType,
+      });
+
+      await queryRunner.manager.save(Form, form);
+
+      // Handle categories update if provided
+      if (changes.categories) {
+        // Delete existing categories and questions (cascade will handle questions)
+        await queryRunner.manager.delete(Category, { form: { id } });
+
+        // Create new categories and questions
+        await this.createCategoriesWithQuestions(queryRunner, form, changes.categories);
+      }
+
+      await queryRunner.commitTransaction();
+      return (await this.findFormById(id)) as Form;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
-    return (await this.findFormById(id))!;
   }
 
   async deleteForm(id: string): Promise<void> {
-    const res = await super.delete(id);
-    if (res.affected === 0) throw new Error('Form not found');
+    const form = await this.findFormById(id);
+    if (!form) throw new Error('Form not found');
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // If form has a dynamic table, drop it
+      if (form.tableCreated && form.tableName) {
+        await queryRunner.query(`DROP TABLE IF EXISTS "${form.tableName}" CASCADE`);
+      }
+
+      // Delete form (cascade will handle categories and questions)
+      const result = await queryRunner.manager.delete(Form, id);
+      if (result.affected === 0) throw new Error('Form not found');
+
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async findFormById(id: string): Promise<Form | null> {
     return this.findOne({
       where: { id },
-      relations: { questions: true },
-      order: { questions: { id: 'ASC' } },
+      relations: {
+        categories: {
+          questions: true,
+        },
+        admin: true,
+        parent: true,
+      },
+      order: {
+        categories: { sortOrder: 'ASC' },
+      },
     });
   }
 
   async findFormBySlug(slug: string): Promise<Form | null> {
     return this.findOne({
       where: { slug },
-      relations: { questions: true },
+      relations: {
+        categories: {
+          questions: true,
+        },
+        admin: true,
+      },
+      order: {
+        categories: { sortOrder: 'ASC' },
+      },
     });
   }
 
-  async findAllForms({ skip = 0, take = 50 }: { skip?: number; take?: number } = {}): Promise<
-    [Form[], number]
-  > {
+  async findAllForms({
+    skip = 0,
+    take = 50,
+    status,
+    formType,
+    adminId,
+  }: {
+    skip?: number;
+    take?: number;
+    status?: FormStatus;
+    formType?: string;
+    adminId?: string;
+  } = {}): Promise<[Form[], number]> {
+    const whereConditions: any = {};
+
+    if (status) whereConditions.status = status;
+    if (formType) whereConditions.formType = formType;
+    if (adminId) whereConditions.adminId = adminId;
+
     return this.findAndCount({
-      relations: { questions: true },
-      order: { createdAt: 'DESC' },
+      where: whereConditions,
+      relations: {
+        categories: {
+          questions: true,
+        },
+        admin: true,
+      },
+      order: { createdAt: 'DESC', categories: { sortOrder: 'ASC' } },
       skip,
       take,
     });
   }
 
   /* -------------------------------------------------- */
+  /*  Category Management                               */
+  /* -------------------------------------------------- */
+
+  async addCategoryToForm(formId: string, categoryDto: CreateCategoryDto): Promise<Category> {
+    const form = await this.findFormByIdOrFail(formId);
+
+    const category = this.categoryRepo.create({
+      name: categoryDto.name,
+      slug: categoryDto.slug,
+      sortOrder: categoryDto.sortOrder || 0,
+      form: form,
+    });
+
+    const savedCategory = await this.categoryRepo.save(category);
+
+    // Add questions if provided
+    if (categoryDto.questions && categoryDto.questions.length > 0) {
+      const questions = categoryDto.questions.map((q, index) =>
+        this.questionRepo.create({
+          ...q,
+          sortOrder: q.sortOrder || index,
+          category: savedCategory,
+        })
+      );
+      await this.questionRepo.save(questions);
+    }
+
+    return this.categoryRepo.findOne({
+      where: { id: savedCategory.id },
+      relations: { questions: true },
+      order: { questions: { sortOrder: 'ASC' } },
+    }) as Promise<Category>;
+  }
+
+  async updateCategory(categoryId: string, updates: Partial<Category>): Promise<Category> {
+    const category = await this.categoryRepo.findOneBy({ id: categoryId });
+    if (!category) throw new Error('Category not found');
+
+    Object.assign(category, updates);
+    await this.categoryRepo.save(category);
+
+    return this.categoryRepo.findOne({
+      where: { id: categoryId },
+      relations: { questions: true },
+      order: { questions: { sortOrder: 'ASC' } },
+    }) as Promise<Category>;
+  }
+
+  async deleteCategory(categoryId: string): Promise<void> {
+    const result = await this.categoryRepo.delete(categoryId);
+    if (result.affected === 0) throw new Error('Category not found');
+  }
+
+  /* -------------------------------------------------- */
+  /*  Question Management                               */
+  /* -------------------------------------------------- */
+
+  async addQuestionToCategory(categoryId: string, questionDto: any): Promise<Question> {
+    const category = await this.categoryRepo.findOneBy({ id: categoryId });
+    if (!category) throw new Error('Category not found');
+
+    const question = this.questionRepo.create({
+      ...questionDto,
+      category: category,
+    });
+
+    return this.questionRepo.save(question);
+  }
+
+  async updateQuestion(questionId: string, updates: Partial<Question>): Promise<Question> {
+    const question = await this.questionRepo.findOneBy({ id: questionId });
+    if (!question) throw new Error('Question not found');
+
+    Object.assign(question, updates);
+    return this.questionRepo.save(question);
+  }
+
+  async deleteQuestion(questionId: string): Promise<void> {
+    const result = await this.questionRepo.delete(questionId);
+    if (result.affected === 0) throw new Error('Question not found');
+  }
+
+  /* -------------------------------------------------- */
+  /*  Dynamic Table Management                          */
+  /* -------------------------------------------------- */
+
+  async publishForm(formId: string): Promise<Form> {
+    const form = await this.findFormByIdOrFail(formId);
+
+    if (form.status === FormStatus.PUBLISHED) {
+      throw new Error('Form is already published');
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Update form status
+      form.status = FormStatus.PUBLISHED;
+      form.publishedAt = new Date();
+
+      // Generate table name if not exists
+      if (!form.tableName) {
+        form.tableName = this.generateTableName(form.slug);
+      }
+
+      await queryRunner.manager.save(Form, form);
+
+      // Create dynamic table for submissions
+      if (!form.tableCreated) {
+        await this.createFormSubmissionTable(queryRunner, form);
+        form.tableCreated = true;
+        form.lastMigrationVersion = form.version;
+        await queryRunner.manager.save(Form, form);
+      }
+
+      await queryRunner.commitTransaction();
+      return (await this.findFormById(formId)) as Form;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async unpublishForm(formId: string): Promise<Form> {
+    const form = await this.findFormByIdOrFail(formId);
+    form.status = FormStatus.DRAFT;
+    return this.save(form);
+  }
+
+  /* -------------------------------------------------- */
+  /*  Additional Repository Methods                     */
+  /* -------------------------------------------------- */
+
+  async getSubmissionById(formId: string, submissionId: string): Promise<any | null> {
+    const form = await this.findFormById(formId);
+    if (!form?.tableName) throw new Error('Form table not found');
+
+    const tableName = form.tableName;
+    const sql = `SELECT * FROM "${tableName}" WHERE form_id = $1 AND id = $2`;
+    const result = await this.dataSource.query(sql, [formId, submissionId]);
+
+    return result.length > 0 ? result[0] : null;
+  }
+
+  async updateSubmission(
+    formId: string,
+    submissionId: string,
+    updates: Record<string, any>
+  ): Promise<any> {
+    const form = await this.findFormById(formId);
+    if (!form?.tableName) throw new Error('Form table not found');
+
+    const tableName = form.tableName;
+    const setClauses: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    // Build SET clauses for update
+    for (const [key, value] of Object.entries(updates)) {
+      if (key === 'id' || key === 'form_id' || key === 'submitted_at') continue; // Skip protected fields
+
+      const columnName = this.sanitizeColumnName(key);
+      setClauses.push(`"${columnName}" = ${paramIndex}`);
+      params.push(value);
+      paramIndex++;
+    }
+
+    if (setClauses.length === 0) {
+      throw new Error('No valid fields to update');
+    }
+
+    // Add updated_at
+    setClauses.push(`"updated_at" = CURRENT_TIMESTAMP`);
+
+    const sql = `
+      UPDATE "${tableName}" 
+      SET ${setClauses.join(', ')} 
+      WHERE form_id = ${paramIndex} AND id = ${paramIndex + 1}
+      RETURNING *
+    `;
+
+    params.push(formId, submissionId);
+    const result = await this.dataSource.query(sql, params);
+
+    if (result.length === 0) {
+      throw new Error('Submission not found or update failed');
+    }
+
+    return result[0];
+  }
+
+  async deleteSubmission(formId: string, submissionId: string): Promise<void> {
+    const form = await this.findFormById(formId);
+    if (!form?.tableName) throw new Error('Form table not found');
+
+    const tableName = form.tableName;
+    const sql = `DELETE FROM "${tableName}" WHERE form_id = $1 AND id = $2`;
+    const result = await this.dataSource.query(sql, [formId, submissionId]);
+
+    if (result.length === 0) {
+      throw new Error('Submission not found');
+    }
+  }
+
+  async bulkDeleteSubmissions(formId: string, submissionIds: string[]): Promise<void> {
+    const form = await this.findFormById(formId);
+    if (!form?.tableName) throw new Error('Form table not found');
+
+    const tableName = form.tableName;
+    const placeholders = submissionIds.map((_, index) => `${index + 2}`).join(', ');
+    const sql = `DELETE FROM "${tableName}" WHERE form_id = $1 AND id IN (${placeholders})`;
+
+    await this.dataSource.query(sql, [formId, ...submissionIds]);
+  }
+
+  async bulkUpdateSubmissionStatus(
+    formId: string,
+    submissionIds: string[],
+    status: string,
+    reviewerId?: string
+  ): Promise<void> {
+    const form = await this.findFormById(formId);
+    if (!form?.tableName) throw new Error('Form table not found');
+
+    const tableName = form.tableName;
+    const placeholders = submissionIds.map((_, index) => `${index + 3}`).join(', ');
+
+    let sql = `
+      UPDATE "${tableName}" 
+      SET "status" = $1, "updated_at" = CURRENT_TIMESTAMP
+    `;
+    const params = [status];
+
+    if (reviewerId) {
+      sql += `, "reviewed_by" = $2`;
+      params.push(reviewerId);
+      sql += ` WHERE form_id = $3 AND id IN (${placeholders})`;
+      params.push(formId, ...submissionIds);
+    } else {
+      sql += ` WHERE form_id = $2 AND id IN (${placeholders})`;
+      params.push(formId, ...submissionIds);
+    }
+
+    await this.dataSource.query(sql, params);
+  }
+
+  async getFormStatistics(formId: string): Promise<any> {
+    const form = await this.findFormById(formId);
+    if (!form?.tableName) {
+      return {
+        totalSubmissions: 0,
+        statusDistribution: {},
+        submissionsByDate: [],
+        averageCompletionTime: 0,
+      };
+    }
+
+    const tableName = form.tableName;
+
+    // Get total submissions
+    const totalResult = await this.dataSource.query(
+      `SELECT COUNT(*) as total FROM "${tableName}" WHERE form_id = $1`,
+      [formId]
+    );
+
+    // Get status distribution
+    const statusResult = await this.dataSource.query(
+      `SELECT status, COUNT(*) as count FROM "${tableName}" WHERE form_id = $1 GROUP BY status`,
+      [formId]
+    );
+
+    // Get submissions by date (last 30 days)
+    const dateResult = await this.dataSource.query(
+      `
+      SELECT 
+        DATE(submitted_at) as date,
+        COUNT(*) as count
+      FROM "${tableName}" 
+      WHERE form_id = $1 
+        AND submitted_at >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY DATE(submitted_at)
+      ORDER BY date ASC
+    `,
+      [formId]
+    );
+
+    return {
+      totalSubmissions: parseInt(totalResult[0].total),
+      statusDistribution: statusResult.reduce((acc: any, row: any) => {
+        acc[row.status] = parseInt(row.count);
+        return acc;
+      }, {}),
+      submissionsByDate: dateResult.map((row: any) => ({
+        date: row.date,
+        count: parseInt(row.count),
+      })),
+      averageCompletionTime: 0, // Would need additional tracking to calculate this
+    };
+  }
+
+  async exportFormSubmissions(formId: string, submissionIds?: string[]): Promise<any[]> {
+    const form = await this.findFormById(formId);
+    if (!form?.tableName) throw new Error('Form table not found');
+
+    const tableName = form.tableName;
+    let sql = `SELECT * FROM "${tableName}" WHERE form_id = $1`;
+    const params = [formId];
+
+    if (submissionIds && submissionIds.length > 0) {
+      const placeholders = submissionIds.map((_, index) => `${index + 2}`).join(', ');
+      sql += ` AND id IN (${placeholders})`;
+      params.push(...submissionIds);
+    }
+
+    sql += ` ORDER BY submitted_at DESC`;
+
+    return this.dataSource.query(sql, params);
+  }
+
+  async checkTableHealth(formId: string): Promise<any> {
+    const form = await this.findFormById(formId);
+    if (!form) throw new Error('Form not found');
+
+    const health = {
+      formId,
+      tableName: form.tableName,
+      tableExists: false,
+      schemaMatches: false,
+      submissionCount: 0,
+      issues: [] as string[],
+    };
+
+    if (!form.tableName || !form.tableCreated) {
+      health.issues.push('No submission table created');
+      return health;
+    }
+
+    try {
+      // Check if table exists
+      const tableExistsResult = await this.dataSource.query(
+        `
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = $1
+        )
+      `,
+        [form.tableName]
+      );
+
+      health.tableExists = tableExistsResult[0].exists;
+
+      if (health.tableExists) {
+        // Get submission count
+        const countResult = await this.dataSource.query(
+          `SELECT COUNT(*) as count FROM "${form.tableName}"`,
+          []
+        );
+        health.submissionCount = parseInt(countResult[0].count);
+
+        // Check schema matches (basic check)
+        const columnsResult = await this.dataSource.query(
+          `
+          SELECT column_name, data_type, is_nullable
+          FROM information_schema.columns 
+          WHERE table_name = $1 AND table_schema = 'public'
+          ORDER BY ordinal_position
+        `,
+          [form.tableName]
+        );
+
+        // Validate expected columns exist
+        const expectedColumns = ['id', 'form_id', 'submitted_by', 'submitted_at', 'status'];
+        const actualColumns = columnsResult.map((col: any) => col.column_name);
+
+        const missingColumns = expectedColumns.filter(col => !actualColumns.includes(col));
+        if (missingColumns.length > 0) {
+          health.issues.push(`Missing columns: ${missingColumns.join(', ')}`);
+        }
+
+        // Check for form-specific columns
+        for (const category of form.categories) {
+          for (const question of category.questions) {
+            const columnName = this.sanitizeColumnName(question.slug);
+            if (!actualColumns.includes(columnName)) {
+              health.issues.push(`Missing question column: ${columnName}`);
+            }
+          }
+        }
+
+        health.schemaMatches = health.issues.length === 0;
+      } else {
+        health.issues.push('Submission table does not exist');
+      }
+    } catch (error) {
+      health.issues.push(`Error checking table health: ${error.message}`);
+    }
+
+    return health;
+  }
+
+  async repairFormTable(formId: string): Promise<any> {
+    const form = await this.findFormByIdOrFail(formId);
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Drop existing table if it exists (with backup consideration)
+      if (form.tableName) {
+        await queryRunner.query(`DROP TABLE IF EXISTS "${form.tableName}" CASCADE`);
+      }
+
+      // Generate new table name
+      form.tableName = this.generateTableName(form.slug);
+
+      // Create fresh table
+      await this.createFormSubmissionTable(queryRunner, form);
+
+      // Update form record
+      form.tableCreated = true;
+      form.lastMigrationVersion = form.version;
+      await queryRunner.manager.save(Form, form);
+
+      await queryRunner.commitTransaction();
+
+      return {
+        success: true,
+        tableName: form.tableName,
+        message: 'Form table repaired successfully',
+      };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /* -------------------------------------------------- */
+  /*  Form Submission Data Management                   */
+  /* -------------------------------------------------- */
+
+  async submitFormData(
+    formId: string,
+    submissionData: Record<string, any>,
+    submittedBy?: string
+  ): Promise<any> {
+    const form = await this.findFormById(formId);
+
+    if (!form) throw new Error('Form not found');
+    if (form.status !== FormStatus.PUBLISHED) throw new Error('Form is not published');
+    if (!form.tableCreated || !form.tableName) throw new Error('Form table not created');
+
+    const tableName = form.tableName;
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    try {
+      await queryRunner.connect();
+
+      // Prepare insertion data
+      const insertData: Record<string, any> = {
+        form_id: formId,
+        submitted_by: submittedBy,
+        submitted_at: new Date(),
+        status: 'SUBMITTED',
+      };
+
+      // Map form data to table columns
+      for (const category of form.categories) {
+        for (const question of category.questions) {
+          const columnName = this.sanitizeColumnName(question.slug);
+          const value = submissionData[question.slug];
+
+          if (value !== undefined) {
+            insertData[columnName] = value;
+          }
+        }
+      }
+
+      // Build and execute INSERT
+      const columns = Object.keys(insertData)
+        .map(col => `"${col}"`)
+        .join(', ');
+      const values = Object.values(insertData);
+      const placeholders = values.map((_, index) => `$${index + 1}`).join(', ');
+
+      const insertSQL = `INSERT INTO "${tableName}" (${columns}) VALUES (${placeholders}) RETURNING id`;
+      const result = await queryRunner.query(insertSQL, values);
+
+      return { id: result[0].id, ...insertData };
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async getFormSubmissions(
+    formId: string,
+    filters?: Record<string, any>,
+    pagination?: { page: number; limit: number }
+  ): Promise<any[]> {
+    const form = await this.findFormById(formId);
+
+    if (!form?.tableName) throw new Error('Form table not found');
+
+    const tableName = form.tableName;
+    let sql = `SELECT * FROM "${tableName}" WHERE form_id = $1`;
+    const params: any[] = [formId];
+
+    // Add filters if provided
+    if (filters) {
+      let paramIndex = 2;
+      for (const [key, value] of Object.entries(filters)) {
+        const columnName = this.sanitizeColumnName(key);
+        sql += ` AND "${columnName}" = $${paramIndex}`;
+        params.push(value);
+        paramIndex++;
+      }
+    }
+
+    sql += ` ORDER BY submitted_at DESC`;
+
+    // Add pagination
+    if (pagination) {
+      const offset = (pagination.page - 1) * pagination.limit;
+      sql += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      params.push(pagination.limit, offset);
+    }
+
+    return this.dataSource.query(sql, params);
+  }
+
+  /* -------------------------------------------------- */
   /*  Helper methods                                    */
   /* -------------------------------------------------- */
+
+  private async createCategoriesWithQuestions(
+    queryRunner: QueryRunner,
+    form: Form,
+    categoriesData: CreateCategoryDto[]
+  ): Promise<void> {
+    for (const categoryData of categoriesData) {
+      const category = this.categoryRepo.create({
+        name: categoryData.name,
+        slug: categoryData.slug,
+        sortOrder: categoryData.sortOrder || 0,
+        form: form,
+      });
+
+      const savedCategory = await queryRunner.manager.save(Category, category);
+
+      if (categoryData.questions && categoryData.questions.length > 0) {
+        const questions = categoryData.questions.map((q, index) =>
+          this.questionRepo.create({
+            ...q,
+            sortOrder: q.sortOrder || index,
+            category: savedCategory,
+          })
+        );
+
+        await queryRunner.manager.save(Question, questions);
+      }
+    }
+  }
+
+  private async createFormSubmissionTable(queryRunner: QueryRunner, form: Form): Promise<void> {
+    const tableName = form.tableName!;
+
+    let sql = `CREATE TABLE "${tableName}" (\n`;
+    sql += `  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`;
+    sql += `  "form_id" UUID NOT NULL REFERENCES forms(id) ON DELETE CASCADE,\n`;
+    sql += `  "submitted_by" UUID REFERENCES users(id) ON DELETE SET NULL,\n`;
+    sql += `  "submitted_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n`;
+    sql += `  "status" VARCHAR(20) DEFAULT 'SUBMITTED',\n`;
+
+    // Add columns for each question
+    for (const category of form.categories) {
+      for (const question of category.questions) {
+        const columnName = this.sanitizeColumnName(question.slug);
+        const columnType = this.getPostgreSQLType(question.type);
+        const nullable = question.required ? 'NOT NULL' : 'NULL';
+
+        sql += `  "${columnName}" ${columnType} ${nullable},\n`;
+      }
+    }
+
+    sql += `  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n`;
+    sql += `  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n`;
+    sql += `);`;
+
+    await queryRunner.query(sql);
+
+    // Create indexes
+    const indexes = [
+      `CREATE INDEX "idx_${tableName.replace(/-/g, '_')}_form_id" ON "${tableName}"("form_id");`,
+      `CREATE INDEX "idx_${tableName.replace(/-/g, '_')}_submitted_by" ON "${tableName}"("submitted_by");`,
+      `CREATE INDEX "idx_${tableName.replace(/-/g, '_')}_submitted_at" ON "${tableName}"("submitted_at");`,
+    ];
+
+    for (const indexSQL of indexes) {
+      await queryRunner.query(indexSQL);
+    }
+  }
+
+  private generateTableName(slug: string): string {
+    return `${slug.replace(/-/g, '_')}_submissions`;
+  }
+
+  private getPostgreSQLType(questionType: string): string {
+    const typeMap: Record<string, string> = {
+      text: 'TEXT',
+      textarea: 'TEXT',
+      number: 'DECIMAL',
+      currency: 'DECIMAL(15,2)',
+      date: 'DATE',
+      datetime: 'TIMESTAMP',
+      boolean: 'BOOLEAN',
+      select: 'VARCHAR(255)',
+      multiselect: 'JSONB',
+      file: 'TEXT',
+      email: 'VARCHAR(255)',
+      phone: 'VARCHAR(20)',
+      url: 'TEXT',
+    };
+
+    return typeMap[questionType] || 'TEXT';
+  }
+
+  private sanitizeColumnName(slug: string): string {
+    return slug
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '_')
+      .replace(/_{2,}/g, '_')
+      .replace(/^_|_$/g, '');
+  }
+
   private async assertSlugUnique(slug: string): Promise<void> {
     const exists = await this.exists({ where: { slug } });
     if (exists) throw new Error('Slug already taken');

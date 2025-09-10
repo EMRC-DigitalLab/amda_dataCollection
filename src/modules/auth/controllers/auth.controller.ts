@@ -1,13 +1,13 @@
 // src/modules/auth/controllers/auth.controller.ts
+import { asyncHandler } from '@/shared/middleware/error.middleware';
+import { ResponseHelper } from '@/shared/utils/response';
 import { Request, Response } from 'express';
 import { DataSource } from 'typeorm';
 import { AuthService } from '../services/auth.service';
-import { ResponseHelper } from '@/shared/utils/response';
-import { asyncHandler } from '@/shared/middleware/error.middleware';
 
 interface AuthenticatedRequest extends Request {
   user?: {
-    userId: string;
+    id: string;
     email: string;
     role: string;
   };
@@ -31,7 +31,8 @@ export class AuthController {
 
   createMember = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const adminId = req.user?.userId;
+      console.log(req.user, 'this is user');
+      const adminId = req.user?.id;
       if (!adminId) {
         return ResponseHelper.error(res, 'Admin authentication required', 401);
       }
@@ -54,7 +55,7 @@ export class AuthController {
 
   changePassword = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       if (!userId) {
         return ResponseHelper.error(res, 'Authentication required', 401);
       }
@@ -77,7 +78,7 @@ export class AuthController {
 
   logout = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       if (!userId) {
         return ResponseHelper.error(res, 'Authentication required', 401);
       }
@@ -109,7 +110,7 @@ export class AuthController {
 
   getProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       if (!userId) {
         return ResponseHelper.error(res, 'Authentication required', 401);
       }

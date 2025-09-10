@@ -9,8 +9,8 @@ import swaggerUi from 'swagger-ui-express';
 
 import { createApiRouter } from '@/api/routes';
 import { getSwaggerInfo, swaggerSpec } from '@/api/swagger/schemas/swagger.config';
-import { config, connectDatabase, connectRedis } from '@/config';
-import { AppDataSource } from '@/config/database';
+import { config, connectRedis } from '@/config';
+import { AppDataSource, connectDatabase } from '@/config/database';
 import { errorHandler, notFoundHandler } from '@/shared/middleware/error.middleware';
 import { generalRateLimit } from '@/shared/middleware/rate-limit.middleware';
 import { logger } from '@/shared/utils/logger';
