@@ -1,7 +1,8 @@
 // src/database/entities/user.entity.ts
 import * as bcrypt from 'bcryptjs';
-import { BeforeInsert, BeforeUpdate, Column, Entity, Index } from 'typeorm';
+import { BeforeInsert, BeforeUpdate, Column, Entity, Index, OneToOne } from 'typeorm';
 import { BaseEntity } from './base.entity';
+import { Member } from './member.entity';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -19,6 +20,8 @@ export enum UserStatus {
 @Index(['phoneNumber'], { unique: true })
 @Index(['status'])
 @Index(['role'])
+@Index(['country']) // Added index for country for better query performance
+@Index(['isVerified']) // Added index for isVerified for better query performance
 export class User extends BaseEntity {
   @Column({ type: 'varchar', length: 100 })
   firstName!: string;
@@ -34,6 +37,14 @@ export class User extends BaseEntity {
 
   @Column({ type: 'varchar', length: 255, select: false })
   password!: string;
+
+  // New field: Countryj
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  country!: string;
+
+  // New field: Is Verified (for member verification status)
+  @Column({ type: 'boolean', default: false })
+  isVerified!: boolean;
 
   @Column({
     type: 'enum',
@@ -58,6 +69,14 @@ export class User extends BaseEntity {
   @Column({ type: 'timestamp', nullable: true })
   emailVerifiedAt?: Date;
 
+  // Optional: Add verification timestamp for when member was verified
+  @Column({ type: 'timestamp', nullable: true })
+  verifiedAt?: Date;
+
+  // Optional: Track who verified the member (admin ID)
+  @Column({ type: 'uuid', nullable: true })
+  verifiedByAdminId?: string;
+
   @Column({ type: 'varchar', length: 255, nullable: true, select: false })
   resetPasswordToken?: string;
 
@@ -73,6 +92,10 @@ export class User extends BaseEntity {
 
   @Column({ type: 'boolean', default: false })
   isFirstLogin?: boolean;
+
+  @OneToOne(() => Member, (member) => member.user)
+  member!: Member;
+
   minigridSites: any;
 
   // Methods
@@ -108,5 +131,29 @@ export class User extends BaseEntity {
   // Check if user needs to change password on first login
   get requiresPasswordChange(): boolean {
     return (this.isFirstLogin ?? false) && this.isMember;
+  }
+
+  // New getter: Check if member is verified
+  get isVerifiedMember(): boolean {
+    return this.isMember && this.isVerified;
+  }
+
+  // New getter: Check if email is verified
+  get isEmailVerified(): boolean {
+    return this.emailVerifiedAt !== null;
+  }
+
+  // New method: Mark member as verified
+  markAsVerified(adminId?: string): void {
+    this.isVerified = true;
+    this.verifiedAt = new Date();
+    if (adminId) {
+      this.verifiedByAdminId = adminId;
+    }
+  }
+
+  // New method: Mark member as unverified
+  markAsUnverified(): void {
+    this.isVerified = false;
   }
 }

@@ -1,6 +1,6 @@
 // @ts-nocheck
 
-import { FindManyOptions, Repository } from 'typeorm';
+import { DataSource, FindManyOptions, Repository } from 'typeorm';
 import { AppDataSource } from '../../../config';
 import { IMinigridSiteRepository } from '../../../modules/forms/interfaces/minigrid-site.interface';
 import { MinigridSite } from '../../entities/minigrid-site.entity';
@@ -8,7 +8,7 @@ import { MinigridSite } from '../../entities/minigrid-site.entity';
 export class MinigridSiteRepository implements IMinigridSiteRepository {
   private repository: Repository<MinigridSite>;
 
-  constructor() {
+  constructor(dataSource: DataSource) {
     this.repository = AppDataSource.getRepository(MinigridSite);
   }
 
@@ -32,10 +32,8 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
   }
 
   async findByName(name: string): Promise<MinigridSite | null> {
-    console.log(name, 'this is name in repo');
     return await this.repository.findOne({
       where: { name },
-      relations: ['forms'],
     });
   }
 
@@ -46,7 +44,7 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
   ): Promise<MinigridSite[]> {
     return await this.repository.find({
       where: { userId },
-      relations: ['forms', 'user'],
+      // relations: ['forms', 'user'],
       ...options,
     });
   }
@@ -58,7 +56,7 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
   ): Promise<MinigridSite[]> {
     return await this.repository.find({
       where: { status: status as any }, // Cast to handle enum type
-      relations: ['forms', 'user'],
+      // relations: ['forms', 'user'],
       ...options,
     });
   }
@@ -74,7 +72,7 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
         userId,
         status: status as any,
       },
-      relations: ['forms', 'user'],
+      // relations: ['forms', 'user'],
       ...options,
     });
   }
@@ -86,7 +84,7 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
   ): Promise<MinigridSite[]> {
     return await this.repository.find({
       where: { region },
-      relations: ['forms', 'user'],
+      // relations: ['forms', 'user'],
       ...options,
     });
   }
@@ -98,7 +96,7 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
   ): Promise<MinigridSite[]> {
     return await this.repository.find({
       where: { country },
-      relations: ['forms', 'user'],
+      // relations: ['forms', 'user'],
       ...options,
     });
   }
@@ -107,7 +105,7 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
   async findOperational(options?: FindManyOptions<MinigridSite>): Promise<MinigridSite[]> {
     return await this.repository.find({
       where: { status: 'Operational' },
-      relations: ['forms', 'user'],
+      // relations: ['forms', 'user'],
       ...options,
     });
   }
@@ -119,7 +117,7 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
   ): Promise<MinigridSite[]> {
     return await this.repository.find({
       where: { generationType },
-      relations: ['forms', 'user'],
+      // relations: ['forms', 'user'],
       ...options,
     });
   }

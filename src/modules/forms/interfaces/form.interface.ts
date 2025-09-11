@@ -5,6 +5,12 @@ import { Question } from '../../../database/entities/question.entity';
 import { CreateCategoryDto, CreateFormDto, UpdateFormDto } from '../../../shared/types/form.types';
 
 export interface IFormRepository {
+  getPublishedFormTypes(): unknown;
+  getFormsByType(formType: string, status: FormStatus | undefined): Form[] | PromiseLike<Form[]>;
+  getFormTypesByStatus(DRAFT: FormStatus): unknown;
+  getAllFormTypesCounts(): unknown;
+  getFormTypesByStatus(ARCHIVED: FormStatus): unknown;
+  getFormTypesByStatus(PUBLISHED: FormStatus): unknown;
   categoryRepo: any;
   /* ============================================================================ */
   /* Basic Form CRUD Operations                                                   */
@@ -59,11 +65,14 @@ export interface IFormRepository {
   getFormSubmissions(
     formId: string,
     filters?: Record<string, any>,
-    pagination?: { page: number; limit: number }
+    pagination?: { page: number; limit: number },
+    populate?: boolean
   ): Promise<any[]>;
 
   getSubmissionById(formId: string, submissionId: string): Promise<any | null>;
 
+
+  getSubmissionByMinigridSiteId(formId:string, siteId:string): Promise<any | null>;
   updateSubmission(
     formId: string,
     submissionId: string,
@@ -112,6 +121,9 @@ export interface IFormRepository {
   }>;
 
   repairFormTable(formId: string): Promise<{
+    lastSubmissionAt: any;
+    lastMigrationVersion: any;
+    tableCreated: any;
     success: boolean;
     tableName: string;
     message: string;

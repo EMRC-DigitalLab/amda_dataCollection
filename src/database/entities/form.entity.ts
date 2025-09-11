@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { Category } from './category.entity';
+import { FormSettings } from './form-settings.entity';
 import { User } from './user.entity';
 
 export enum FormStatus {
@@ -25,7 +26,7 @@ export enum FormType {
   ASSESSMENT = 'ASSESSMENT',
   SURVEY = 'SURVEY',
   CUSTOM = 'CUSTOM',
-  ORGANIZATION="ORGANIZATION"
+  ORGANIZATION = 'ORGANIZATION',
 }
 
 @Entity({ name: 'forms' })
@@ -89,6 +90,8 @@ export class Form extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   parentId?: string;
 
+  @OneToMany(() => FormSettings, settings => settings.form, { cascade: true })
+  settings!: FormSettings[];
   // Track if the database table has been created for this form
   @Column({
     name: 'table_created',

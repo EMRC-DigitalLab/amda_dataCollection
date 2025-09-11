@@ -145,10 +145,12 @@ export function createFormRoutes(dataSource: DataSource): Router {
   /* ============================================================================ */
 
   // Submit form data (public or authenticated based on form settings)
+  router.get('/:id/can-submit', authMiddleware, formController.canUserSubmit);
+
   router.post(
     '/:id/submit',
     // Conditional auth middleware based on form.isAnonymous setting
-    formController.conditionalAuth,
+    authMiddleware,
     // validationMiddleware(FormSubmissionDto),
     formController.submitForm
   );
@@ -179,6 +181,12 @@ export function createFormRoutes(dataSource: DataSource): Router {
     authMiddleware,
     adminMiddleware,
     formController.getSubmissionById
+  );
+  router.get(
+    '/:id/submissions-site/:siteId',
+    authMiddleware,
+    adminMiddleware,
+    formController.getSubmissionByMinigridSiteId
   );
 
   // Update any submission (admin only)
@@ -322,36 +330,27 @@ export function createFormRoutes(dataSource: DataSource): Router {
   // Repair form table (if schema mismatch detected)
   router.post('/:id/repair-table', authMiddleware, adminMiddleware, formController.repairFormTable);
 
+  // Get all published form types with counts
+  router.get('/types/published', authMiddleware, formController.getPublishedFormTypes);
+
+  // Get form types with counts by status (requires auth for detailed analytics)
+  router.get(
+    '/types/analytics',
+    authMiddleware,
+    adminMiddleware,
+    formController.getFormTypesWithCounts
+  );
+
+  // Get all forms by type (with optional status filter)
+  router.get('/types/:formType/forms', formController.findAll); // This will use existing findAll with formType filter
+
+  // Get published forms by type only
+  router.get('/types/:formType/published', (req: Request, res: Response, next: NextFunction) => {
+    // Add formType and status to query params before calling findAll
+    req.query.formType = req.params.formType;
+    req.query.status = 'PUBLISHED';
+    formController.findAll(req, res, next);
+  });
+
   return router;
 }
-
-/* ============================================================================ */
-/* Route Usage Examples                                                         */
-/* ============================================================================ */
-
-/*
-
-// FORM CREATION FLOW:
-POST /api/forms                           // Create form schema
-POST /api/forms/:id/categories            // Add categories
-POST /api/forms/categories/:id/questions  // Add questions
-POST /api/forms/:id/publish               // Publish (creates table)
-
-// FORM SUBMISSION FLOW:
-GET  /api/forms/:id/structure             // Get form for rendering
-POST /api/forms/:id/submit                // Submit form data
-GET  /api/forms/:id/my-submissions        // User's submissions
-
-// ADMIN MANAGEMENT FLOW:
-GET  /api/forms/:id/submissions           // View all submissions
-GET  /api/forms/:id/analytics             // View analytics
-GET  /api/forms/:id/export/csv            // Export data
-POST /api/forms/:id/submissions/:subId/approve  // Approve submission
-
-// FORM EVOLUTION FLOW:
-PUT  /api/forms/:id                       // Update form schema
-POST /api/forms/:id/create-version        // Version form
-GET  /api/forms/:id/health                // Check table health
-POST /api/forms/:id/repair-table          // Fix schema issues
-
-*/

@@ -134,15 +134,15 @@ services:
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     restart: unless-stopped
 
-  amda-mailhog:
-    image: mailhog/mailhog:latest
-    container_name: amda-mailhog
-    ports:
-      - "1025:1025"  # SMTP port
-      - "8025:8025"  # Web UI port
-    networks:
-      - amda-dev-network
-    restart: unless-stopped
+  # amda-mailhog:
+  #   image: mailhog/mailhog:latest
+  #   container_name: amda-mailhog
+  #   ports:
+  #     - "1025:1025"  # SMTP port
+  #     - "8025:8025"  # Web UI port
+  #   networks:
+  #     - amda-dev-network
+  #   restart: unless-stopped
 
   # Optional: Database management tool
   amda-pgadmin:

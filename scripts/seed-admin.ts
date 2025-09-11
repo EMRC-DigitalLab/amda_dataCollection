@@ -18,7 +18,6 @@ export async function seedAdmin() {
   });
 
   await userRepo.save(admin);
-  console.log('Admin user created');
   process.exit(0);
 }
 

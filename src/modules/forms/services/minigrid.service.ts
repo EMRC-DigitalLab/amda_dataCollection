@@ -1,15 +1,13 @@
+import { Injectable } from 'injection-js';
 import { MinigridSite } from '../../../database/entities/minigrid-site.entity';
 import { MinigridSiteRepository } from '../../../database/repositories/forms/minigrid-site.repository';
 import { AppError } from '../../../shared/middleware/error.middleware';
 import { CreateMinigridSiteDto, UpdateMinigridSiteDto } from '../dtos/minigrid-site.dto';
 import { IMinigridSiteService, MinigridSiteStats } from '../interfaces/minigrid-site.interface';
 
+@Injectable()
 export class MinigridSiteService implements IMinigridSiteService {
-  private minigridSiteRepository: MinigridSiteRepository;
-
-  constructor() {
-    this.minigridSiteRepository = new MinigridSiteRepository();
-  }
+  constructor(private readonly minigridSiteRepository: MinigridSiteRepository) {}
 
   async createMinigridSite(data: CreateMinigridSiteDto): Promise<MinigridSite> {
     console.log(data, 'this is data in service');

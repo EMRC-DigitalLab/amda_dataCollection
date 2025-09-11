@@ -1,11 +1,10 @@
-// src/database/repositories/user.repository.ts
-import { Repository, DataSource } from 'typeorm';
+// src/database/repositories/auth/user.repository.ts
+import { DataSource, Repository } from 'typeorm';
 import { User, UserRole, UserStatus } from '../../entities/user.entity';
 
 export class UserRepository extends Repository<User> {
-  // In UserRepository constructor:
   constructor(private dataSource: DataSource) {
-    super(User, dataSource.manager); // Change this line
+    super(User, dataSource.manager);
   }
 
   /**
@@ -98,9 +97,191 @@ export class UserRepository extends Repository<User> {
       role: UserRole.MEMBER,
       status: UserStatus.ACTIVE,
       isFirstLogin: true,
+      isVerified: false,
     });
 
     return this.save(member);
+  }
+
+  /**
+   * Update verification status - FIXED IMPLEMENTATION
+   */
+  async updateVerificationStatus(memberId: string, isVerified: boolean, adminId?: string): Promise<User> {
+    const member = await this.findOne({ where: { id: memberId } });
+    if (!member) {
+      throw new Error('Member not found');
+    }
+
+    member.isVerified = isVerified;
+    if (isVerified && adminId) {
+      member.verifiedAt = new Date();
+      member.verifiedByAdminId = adminId;
+    } 
+
+    return this.save(member);
+  }
+
+  /**
+   * Verify a member - REFACTORED
+   */
+  async verifyMember(memberId: string, adminId?: string): Promise<User> {
+    return this.updateVerificationStatus(memberId, true, adminId);
+  }
+
+  /**
+   * Unverify a member - REFACTORED
+   */
+  async unverifyMember(memberId: string): Promise<User> {
+    return this.updateVerificationStatus(memberId, false);
+  }
+
+  /**
+   * Get unverified members (pending verification) - MOVED FROM SERVICE
+   */
+  async getPendingVerifications(
+    page: number = 1,
+    limit: number = 10,
+    country?: string
+  ): Promise<{
+    members: User[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    const skip = (page - 1) * limit;
+
+    const query = this.createQueryBuilder('user')
+      .where('user.role = :role', { role: UserRole.MEMBER })
+      .andWhere('user.isVerified = :isVerified', { isVerified: false });
+
+    if (country) {
+      query.andWhere('user.country = :country', { country });
+    }
+
+    const [members, total] = await query
+      .orderBy('user.createdAt', 'ASC') // Oldest first for fairness
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      members,
+      total,
+      hasMore: skip + members.length < total,
+    };
+  }
+
+  /**
+   * Get verified members - MOVED FROM SERVICE
+   */
+  async getVerifiedMembers(
+    page: number = 1,
+    limit: number = 10,
+    country?: string
+  ): Promise<{
+    members: User[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    const skip = (page - 1) * limit;
+
+    const query = this.createQueryBuilder('user')
+      .where('user.role = :role', { role: UserRole.MEMBER })
+      .andWhere('user.isVerified = :isVerified', { isVerified: true });
+
+    if (country) {
+      query.andWhere('user.country = :country', { country });
+    }
+
+    const [members, total] = await query
+      .orderBy('user.verifiedAt', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      members,
+      total,
+      hasMore: skip + members.length < total,
+    };
+  }
+
+  /**
+   * Get all members with verification status - NEW METHOD FOR HOOKS
+   */
+  async getAllMembersWithVerificationStatus(params?: {
+    page?: number;
+    limit?: number;
+    country?: string;
+    status?: "verified" | "unverified" | "all";
+  }): Promise<{
+    members: User[];
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  }> {
+    const page = params?.page || 1;
+    const limit = params?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const query = this.createQueryBuilder('user')
+      .where('user.role = :role', { role: UserRole.MEMBER });
+
+    if (params?.country) {
+      query.andWhere('user.country = :country', { country: params.country });
+    }
+
+    if (params?.status === 'verified') {
+      query.andWhere('user.isVerified = :isVerified', { isVerified: true });
+    } else if (params?.status === 'unverified') {
+      query.andWhere('user.isVerified = :isVerified', { isVerified: false });
+    }
+
+    const [members, total] = await query
+      .orderBy('user.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      members,
+      total,
+      totalPages,
+      hasMore: skip + members.length < total,
+    };
+  }
+
+  /**
+   * Get members verified by a specific admin - MOVED FROM SERVICE
+   */
+  async getMembersVerifiedByAdmin(
+    adminId: string,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<{
+    members: User[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    const skip = (page - 1) * limit;
+
+    const [members, total] = await this.findAndCount({
+      where: {
+        role: UserRole.MEMBER,
+        verifiedByAdminId: adminId,
+        isVerified: true,
+      },
+      order: { verifiedAt: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    return {
+      members,
+      total,
+      hasMore: skip + members.length < total,
+    };
   }
 
   /**
@@ -117,7 +298,6 @@ export class UserRepository extends Repository<User> {
    * Update user password
    */
   async updatePassword(userId: string, newPassword: string): Promise<void> {
-    // The password will be automatically hashed by the @BeforeUpdate hook
     await this.update(userId, {
       password: newPassword,
       isFirstLogin: false,
@@ -186,21 +366,33 @@ export class UserRepository extends Repository<User> {
   }
 
   /**
-   * Search users with pagination
+   * Search users with pagination - IMPROVED
    */
   async searchUsers(
     searchTerm: string,
     page: number = 1,
     limit: number = 10,
-    role?: UserRole
+    filters?: {
+      role?: UserRole;
+      isVerified?: boolean;
+      country?: string;
+    }
   ): Promise<{ users: User[]; total: number }> {
     const query = this.createQueryBuilder('user').where(
       'user.firstName ILIKE :search OR user.lastName ILIKE :search OR user.email ILIKE :search',
       { search: `%${searchTerm}%` }
     );
 
-    if (role) {
-      query.andWhere('user.role = :role', { role });
+    if (filters?.role) {
+      query.andWhere('user.role = :role', { role: filters.role });
+    }
+
+    if (filters?.isVerified !== undefined) {
+      query.andWhere('user.isVerified = :isVerified', { isVerified: filters.isVerified });
+    }
+
+    if (filters?.country) {
+      query.andWhere('user.country = :country', { country: filters.country });
     }
 
     const [users, total] = await query
@@ -210,5 +402,38 @@ export class UserRepository extends Repository<User> {
       .getManyAndCount();
 
     return { users, total };
+  }
+
+  /**
+   * Get verification statistics - MOVED FROM SERVICE
+   */
+  async getVerificationStats(): Promise<{
+    totalMembers: number;
+    verifiedMembers: number;
+    unverifiedMembers: number;
+    verificationRate: number;
+    recentVerifications: User[];
+  }> {
+    const [totalMembers, verifiedMembers, unverifiedMembers, recentVerifications] =
+      await Promise.all([
+        this.count({ where: { role: UserRole.MEMBER } }),
+        this.count({ where: { role: UserRole.MEMBER, isVerified: true } }),
+        this.count({ where: { role: UserRole.MEMBER, isVerified: false } }),
+        this.find({
+          where: { role: UserRole.MEMBER, isVerified: true },
+          order: { verifiedAt: 'DESC' },
+          take: 10,
+        }),
+      ]);
+
+    const verificationRate = totalMembers > 0 ? (verifiedMembers / totalMembers) * 100 : 0;
+
+    return {
+      totalMembers,
+      verifiedMembers,
+      unverifiedMembers,
+      verificationRate: Math.round(verificationRate * 100) / 100,
+      recentVerifications,
+    };
   }
 }

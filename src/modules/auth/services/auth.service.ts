@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { DataSource } from 'typeorm';
 import { User, UserRole, UserStatus } from '../../../database/entities/user.entity';
 import { UserRepository } from '../../../database/repositories/auth/user.repository';
+import { VerificationResult } from '../../../shared/types/auth.types';
 import {
   ChangePasswordRequest,
   ForgotPasswordRequest,
@@ -323,5 +324,250 @@ export class AuthService {
     } catch (error) {
       throw new Error('Invalid or expired token');
     }
+  }
+
+  /**
+   * Verify or unverify a member (Admin only)
+   */
+  async verifyMember(
+    memberId: string,
+    adminId: string,
+    verifyDto: { isVerified: boolean }
+  ): Promise<any> {
+    // Check if the admin exists and has admin role
+    const admin = await this.userRepository.findOne({
+      where: { id: adminId, role: UserRole.ADMIN },
+    });
+  
+    if (!admin) {
+      const error: any = new Error('Only admins can verify members');
+      error.status = 403;
+      throw error;
+    }
+  
+    // Find the member to verify
+    const member = await this.userRepository.findOne({
+      where: { id: memberId, role: UserRole.MEMBER },
+    });
+  
+    if (!member) {
+      const error: any = new Error('Member not found');
+      error.status = 404;
+      throw error;
+    }
+  
+    // Check if member is already in the desired verification state
+    if (member.isVerified === verifyDto.isVerified) {
+      const status = verifyDto.isVerified ? 'verified' : 'unverified';
+      const error: any = new Error(`Member is already ${status}`);
+      error.status = 400;
+      throw error;
+    }
+  
+    try {
+      // Use repository method instead of direct database queries
+      const updatedMember = await this.userRepository.updateVerificationStatus(
+        memberId,
+        verifyDto.isVerified,
+        verifyDto.isVerified ? adminId : undefined
+      );
+  
+      const action = verifyDto.isVerified ? 'verified' : 'unverified';
+      const message = `Member ${updatedMember.firstName} ${updatedMember.lastName} has been ${action} successfully`;
+  
+      return {
+        success: true,
+        message,
+        member: {
+          id: updatedMember.id,
+          firstName: updatedMember.firstName,
+          lastName: updatedMember.lastName,
+          email: updatedMember.email,
+          country: updatedMember.country,
+          isVerified: updatedMember.isVerified,
+          verifiedAt: updatedMember.verifiedAt,
+        },
+        verifiedBy: verifyDto.isVerified ? admin.firstName + ' ' + admin.lastName : undefined,
+        verifiedAt: updatedMember.verifiedAt,
+      };
+    } catch (error: any) {
+      const customError: any = new Error(`Failed to update member verification: ${error.message}`);
+      customError.status = 400;
+      throw customError;
+    }
+  }
+
+  /**
+   * Bulk verify multiple members
+   */
+  async bulkVerifyMembers(
+    memberIds: string[],
+    adminId: string,
+    isVerified: boolean = true
+  ): Promise<{
+    successful: VerificationResult[];
+    failed: Array<{ memberId: string; error: string }>;
+  }> {
+    const successful: VerificationResult[] = [];
+    const failed: Array<{ memberId: string; error: string }> = [];
+
+    for (const memberId of memberIds) {
+      try {
+        const result = await this.verifyMember(memberId, adminId, { isVerified });
+        successful.push(result);
+      } catch (error: any) {
+        failed.push({
+          memberId,
+          error: error.message,
+        });
+      }
+    }
+
+    return { successful, failed };
+  }
+
+ 
+/**
+ * Get verification statistics
+ */
+async getVerificationStats(): Promise<any> {
+  return this.userRepository.getVerificationStats();
+}
+
+  /**
+   * Get unverified members (pending verification)
+   */
+  async getPendingVerifications(
+    page: number = 1,
+    limit: number = 10,
+    country?: string
+  ): Promise<{
+    members: User[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    return this.userRepository.getPendingVerifications(page, limit, country);
+  }
+
+  /**
+   * Get verified members
+   */
+  async getVerifiedMembers(
+    page: number = 1,
+    limit: number = 10,
+    country?: string
+  ): Promise<{
+    members: User[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    return this.userRepository.getVerifiedMembers(page, limit, country);
+  }
+
+  /**
+   * Get members verified by a specific admin
+   */
+  async getMembersVerifiedByAdmin(
+    adminId: string,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<{
+    members: User[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    return this.userRepository.getMembersVerifiedByAdmin(adminId, page, limit);
+  }
+
+  /**
+   * Search members by verification status
+   */
+  async searchMembers(
+    searchTerm: string,
+    isVerified?: boolean,
+    country?: string,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<{
+    members: User[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    const filters: any = { role: UserRole.MEMBER };
+  
+    if (isVerified !== undefined) {
+      filters.isVerified = isVerified;
+    }
+  
+    if (country) {
+      filters.country = country;
+    }
+  
+    const { users: members, total } = await this.userRepository.searchUsers(
+      searchTerm,
+      page,
+      limit,
+      filters
+    );
+  
+    return {
+      members,
+      total,
+      hasMore: (page - 1) * limit + members.length < total,
+    };
+  }
+  
+
+
+  /**
+   * Get verification history for a member
+   */
+  async getMemberVerificationHistory(memberId: string): Promise<{
+    member: User;
+    verificationHistory: {
+      isVerified: boolean;
+      verifiedAt: Date | null;
+      verifiedByAdmin: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+      } | null;
+    };
+  }> {
+    const member = await this.userRepository.findOne({
+      where: { id: memberId, role: UserRole.MEMBER },
+    });
+
+    if (!member) {
+      const error: any = new Error('Member not found');
+      error.status = 404;
+      throw error;
+    }
+
+    let verifiedByAdmin = null;
+    if (member.verifiedByAdminId) {
+      const admin = await this.userRepository.findOne({
+        where: { id: member.verifiedByAdminId },
+      });
+
+      if (admin) {
+        verifiedByAdmin = {
+          id: admin.id,
+          firstName: admin.firstName,
+          lastName: admin.lastName,
+          email: admin.email,
+        };
+      }
+    }
+
+    return {
+      member,
+      verificationHistory: {
+        isVerified: member.isVerified,
+        verifiedAt: member.verifiedAt || null,
+        verifiedByAdmin,
+      },
+    };
   }
 }

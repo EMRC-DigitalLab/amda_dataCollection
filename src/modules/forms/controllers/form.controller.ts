@@ -12,6 +12,7 @@ import {
   SubmissionQueryDto,
   UpdateFormDto,
 } from '../../../shared/types/form.types';
+import { ResponseHelper } from '../../../shared/utils/response';
 import { FormService } from '../services/form.service';
 
 // Extended Request interface for authenticated requests
@@ -48,7 +49,7 @@ export class FormController {
         message: 'Form created successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -65,7 +66,7 @@ export class FormController {
         message: 'Form updated successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -77,7 +78,7 @@ export class FormController {
         message: 'Form deleted successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -89,7 +90,7 @@ export class FormController {
         data: form,
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -101,7 +102,7 @@ export class FormController {
         data: form,
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -129,7 +130,7 @@ export class FormController {
         },
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -145,7 +146,7 @@ export class FormController {
         data: structure,
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -159,7 +160,7 @@ export class FormController {
         message: 'Form cloned successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -176,7 +177,7 @@ export class FormController {
         message: 'Form published successfully. Dynamic table created.',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -189,7 +190,7 @@ export class FormController {
         message: 'Form unpublished successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -202,7 +203,7 @@ export class FormController {
         message: 'Form archived successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -220,7 +221,7 @@ export class FormController {
         message: 'Category added successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -233,7 +234,7 @@ export class FormController {
         message: 'Category updated successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -245,7 +246,7 @@ export class FormController {
         message: 'Category deleted successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -258,7 +259,7 @@ export class FormController {
         message: 'Categories reordered successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -275,7 +276,7 @@ export class FormController {
         message: 'Question added successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -288,7 +289,7 @@ export class FormController {
         message: 'Question updated successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -300,7 +301,7 @@ export class FormController {
         message: 'Question deleted successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -313,7 +314,7 @@ export class FormController {
         message: 'Questions reordered successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -343,29 +344,98 @@ export class FormController {
       // For now, assuming authMiddleware has already run if needed
       next();
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
   submitForm = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const dto: FormSubmissionDto = {
-        formId: req.params.id,
-        submittedBy: req.user?.id,
-        data: req.body.data || req.body,
+      // Check if user has already submitted to this form
+      const existingSubmission = await this.service.getUserSubmission(
+        req.params.id,
+        req.body.data.minigrid_siteId
+      );
+
+      const body = {
+        ...req.body.data,
       };
 
-      const submission = await this.service.submitFormData(dto);
-      res.status(201).json({
+      const dto: FormSubmissionDto = {
+        formId: req.params.id,
+        submittedBy: req.user.id,
+        data: req.body.data,
+      };
+
+      let submission;
+      let message;
+
+      if (existingSubmission) {
+        // Update existing submission dinstead of creating new one
+        submission = await this.service.updateSubmission(
+          req.params.id,
+          existingSubmission.id,
+          dto.data,
+          req.user?.id
+        );
+        message = 'Form submission updated successfully';
+      } else {
+        // Create new submission
+        submission = await this.service.submitFormData(dto);
+        message = 'Form submitted successfully';
+      }
+
+      res.status(existingSubmission ? 200 : 201).json({
         success: true,
         data: submission,
-        message: 'Form submitted successfully',
+        message,
+        isUpdate: !!existingSubmission,
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
+  canUserSubmit = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const canSubmit = await this.service.canUserSubmit(req.params.id, req.user?.id);
+      res.json({
+        success: true,
+        data: { canSubmit },
+        message: canSubmit
+          ? 'User can submit to this form'
+          : 'User has already submitted to this form',
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+
+  getPublishedFormTypes = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const formTypes = await this.service.getPublishedFormTypes();
+      res.json({
+        success: true,
+        data: formTypes,
+        message: 'Published form types retrieved successfully',
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+
+  // Also add this method if you want to get form types with counts
+  getFormTypesWithCounts = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const formTypesWithCounts = await this.service.getFormTypesWithCounts();
+      res.json({
+        success: true,
+        data: formTypesWithCounts,
+        message: 'Form types with counts retrieved successfully',
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
   getMySubmissions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { page = 1, limit = 10 } = req.query;
@@ -381,7 +451,7 @@ export class FormController {
         message: 'Submissions retrieved successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -399,7 +469,7 @@ export class FormController {
         message: 'Submission updated successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -415,7 +485,7 @@ export class FormController {
         message: 'Submission deleted successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -425,6 +495,8 @@ export class FormController {
 
   getAllSubmissions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
+
+      console.log("Reached controller")
       const { page = 1, limit = 10, status, dateFrom, dateTo, ...filters } = req.query;
 
       const queryDto: SubmissionQueryDto = {
@@ -436,10 +508,15 @@ export class FormController {
         filters: filters as Record<string, any>,
       };
 
-      const submissions = await this.service.getFormSubmissions(req.params.id, queryDto.filters, {
-        page: queryDto.page!,
-        limit: queryDto.limit!,
-      });
+      const submissions = await this.service.getFormSubmissions(
+        req.params.id,
+        queryDto.filters,
+        {
+          page: queryDto.page!,
+          limit: queryDto.limit!,
+        },
+        true
+      );
 
       res.json({
         success: true,
@@ -447,7 +524,7 @@ export class FormController {
         message: 'Submissions retrieved successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -462,7 +539,21 @@ export class FormController {
         data: submission,
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+  getSubmissionByMinigridSiteId = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const submission = await this.service.getSubmissionByMinigridSiteId(
+        req.params.id,
+        req.params.siteId
+      );
+      res.json({
+        success: true,
+        data: submission,
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -479,7 +570,7 @@ export class FormController {
         message: 'Submission updated successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -491,7 +582,7 @@ export class FormController {
         message: 'Submission deleted successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -509,7 +600,7 @@ export class FormController {
         message: 'Submission approved successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -529,11 +620,11 @@ export class FormController {
         message: 'Submission rejected successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
-  /* ============================================================================ */
+  /* ======================f====================================================== */
   /* Analytics & Reporting                                                        */
   /* ============================================================================ */
 
@@ -545,7 +636,7 @@ export class FormController {
         data: analytics,
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -560,7 +651,7 @@ export class FormController {
       );
       res.send(csvData);
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -578,7 +669,7 @@ export class FormController {
       );
       res.send(excelBuffer);
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -590,7 +681,7 @@ export class FormController {
         data: stats,
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -607,7 +698,7 @@ export class FormController {
         message: 'Form saved as template successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -625,7 +716,7 @@ export class FormController {
         message: 'Form created from template successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -637,7 +728,7 @@ export class FormController {
         data: versions,
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -654,7 +745,7 @@ export class FormController {
         message: 'New form version created successfully',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -671,7 +762,7 @@ export class FormController {
         message: `${submissionIds.length} submissions deleted successfully`,
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -693,7 +784,7 @@ export class FormController {
         message: `${submissionIds.length} submissions updated successfully`,
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -725,7 +816,7 @@ export class FormController {
         res.send(excelBuffer);
       }
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -741,7 +832,7 @@ export class FormController {
         data: preview,
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -754,7 +845,7 @@ export class FormController {
         message: 'Form submission test completed',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -770,7 +861,7 @@ export class FormController {
         data: health,
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 
@@ -783,7 +874,7 @@ export class FormController {
         message: 'Form table repair completed',
       });
     } catch (err) {
-      next(err);
+      ResponseHelper.error(res, err.message, 400);
     }
   };
 }

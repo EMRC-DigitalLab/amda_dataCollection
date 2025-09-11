@@ -1,9 +1,9 @@
-import { DataSource, EntityManager } from 'typeorm';
-import { Form } from '../../../database/entities/form.entity';
 import { Injectable } from 'injection-js';
+import { DataSource } from 'typeorm';
+import { Form } from '../../../database/entities/form.entity';
 
 @Injectable()
-export class DynamicFormService {
+export class FormSettingsService {
   constructor(private dataSource: DataSource) {}
 
   /**
@@ -89,13 +89,14 @@ export class DynamicFormService {
    * Build CREATE TABLE SQL from form schema
    */
   private async buildCreateTableSQL(form: Form, tableName: string): Promise<string> {
-    await form.categories; // Load categories with questions
+    await form.categories;
 
     let sql = `CREATE TABLE "${tableName}" (\n`;
     sql += `  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`;
     sql += `  "form_id" UUID NOT NULL REFERENCES forms(id) ON DELETE CASCADE,\n`;
     sql += `  "submitted_by" UUID REFERENCES users(id) ON DELETE SET NULL,\n`;
     sql += `  "submitted_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n`;
+    sql += `  "minigrid_siteId" UUID REFERENCES minigrid_sites(id) ON DELETE SET NULL,\n`;
     sql += `  "status" VARCHAR(20) DEFAULT 'SUBMITTED',\n`;
 
     // Add columns for each question

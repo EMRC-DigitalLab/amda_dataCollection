@@ -7,7 +7,7 @@ import { UpdateMinigridSiteDto } from '../dtos/minigrid-site.dto';
 
 export function createMinigridRoutes(dataSource: DataSource): Router {
   const router = Router();
-  const minigridSiteController = new MinigridSiteController();
+  const minigridSiteController = new MinigridSiteController(dataSource);
 
   // Public routes (if any)
   // router.get('/active', minigridSiteController.getActiveMinigridSites);

@@ -1,18 +1,23 @@
+// @ts-nocheck
+
 import { plainToClass } from 'class-transformer';
 import { validate } from 'class-validator';
 import { NextFunction, Request, Response } from 'express';
+import { DataSource } from 'typeorm';
+import { MinigridSiteRepository } from '../../../database/repositories/forms/minigrid-site.repository';
 import { AppError } from '../../../shared/middleware/error.middleware';
+import { ResponseHelper } from '../../../shared/utils/response';
 import { CreateMinigridSiteDto, UpdateMinigridSiteDto } from '../dtos/minigrid-site.dto';
 import { MinigridSiteService } from '../services/minigrid.service';
 
 export class MinigridSiteController {
   private minigridSiteService: MinigridSiteService;
 
-  constructor() {
-    this.minigridSiteService = new MinigridSiteService();
+  constructor(dataSource: DataSource) {
+    this.minigridSiteService = new MinigridSiteService(new MinigridSiteRepository(dataSource));
   }
 
-  createMinigridSite = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  createMinigridSite = async (req: Request, res: Response, next: NextFunction) => {
     try {
       console.log(req.body, 'this is the request body');
       // Validate input
@@ -33,7 +38,7 @@ export class MinigridSiteController {
         message: 'Minigrid site created successfully',
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -55,7 +60,7 @@ export class MinigridSiteController {
         message: 'Minigrid sites retrieved successfully',
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error?.message!, 400);
     }
   };
 
@@ -69,7 +74,7 @@ export class MinigridSiteController {
         message: 'Minigrid site retrieved successfully',
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -97,7 +102,7 @@ export class MinigridSiteController {
         message: 'User minigrid sites retrieved successfully',
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -127,7 +132,7 @@ export class MinigridSiteController {
         message: 'My minigrid sites retrieved successfully',
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -153,7 +158,7 @@ export class MinigridSiteController {
         message: 'Minigrid site updated successfully',
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -166,7 +171,7 @@ export class MinigridSiteController {
         message: 'Minigrid site deleted successfully',
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -194,7 +199,7 @@ export class MinigridSiteController {
         message: `Minigrid sites with status '${status}' retrieved successfully`,
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -213,7 +218,7 @@ export class MinigridSiteController {
         message: 'User minigrid site statistics retrieved successfully',
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -230,7 +235,7 @@ export class MinigridSiteController {
   //       message: 'Active minigrid sites retrieved successfully',
   //     });
   //   } catch (error) {
-  //     next(error);
+  //     ResponseHelper.error(res, error.message, 400);
   //   }
   // };
 }

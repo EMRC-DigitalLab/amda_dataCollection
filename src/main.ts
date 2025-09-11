@@ -255,7 +255,7 @@ class Application {
       }
 
       // Connect to Redis
-      await connectRedis();
+      // await connectRedis();
 
       // Start server
       this.app.listen(config.port, () => {
