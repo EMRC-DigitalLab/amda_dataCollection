@@ -43,7 +43,7 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
     options?: FindManyOptions<MinigridSite>
   ): Promise<MinigridSite[]> {
     return await this.repository.find({
-      where: { userId },
+      where: { memberId: userId },
       // relations: ['forms', 'user'],
       ...options,
     });
@@ -69,7 +69,7 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
   ): Promise<MinigridSite[]> {
     return await this.repository.find({
       where: {
-        userId,
+        memberId: userId,
         status: status as any,
       },
       // relations: ['forms', 'user'],
@@ -139,7 +139,7 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
   // New method: Count minigrid sites by userId
   async countByUserId(userId: string): Promise<number> {
     return await this.repository.count({
-      where: { userId },
+      where: { memberId: userId },
     });
   }
 
@@ -154,7 +154,7 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
   async countByUserIdAndStatus(userId: string, status: string): Promise<number> {
     return await this.repository.count({
       where: {
-        userId,
+        memberId: userId,
         status: status as any,
       },
     });

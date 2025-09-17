@@ -31,7 +31,7 @@ export class AuthController {
 
   createMember = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      // THis is an hardcoded adminId, since we no ,longer create a member from the admin dashboard
+      // THis is an hardcsoded adminId, since we no ,longer create a member from the admin dashboard
       const adminId = '40d13800-6ba2-4bea-9298-d53334e600cf';
       if (!adminId) {
         return ResponseHelper.error(res, 'Admin authentication required', 401);
@@ -117,21 +117,7 @@ export class AuthController {
 
       const user = await this.authService.getProfile(userId);
 
-      const profileData = {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phoneNumber: user.phoneNumber,
-        role: user.role,
-        status: user.status,
-        avatar: user.avatar,
-        lastLoginAt: user.lastLoginAt,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      };
-
-      ResponseHelper.success(res, profileData, 'Profile retrieved successfully');
+      ResponseHelper.success(res, user, 'Profile retrieved successfully');
     } catch (error: any) {
       ResponseHelper.error(res, error.message, 404);
     }

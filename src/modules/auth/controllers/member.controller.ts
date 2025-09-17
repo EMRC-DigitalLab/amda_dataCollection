@@ -9,11 +9,13 @@ import { CreateMemberDto, UpdateMemberDto } from '../interfaces/member.interface
 import { MemberService } from '../services/member.service';
 
 export class MemberController {
+  private memberService: MemberService;
 
-    private memberService: MemberService;
-  
   constructor(private readonly dataSource: DataSource) {
-     this.memberService = new MemberService(new MemberRepository(dataSource), new UserRepository(dataSource));
+    this.memberService = new MemberService(
+      new MemberRepository(dataSource),
+      new UserRepository(dataSource)
+    );
   }
 
   getAllMembers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -24,7 +26,7 @@ export class MemberController {
         message: 'Members retrieved successfully',
         data: members,
       });
-    } catch (error:any) {
+    } catch (error: any) {
       ResponseHelper.error(res, error.message, 401);
     }
   };
@@ -38,7 +40,7 @@ export class MemberController {
         message: 'Member retrieved successfully',
         data: member,
       });
-    } catch (error:any) {
+    } catch (error: any) {
       ResponseHelper.error(res, error.message, 401);
     }
   };
@@ -52,7 +54,7 @@ export class MemberController {
         message: 'Member retrieved successfully',
         data: member,
       });
-    } catch (error:any) {
+    } catch (error: any) {
       ResponseHelper.error(res, error.message, 401);
     }
   };
@@ -66,7 +68,7 @@ export class MemberController {
         message: 'Member retrieved successfully',
         data: member,
       });
-    } catch (error:any) {
+    } catch (error: any) {
       ResponseHelper.error(res, error.message, 401);
     }
   };
@@ -80,7 +82,7 @@ export class MemberController {
         message: 'Member created successfully',
         data: member,
       });
-    } catch (error:any) {
+    } catch (error: any) {
       ResponseHelper.error(res, error.message, 401);
     }
   };
@@ -95,7 +97,7 @@ export class MemberController {
         message: 'Member updated successfully',
         data: member,
       });
-    } catch (error:any) {
+    } catch (error: any) {
       ResponseHelper.error(res, error.message, 401);
     }
   };
@@ -108,7 +110,7 @@ export class MemberController {
         success: true,
         message: 'Member deleted successfully',
       });
-    } catch (error:any) {
+    } catch (error: any) {
       ResponseHelper.error(res, error.message, 401);
     }
   };
@@ -122,7 +124,7 @@ export class MemberController {
         message: 'Members retrieved successfully',
         data: members,
       });
-    } catch (error:any) {
+    } catch (error: any) {
       ResponseHelper.error(res, error.message, 401);
     }
   };
@@ -136,7 +138,7 @@ export class MemberController {
         message: 'Members retrieved successfully',
         data: members,
       });
-    } catch (error:any) {
+    } catch (error: any) {
       ResponseHelper.error(res, error.message, 401);
     }
   };
@@ -153,7 +155,7 @@ export class MemberController {
         message: 'Members retrieved successfully',
         data: members,
       });
-    } catch (error:any) {
+    } catch (error: any) {
       ResponseHelper.error(res, error.message, 401);
     }
   };
@@ -168,18 +170,98 @@ export class MemberController {
         message: 'Member status updated successfully',
         data: member,
       });
-    } catch (error:any) {
+    } catch (error: any) {
       ResponseHelper.error(res, error.message, 401);
     }
   };
 
-  getMembersWithFilters = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  // NEW VERIFICATION CONTROLLERS
+  verifyMember = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { adminId } = req.body;
+
+      const member = await this.memberService.verifyMember(id, adminId);
+      res.status(200).json({
+        success: true,
+        message: 'Member verified successfully',
+        data: member,
+      });
+    } catch (error: any) {
+      ResponseHelper.error(res, error.message, error.statusCode || 500);
+    }
+  };
+
+  unverifyMember = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+
+      const member = await this.memberService.unverifyMember(id);
+      res.status(200).json({
+        success: true,
+        message: 'Member unverified successfully',
+        data: member,
+      });
+    } catch (error: any) {
+      ResponseHelper.error(res, error.message, error.statusCode || 500);
+    }
+  };
+
+  getAllMembersWithVerificationStatus = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const result = await this.memberService.getAllMembersWithVerificationStatus();
+      res.status(200).json({
+        success: true,
+        message: 'Members with verification status retrieved successfully',
+        data: result,
+      });
+    } catch (error: any) {
+      ResponseHelper.error(res, error.message, error.statusCode || 500);
+    }
+  };
+
+  getVerifiedMembers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const members = await this.memberService.getVerifiedMembers();
+      res.status(200).json({
+        success: true,
+        message: 'Verified members retrieved successfully',
+        data: members,
+      });
+    } catch (error: any) {
+      ResponseHelper.error(res, error.message, error.statusCode || 500);
+    }
+  };
+
+  getUnverifiedMembers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const members = await this.memberService.getUnverifiedMembers();
+      res.status(200).json({
+        success: true,
+        message: 'Unverified members retrieved successfully',
+        data: members,
+      });
+    } catch (error: any) {
+      ResponseHelper.error(res, error.message, error.statusCode || 500);
+    }
+  };
+
+  getMembersWithFilters = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
       const {
         status,
         country,
         membershipType,
         search,
+        isVerified,
         page = '1',
         limit = '10',
       } = req.query;
@@ -189,6 +271,7 @@ export class MemberController {
         country: country as string,
         membershipType: membershipType as string,
         search: search as string,
+        isVerified: isVerified ? isVerified === 'true' : undefined,
         page: page ? parseInt(page as string, 10) : undefined,
         limit: limit ? parseInt(limit as string, 10) : undefined,
       };
@@ -205,19 +288,25 @@ export class MemberController {
         success: true,
         message: 'Members retrieved successfully',
         data: result.members,
-        pagination: result.total ? {
-          total: result.total,
-          totalPages: result.totalPages,
-          currentPage: result.currentPage,
-          limit: filters.limit,
-        } : undefined,
+        pagination: result.total
+          ? {
+              total: result.total,
+              totalPages: result.totalPages,
+              currentPage: result.currentPage,
+              limit: filters.limit,
+            }
+          : undefined,
       });
-    } catch (error:any) {
+    } catch (error: any) {
       ResponseHelper.error(res, error.message, 401);
     }
   };
 
-  validateMembershipData = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  validateMembershipData = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
       const memberData = req.body;
       await this.memberService.validateMembershipData(memberData);
@@ -225,7 +314,7 @@ export class MemberController {
         success: true,
         message: 'Membership data is valid',
       });
-    } catch (error:any) {
+    } catch (error: any) {
       ResponseHelper.error(res, error.message, 401);
     }
   };

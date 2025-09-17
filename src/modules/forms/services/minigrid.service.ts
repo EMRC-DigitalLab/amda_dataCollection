@@ -10,7 +10,6 @@ export class MinigridSiteService implements IMinigridSiteService {
   constructor(private readonly minigridSiteRepository: MinigridSiteRepository) {}
 
   async createMinigridSite(data: CreateMinigridSiteDto): Promise<MinigridSite> {
-    console.log(data, 'this is data in service');
     // Check if minigrid site with same name already exists
     const existingMinigridSite = await this.minigridSiteRepository.findByName(data.name);
     if (existingMinigridSite) {

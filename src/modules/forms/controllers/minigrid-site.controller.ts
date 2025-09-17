@@ -110,7 +110,9 @@ export class MinigridSiteController {
   getMyMinigridSites = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       // Assuming you have user info in req.user from auth middleware
-      const userId = (req as any).user?.id || (req as any).user?.userId;
+      console.log(req.user);
+      const userId = (req as any).user?.memberId;
+      console.log(userId, 'this is userId');
 
       if (!userId) {
         throw new AppError('User not authenticated', 401);

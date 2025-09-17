@@ -71,8 +71,7 @@ export interface IFormRepository {
 
   getSubmissionById(formId: string, submissionId: string): Promise<any | null>;
 
-
-  getSubmissionByMinigridSiteId(formId:string, siteId:string): Promise<any | null>;
+  getSubmissionByMinigridSiteId(formId: string, siteId: string): Promise<any | null>;
   updateSubmission(
     formId: string,
     submissionId: string,

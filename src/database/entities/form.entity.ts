@@ -12,21 +12,13 @@ import {
 import { BaseEntity } from './base.entity';
 import { Category } from './category.entity';
 import { FormSettings } from './form-settings.entity';
+import { FormType } from './form-type.entity';
 import { User } from './user.entity';
 
 export enum FormStatus {
   DRAFT = 'DRAFT', // Form is being designed
   PUBLISHED = 'PUBLISHED', // Form is live and ready for submissions
   ARCHIVED = 'ARCHIVED', // Form is no longer active
-}
-
-export enum FormType {
-  FINANCE = 'FINANCE',
-  PROJECT = 'PROJECT',
-  ASSESSMENT = 'ASSESSMENT',
-  SURVEY = 'SURVEY',
-  CUSTOM = 'CUSTOM',
-  ORGANIZATION = 'ORGANIZATION',
 }
 
 @Entity({ name: 'forms' })
@@ -43,12 +35,15 @@ export class Form extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @Column({
-    type: 'enum',
-    enum: FormType,
-    default: FormType.CUSTOM,
+  @Column({ type: 'uuid', nullable: true })
+  formTypeId?: string;
+
+  @ManyToOne(() => FormType, formType => formType.forms, {
+    onDelete: 'SET NULL',
+    eager: true, // Load form type data automatically
   })
-  formType!: FormType;
+  @JoinColumn({ name: 'formTypeId' })
+  formType?: FormType;
 
   @Column({
     type: 'enum',

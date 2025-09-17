@@ -3,6 +3,9 @@ import { DataSource, Repository } from 'typeorm';
 import { User, UserRole, UserStatus } from '../../entities/user.entity';
 
 export class UserRepository extends Repository<User> {
+  findByEmail(email: string): User | PromiseLike<User | null> | null {
+    throw new Error('Method not implemented.');
+  }
   constructor(private dataSource: DataSource) {
     super(User, dataSource.manager);
   }
@@ -106,7 +109,11 @@ export class UserRepository extends Repository<User> {
   /**
    * Update verification status - FIXED IMPLEMENTATION
    */
-  async updateVerificationStatus(memberId: string, isVerified: boolean, adminId?: string): Promise<User> {
+  async updateVerificationStatus(
+    memberId: string,
+    isVerified: boolean,
+    adminId?: string
+  ): Promise<User> {
     const member = await this.findOne({ where: { id: memberId } });
     if (!member) {
       throw new Error('Member not found');
@@ -116,7 +123,7 @@ export class UserRepository extends Repository<User> {
     if (isVerified && adminId) {
       member.verifiedAt = new Date();
       member.verifiedByAdminId = adminId;
-    } 
+    }
 
     return this.save(member);
   }
@@ -212,7 +219,7 @@ export class UserRepository extends Repository<User> {
     page?: number;
     limit?: number;
     country?: string;
-    status?: "verified" | "unverified" | "all";
+    status?: 'verified' | 'unverified' | 'all';
   }): Promise<{
     members: User[];
     total: number;
@@ -223,8 +230,9 @@ export class UserRepository extends Repository<User> {
     const limit = params?.limit || 20;
     const skip = (page - 1) * limit;
 
-    const query = this.createQueryBuilder('user')
-      .where('user.role = :role', { role: UserRole.MEMBER });
+    const query = this.createQueryBuilder('user').where('user.role = :role', {
+      role: UserRole.MEMBER,
+    });
 
     if (params?.country) {
       query.andWhere('user.country = :country', { country: params.country });

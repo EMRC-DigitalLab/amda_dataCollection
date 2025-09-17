@@ -3,10 +3,11 @@ import {
   CreateDateColumn,
   Entity,
   JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { User } from './user.entity';
+import { Member } from './member.entity';
 
 @Entity('minigrid_sites')
 export class MinigridSite {
@@ -74,7 +75,7 @@ export class MinigridSite {
   })
   lon!: string;
 
-  // Technical Information s
+  // Technical Information
   @Column({
     type: 'date',
     default: () => 'CURRENT_DATE',
@@ -83,7 +84,6 @@ export class MinigridSite {
 
   @Column({
     type: 'enum',
-
     enum: ['Operational', 'Under Construction', 'Planned', 'Maintenance', 'Decommissioned'],
     default: 'Planned',
   })
@@ -160,16 +160,29 @@ export class MinigridSite {
   })
   developer!: string;
 
-  // User Relationship
+  // Year Added - Automatically set to current year when site is created
+  @Column({
+    type: 'int',
+    default: () => 'EXTRACT(YEAR FROM CURRENT_DATE)',
+    nullable: false,
+  })
+  yearAdded!: number;
+
+  @Column({
+    type: 'text',
+    nullable: false,
+  })
+  memberId!: string;
+
   @Column({
     type: 'uuid',
     nullable: false,
-    default: '550e8400-e29b-41d4-a716-446655440000',
   })
-  userId!: string; // This is thge memberId, the member who had created this minigridSite
+  memberUuid!: string;
 
-  @JoinColumn({ name: 'userId' })
-  user!: User;
+  @ManyToOne(() => Member, member => member.sites, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'memberUuid' })
+  member!: Member;
 
   @CreateDateColumn({
     name: 'created_at',

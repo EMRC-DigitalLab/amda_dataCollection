@@ -1,8 +1,7 @@
 // src/database/entities/user.entity.ts
 import * as bcrypt from 'bcryptjs';
-import { BeforeInsert, BeforeUpdate, Column, Entity, Index, OneToOne } from 'typeorm';
+import { BeforeInsert, BeforeUpdate, Column, Entity, Index } from 'typeorm';
 import { BaseEntity } from './base.entity';
-import { Member } from './member.entity';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -92,11 +91,7 @@ export class User extends BaseEntity {
 
   @Column({ type: 'boolean', default: false })
   isFirstLogin?: boolean;
-
-  @OneToOne(() => Member, (member) => member.user)
-  member!: Member;
-
-  minigridSites: any;
+  memberId: any;
 
   // Methods
   @BeforeInsert()

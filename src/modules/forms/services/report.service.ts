@@ -1,4 +1,3 @@
-
 // @ts-nocheck
 
 import * as ExcelJS from 'exceljs';
@@ -105,10 +104,10 @@ export class ReportService {
   private formService: FormService;
   private scheduledReports: Map<string, ScheduledReport> = new Map();
   private reportHistory: Map<string, ReportHistoryItem> = new Map();
-private repo: FormRepository;
+  private repo: FormRepository;
   constructor(private readonly dataSource: DataSource) {
     this.formService = new FormService(new FormRepository(dataSource));
-    this.repo = new FormRepository(dataSource)
+    this.repo = new FormRepository(dataSource);
   }
 
   /**
@@ -198,16 +197,16 @@ private repo: FormRepository;
     const result = await this.formService.getFormSubmissions(
       formId,
       filters,
-      { 
-        page: 1, 
+      {
+        page: 1,
         limit: 10000,
         sortBy: config.sortBy || 'created_at',
-        sortOrder: config.sortOrder || 'DESC'
+        sortOrder: config.sortOrder || 'DESC',
       },
       true
     );
 
-    console.log(formId, 'and ', result, "form subsss")
+    console.log(formId, 'and ', result, 'form subsss');
 
     return result || [];
   }
@@ -218,22 +217,28 @@ private repo: FormRepository;
   private async calculateComprehensiveSummary(submissions: any[], form: any) {
     const totalSubmissions = submissions.length;
 
-    console.log(submissions, 'From Comprehensive')
+    console.log(submissions, 'From Comprehensive');
     const completedSubmissions = submissions.filter(s => s.status === 'SUBMITTED').length;
-    const completionRate = totalSubmissions > 0 ? (completedSubmissions / totalSubmissions) * 100 : 0;
+    const completionRate =
+      totalSubmissions > 0 ? (completedSubmissions / totalSubmissions) * 100 : 0;
 
     // Calculate average completion time if available
     const submissionsWithTime = submissions.filter(s => s.completionTime && s.completionTime > 0);
-    const averageTime = submissionsWithTime.length > 0
-      ? submissionsWithTime.reduce((sum, s) => sum + s.completionTime, 0) / submissionsWithTime.length
-      : 0;
+    const averageTime =
+      submissionsWithTime.length > 0
+        ? submissionsWithTime.reduce((sum, s) => sum + s.completionTime, 0) /
+          submissionsWithTime.length
+        : 0;
 
     // Status breakdown
-    const statusBreakdown = submissions.reduce((acc, submission) => {
-      const status = submission.status || 'PENDING';
-      acc[status] = (acc[status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const statusBreakdown = submissions.reduce(
+      (acc, submission) => {
+        const status = submission.status || 'PENDING';
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     // Submission trend over time
     const submissionTrend = this.calculateSubmissionTrend(submissions);
@@ -255,11 +260,14 @@ private repo: FormRepository;
    * Calculate submission trend over time
    */
   private calculateSubmissionTrend(submissions: any[]): Array<{ date: string; count: number }> {
-    const grouped = submissions.reduce((acc, submission) => {
-      const date = new Date(submission.createdAt).toDateString();
-      acc[date] = (acc[date] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const grouped = submissions.reduce(
+      (acc, submission) => {
+        const date = new Date(submission.createdAt).toDateString();
+        acc[date] = (acc[date] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     return Object.entries(grouped)
       .map(([date, count]) => ({ date, count }))
@@ -271,18 +279,18 @@ private repo: FormRepository;
    */
   private calculateFieldResponseRates(submissions: any[], form: any): Record<string, number> {
     const responseRates: Record<string, number> = {};
-    
+
     // Get all form fields
     const allFields = this.extractAllFormFields(form);
-    
+
     allFields.forEach(field => {
       const responseCount = submissions.filter(s => {
         const value = s.data?.[field.name];
         return value !== null && value !== undefined && value !== '';
       }).length;
-      
-      responseRates[field.name] = submissions.length > 0 ? 
-        (responseCount / submissions.length) * 100 : 0;
+
+      responseRates[field.name] =
+        submissions.length > 0 ? (responseCount / submissions.length) * 100 : 0;
     });
 
     return responseRates;
@@ -293,9 +301,8 @@ private repo: FormRepository;
    */
   private extractAllFormFields(form: any): any[] {
     const allFields: any[] = [];
-    
-    for (const category of form.categories || []) {
 
+    for (const category of form.categories || []) {
       for (const question of category.questions || []) {
         allFields.push({
           name: question.kpi,
@@ -323,7 +330,7 @@ private repo: FormRepository;
         .map(s => s?.[field.name])
         .filter(value => value !== null && value !== undefined && value !== '');
 
-        // console.log(allFields, field, ":tjd")
+      // console.log(allFields, field, ":tjd")
       const analysis: any = {
         fieldName: field.name,
         fieldLabel: field.label,
@@ -372,7 +379,8 @@ private repo: FormRepository;
           case 'rating':
           case 'scale':
             analysis.statistics = this.calculateNumericStats(fieldData);
-            analysis.averageRating = fieldData.reduce((sum, val) => sum + Number(val), 0) / fieldData.length;
+            analysis.averageRating =
+              fieldData.reduce((sum, val) => sum + Number(val), 0) / fieldData.length;
             analysis.ratingDistribution = this.getRatingDistribution(fieldData);
             break;
 
@@ -397,13 +405,16 @@ private repo: FormRepository;
    * Helper methods for field analysis
    */
   private getMostCommonValue(data: any[]): string {
-    const frequency = data.reduce((acc, value) => {
-      const key = String(value);
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const frequency = data.reduce(
+      (acc, value) => {
+        const key = String(value);
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
-    return Object.keys(frequency).reduce((a, b) => frequency[a] > frequency[b] ? a : b);
+    return Object.keys(frequency).reduce((a, b) => (frequency[a] > frequency[b] ? a : b));
   }
 
   private calculateAverageLength(data: any[]): number {
@@ -419,27 +430,36 @@ private repo: FormRepository;
       .split(/\s+/)
       .filter(word => word.length > 2);
 
-    const frequency = words.reduce((acc, word) => {
-      acc[word] = (acc[word] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const frequency = words.reduce(
+      (acc, word) => {
+        acc[word] = (acc[word] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     // Return top 10 most frequent words
     return Object.entries(frequency)
-      .sort(([,a], [,b]) => b - a)
+      .sort(([, a], [, b]) => b - a)
       .slice(0, 10)
-      .reduce((acc, [word, count]) => {
-        acc[word] = count;
-        return acc;
-      }, {} as Record<string, number>);
+      .reduce(
+        (acc, [word, count]) => {
+          acc[word] = count;
+          return acc;
+        },
+        {} as Record<string, number>
+      );
   }
 
   private getOptionBreakdown(data: any[]): Record<string, number> {
-    return data.reduce((acc, value) => {
-      const key = String(value);
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    return data.reduce(
+      (acc, value) => {
+        const key = String(value);
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
   }
 
   private calculateNumericStats(data: any[]) {
@@ -477,18 +497,21 @@ private repo: FormRepository;
 
   private getDateDistribution(data: any[]): Record<string, number> {
     const dates = data.map(d => new Date(d)).filter(d => !isNaN(d.getTime()));
-    const monthCounts = dates.reduce((acc, date) => {
-      const month = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
-      acc[month] = (acc[month] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const monthCounts = dates.reduce(
+      (acc, date) => {
+        const month = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+        acc[month] = (acc[month] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     return monthCounts;
   }
 
   private analyzeMultiSelectField(data: any[]) {
     const allOptions: string[] = [];
-    
+
     data.forEach(value => {
       if (Array.isArray(value)) {
         allOptions.push(...value.map(v => String(v)));
@@ -497,17 +520,23 @@ private repo: FormRepository;
       }
     });
 
-    const frequency = allOptions.reduce((acc, option) => {
-      acc[option] = (acc[option] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const frequency = allOptions.reduce(
+      (acc, option) => {
+        acc[option] = (acc[option] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     return Object.entries(frequency)
-      .sort(([,a], [,b]) => b - a)
-      .reduce((acc, [option, count]) => {
-        acc[option] = count;
-        return acc;
-      }, {} as Record<string, number>);
+      .sort(([, a], [, b]) => b - a)
+      .reduce(
+        (acc, [option, count]) => {
+          acc[option] = count;
+          return acc;
+        },
+        {} as Record<string, number>
+      );
   }
 
   private calculateAverageSelections(data: any[]): number {
@@ -524,24 +553,31 @@ private repo: FormRepository;
   }
 
   private getRatingDistribution(data: any[]): Record<string, number> {
-    return data.reduce((acc, rating) => {
-      const key = String(rating);
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    return data.reduce(
+      (acc, rating) => {
+        const key = String(rating);
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
   }
 
   private getBooleanBreakdown(data: any[]): Record<string, number> {
-    return data.reduce((acc, value) => {
-      const key = value === true || value === 'true' || value === 'yes' || value === '1' ? 'Yes' : 'No';
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    return data.reduce(
+      (acc, value) => {
+        const key =
+          value === true || value === 'true' || value === 'yes' || value === '1' ? 'Yes' : 'No';
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
   }
 
   private analyzeFileField(data: any[]): any {
     const files = data.filter(d => d && typeof d === 'object');
-    
+
     return {
       totalFiles: files.length,
       fileTypes: this.getFileTypeDistribution(files),
@@ -550,11 +586,14 @@ private repo: FormRepository;
   }
 
   private getFileTypeDistribution(files: any[]): Record<string, number> {
-    return files.reduce((acc, file) => {
-      const extension = file.filename ? file.filename.split('.').pop()?.toLowerCase() : 'unknown';
-      acc[extension] = (acc[extension] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    return files.reduce(
+      (acc, file) => {
+        const extension = file.filename ? file.filename.split('.').pop()?.toLowerCase() : 'unknown';
+        acc[extension] = (acc[extension] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
   }
 
   private calculateAverageFileSize(files: any[]): number {
@@ -575,7 +614,7 @@ private repo: FormRepository;
           Author: 'Form Analytics System',
           Subject: 'Form Submission Report',
           Creator: 'Dynamic Forms System',
-        }
+        },
       });
 
       const chunks: Buffer[] = [];
@@ -610,34 +649,28 @@ private repo: FormRepository;
     };
 
     // 1. Header and title
-    doc.fontSize(24)
-       .fillColor('#2c3e50')
-       .text('Form Analytics Report', margin, yPos);
+    doc.fontSize(24).fillColor('#2c3e50').text('Form Analytics Report', margin, yPos);
     yPos += 40;
 
-    doc.fontSize(16)
-       .fillColor('#34495e')
-       .text(config.customTitle || reportData.form.title, margin, yPos);
+    doc
+      .fontSize(16)
+      .fillColor('#34495e')
+      .text(config.customTitle || reportData.form.title, margin, yPos);
     yPos += 25;
 
-    doc.fontSize(12)
-       .fillColor('#7f8c8d')
-       .text(`Generated on: ${new Date().toLocaleDateString()}`, margin, yPos);
+    doc
+      .fontSize(12)
+      .fillColor('#7f8c8d')
+      .text(`Generated on: ${new Date().toLocaleDateString()}`, margin, yPos);
     yPos += 30;
 
     // Add line separator
-    doc.strokeColor('#ecf0f1')
-       .lineWidth(1)
-       .moveTo(margin, yPos)
-       .lineTo(pageWidth, yPos)
-       .stroke();
+    doc.strokeColor('#ecf0f1').lineWidth(1).moveTo(margin, yPos).lineTo(pageWidth, yPos).stroke();
     yPos += 30;
 
     // 2. Executive Summary
     checkNewPage(100);
-    doc.fontSize(18)
-       .fillColor('#2c3e50')
-       .text('Executive Summary', margin, yPos);
+    doc.fontSize(18).fillColor('#2c3e50').text('Executive Summary', margin, yPos);
     yPos += 30;
 
     // Summary metrics in a grid-like format
@@ -648,35 +681,31 @@ private repo: FormRepository;
     ];
 
     summaryItems.forEach((item, index) => {
-      const xPos = margin + (index * 180);
-      
+      const xPos = margin + index * 180;
+
       // Draw card background
-      doc.rect(xPos, yPos, 160, 60)
-         .fillColor('#f8f9fa')
-         .fill();
-      
+      doc.rect(xPos, yPos, 160, 60).fillColor('#f8f9fa').fill();
+
       // Add border
-      doc.rect(xPos, yPos, 160, 5)
-         .fillColor('#3498db')
-         .fill();
-      
+      doc.rect(xPos, yPos, 160, 5).fillColor('#3498db').fill();
+
       // Add text
-      doc.fontSize(16)
-         .fillColor('#2c3e50')
-         .text(item.value, xPos + 10, yPos + 15);
-      
-      doc.fontSize(10)
-         .fillColor('#7f8c8d')
-         .text(item.label, xPos + 10, yPos + 35);
+      doc
+        .fontSize(16)
+        .fillColor('#2c3e50')
+        .text(item.value, xPos + 10, yPos + 15);
+
+      doc
+        .fontSize(10)
+        .fillColor('#7f8c8d')
+        .text(item.label, xPos + 10, yPos + 35);
     });
 
     yPos += 80;
 
     // 3. Form Overview
     checkNewPage(80);
-    doc.fontSize(16)
-       .fillColor('#2c3e50')
-       .text('Form Overview', margin, yPos);
+    doc.fontSize(16).fillColor('#2c3e50').text('Form Overview', margin, yPos);
     yPos += 25;
 
     const details = [
@@ -684,15 +713,21 @@ private repo: FormRepository;
       ['Status', reportData.form.status],
       ['Created', new Date(reportData.form.createdAt).toLocaleDateString()],
       ['Categories', reportData.form.categories?.length || 0],
-      ['Total Questions', reportData.form.categories?.reduce((sum: number, cat: any) => sum + (cat.questions?.length || 0), 0) || 0],
+      [
+        'Total Questions',
+        reportData.form.categories?.reduce(
+          (sum: number, cat: any) => sum + (cat.questions?.length || 0),
+          0
+        ) || 0,
+      ],
     ];
 
     details.forEach(([label, value]) => {
-      doc.fontSize(11)
-         .fillColor('#2c3e50')
-         .text(`${label}: `, margin + 20, yPos);
-      doc.fillColor('#7f8c8d')
-         .text(value.toString(), margin + 120, yPos);
+      doc
+        .fontSize(11)
+        .fillColor('#2c3e50')
+        .text(`${label}: `, margin + 20, yPos);
+      doc.fillColor('#7f8c8d').text(value.toString(), margin + 120, yPos);
       yPos += 18;
     });
 
@@ -701,70 +736,82 @@ private repo: FormRepository;
     // 4. Field Analysis
     if (config.includeAnalytics && reportData.fieldAnalysis.length > 0) {
       checkNewPage(100);
-      doc.fontSize(16)
-         .fillColor('#2c3e50')
-         .text('Field Analysis', margin, yPos);
+      doc.fontSize(16).fillColor('#2c3e50').text('Field Analysis', margin, yPos);
       yPos += 25;
 
       // Group fields by category
-      const fieldsByCategory = reportData.fieldAnalysis.reduce((acc, field) => {
-        const category = field.categoryName || 'Uncategorized';
-        if (!acc[category]) acc[category] = [];
-        acc[category].push(field);
-        return acc;
-      }, {} as Record<string, any[]>);
+      const fieldsByCategory = reportData.fieldAnalysis.reduce(
+        (acc, field) => {
+          const category = field.categoryName || 'Uncategorized';
+          if (!acc[category]) acc[category] = [];
+          acc[category].push(field);
+          return acc;
+        },
+        {} as Record<string, any[]>
+      );
 
       Object.entries(fieldsByCategory).forEach(([category, fields]) => {
         checkNewPage(60);
-        doc.fontSize(14)
-           .fillColor('#34495e')
-           .text(`Category: ${category}`, margin, yPos);
+        doc.fontSize(14).fillColor('#34495e').text(`Category: ${category}`, margin, yPos);
         yPos += 20;
 
-        fields.slice(0, 10).forEach(field => { // Limit to first 10 fields per category
+        fields.slice(0, 10).forEach(field => {
+          // Limit to first 10 fields per category
           checkNewPage(50);
-          
-          doc.fontSize(12)
-             .fillColor('#34495e');
+
+          doc.fontSize(12).fillColor('#34495e');
           const fieldName = field.fieldLabel || field.fieldName;
           doc.text(fieldName.substring(0, 40), margin + 20, yPos); // Truncate long names
           yPos += 15;
 
-          doc.fontSize(9)
-             .fillColor('#7f8c8d')
-             .text(`Type: ${field.fieldType} | Response Rate: ${field.responseRate.toFixed(1)}% | Responses: ${field.responseCount}`, margin + 20, yPos);
+          doc
+            .fontSize(9)
+            .fillColor('#7f8c8d')
+            .text(
+              `Type: ${field.fieldType} | Response Rate: ${field.responseRate.toFixed(1)}% | Responses: ${field.responseCount}`,
+              margin + 20,
+              yPos
+            );
           yPos += 12;
 
           // Progress bar simulation
           const barWidth = 200;
           const barHeight = 6;
           const fillWidth = (field.responseRate / 100) * barWidth;
-          
-          doc.rect(margin + 20, yPos, barWidth, barHeight)
-             .fillColor('#ecf0f1')
-             .fill();
-          
-          const barColor = field.responseRate > 70 ? '#2ecc71' : 
-                          field.responseRate > 40 ? '#f1c40f' : '#e74c3c';
-          doc.rect(margin + 20, yPos, fillWidth, barHeight)
-             .fillColor(barColor)
-             .fill();
-          
+
+          doc
+            .rect(margin + 20, yPos, barWidth, barHeight)
+            .fillColor('#ecf0f1')
+            .fill();
+
+          const barColor =
+            field.responseRate > 70 ? '#2ecc71' : field.responseRate > 40 ? '#f1c40f' : '#e74c3c';
+          doc
+            .rect(margin + 20, yPos, fillWidth, barHeight)
+            .fillColor(barColor)
+            .fill();
+
           yPos += 15;
 
           // Field-specific details
           if (field.statistics) {
             const stats = field.statistics;
-            doc.fontSize(8)
-               .fillColor('#2c3e50')
-               .text(`Stats: Min: ${stats.min} | Max: ${stats.max} | Average: ${stats.mean.toFixed(2)}`, margin + 20, yPos);
+            doc
+              .fontSize(8)
+              .fillColor('#2c3e50')
+              .text(
+                `Stats: Min: ${stats.min} | Max: ${stats.max} | Average: ${stats.mean.toFixed(2)}`,
+                margin + 20,
+                yPos
+              );
             yPos += 12;
           }
 
           if (field.mostCommon) {
-            doc.fontSize(8)
-               .fillColor('#2c3e50')
-               .text(`Most Common: ${field.mostCommon.substring(0, 30)}`, margin + 20, yPos);
+            doc
+              .fontSize(8)
+              .fillColor('#2c3e50')
+              .text(`Most Common: ${field.mostCommon.substring(0, 30)}`, margin + 20, yPos);
             yPos += 12;
           }
 
@@ -777,15 +824,13 @@ private repo: FormRepository;
 
     // 5. Trends and Insights
     checkNewPage(80);
-    doc.fontSize(16)
-       .fillColor('#2c3e50')
-       .text('Trends and Insights', margin, yPos);
+    doc.fontSize(16).fillColor('#2c3e50').text('Trends and Insights', margin, yPos);
     yPos += 25;
 
     // const insights = this.generateInsights(reportData);
     // insights.slice(0, 5).forEach((insight, index) => { // Limit to first 5 insights
     //   checkNewPage(60);
-      
+
     //   doc.fontSize(12)
     //      .fillColor('#2c3e50')
     //      .text(`${index + 1}. ${insight.title}`, margin + 20, yPos);
@@ -794,7 +839,7 @@ private repo: FormRepository;
     //   doc.fontSize(9)
     //      .fillColor('#7f8c8d');
     //   const description = insight.description.substring(0, 120) + (insight.description.length > 120 ? '...' : '');
-    //   const lines = doc.widthOfString(description) > 450 ? 
+    //   const lines = doc.widthOfString(description) > 450 ?
     //     this.wrapText(description, 450, doc) : [description];
     //   lines.forEach(line => {
     //     doc.text(line, margin + 30, yPos);
@@ -821,7 +866,7 @@ private repo: FormRepository;
     // const recommendations = this.generateRecommendations(reportData);
     // recommendations.slice(0, 5).forEach((recommendation, index) => {
     //   checkNewPage(50);
-      
+
     //   doc.fontSize(12)
     //      .fillColor('#2c3e50')
     //      .text(`${index + 1}. ${recommendation.title}`, margin + 20, yPos);
@@ -830,7 +875,7 @@ private repo: FormRepository;
     //   doc.fontSize(9)
     //      .fillColor('#7f8c8d');
     //   const description = recommendation.description.substring(0, 120) + (recommendation.description.length > 120 ? '...' : '');
-    //   const lines = doc.widthOfString(description) > 450 ? 
+    //   const lines = doc.widthOfString(description) > 450 ?
     //     this.wrapText(description, 450, doc) : [description];
     //   lines.forEach(line => {
     //     doc.text(line, margin + 30, yPos);
@@ -842,9 +887,10 @@ private repo: FormRepository;
     // 7. Footer with metadata
     const totalPages = doc.bufferedPageRange().count;
     for (let i = 0; i < totalPages; i++) {
-      doc.fontSize(8)
-         .fillColor('#7f8c8d')
-         .text(`Page ${i + 1} of ${totalPages}`, pageWidth - 50, pageHeight + 20);
+      doc
+        .fontSize(8)
+        .fillColor('#7f8c8d')
+        .text(`Page ${i + 1} of ${totalPages}`, pageWidth - 50, pageHeight + 20);
       doc.text(`Generated by Dynamic Forms System`, margin, pageHeight + 20);
     }
   }
@@ -871,14 +917,17 @@ private repo: FormRepository;
 
     return lines;
   }
-  private generateRecommendations(reportData: ReportData): Array<{title: string, description: string}> {
-    const recommendations: Array<{title: string, description: string}> = [];
+  private generateRecommendations(
+    reportData: ReportData
+  ): Array<{ title: string; description: string }> {
+    const recommendations: Array<{ title: string; description: string }> = [];
 
     // Low completion rate recommendations
     if (reportData.summary.completionRate < 50) {
       recommendations.push({
         title: 'Simplify Form Structure',
-        description: 'Consider reducing the number of required fields and breaking the form into multiple steps to improve completion rates.'
+        description:
+          'Consider reducing the number of required fields and breaking the form into multiple steps to improve completion rates.',
       });
     }
 
@@ -887,37 +936,48 @@ private repo: FormRepository;
     if (lowResponseFields.length > 0) {
       recommendations.push({
         title: 'Optimize Low-Response Fields',
-        description: `Review and optimize ${lowResponseFields.length} fields with low response rates. Consider making them optional or providing better instructions.`
+        description: `Review and optimize ${lowResponseFields.length} fields with low response rates. Consider making them optional or providing better instructions.`,
       });
     }
 
     // Field type recommendations
-    const textFields = reportData.fieldAnalysis.filter(f => f.fieldType === 'textarea' && f.averageLength && f.averageLength < 50);
+    const textFields = reportData.fieldAnalysis.filter(
+      f => f.fieldType === 'textarea' && f.averageLength && f.averageLength < 50
+    );
     if (textFields.length > 0) {
       recommendations.push({
         title: 'Consider Alternative Input Types',
-        description: 'Some textarea fields have very short responses. Consider using select or radio buttons for these fields.'
+        description:
+          'Some textarea fields have very short responses. Consider using select or radio buttons for these fields.',
       });
     }
 
     // Data quality recommendations
-    const numericFields = reportData.fieldAnalysis.filter(f => f.fieldType === 'number' && f.statistics);
-    const fieldsWithOutliers = numericFields.filter(f => 
-      f.statistics && f.statistics.standardDeviation && f.statistics.standardDeviation > f.statistics.mean * 2
+    const numericFields = reportData.fieldAnalysis.filter(
+      f => f.fieldType === 'number' && f.statistics
     );
-    
+    const fieldsWithOutliers = numericFields.filter(
+      f =>
+        f.statistics &&
+        f.statistics.standardDeviation &&
+        f.statistics.standardDeviation > f.statistics.mean * 2
+    );
+
     if (fieldsWithOutliers.length > 0) {
       recommendations.push({
         title: 'Add Input Validation',
-        description: 'Some numeric fields show high variance suggesting possible data entry errors. Consider adding validation rules.'
+        description:
+          'Some numeric fields show high variance suggesting possible data entry errors. Consider adding validation rules.',
       });
     }
 
     // User experience recommendations
-    if (reportData.summary.averageTime > 600) { // 10 minutes
+    if (reportData.summary.averageTime > 600) {
+      // 10 minutes
       recommendations.push({
         title: 'Optimize Form Length',
-        description: 'The average completion time is quite high. Consider breaking the form into smaller sections or removing non-essential fields.'
+        description:
+          'The average completion time is quite high. Consider breaking the form into smaller sections or removing non-essential fields.',
       });
     }
 
@@ -926,41 +986,38 @@ private repo: FormRepository;
 
   private addAppendix(doc: PDFDocument, reportData: ReportData, config: ReportConfig) {
     doc.addPage();
-    doc.fontSize(18)
-       .fillColor('#2c3e50')
-       .text('Appendix', 50, 50);
-    
+    doc.fontSize(18).fillColor('#2c3e50').text('Appendix', 50, 50);
+
     let yPos = 90;
 
     // Technical details
-    doc.fontSize(14)
-       .fillColor('#34495e')
-       .text('Technical Information', 50, yPos);
+    doc.fontSize(14).fillColor('#34495e').text('Technical Information', 50, yPos);
     yPos += 25;
-    
+
     const technicalDetails = [
       ['Report Generated', new Date().toISOString()],
       ['Form ID', reportData.form.id],
       ['Total Fields Analyzed', reportData.fieldAnalysis.length.toString()],
       ['Total Submissions Analyzed', reportData.submissions.length.toString()],
-      ['Date Range', config.dateRange ? `${config.dateRange.startDate.toDateString()} to ${config.dateRange.endDate.toDateString()}` : 'All time'],
+      [
+        'Date Range',
+        config.dateRange
+          ? `${config.dateRange.startDate.toDateString()} to ${config.dateRange.endDate.toDateString()}`
+          : 'All time',
+      ],
     ];
 
     technicalDetails.forEach(([label, value]) => {
-      doc.fontSize(10)
-         .fillColor('#7f8c8d')
-         .text(`${label}: ${value}`, 70, yPos);
+      doc.fontSize(10).fillColor('#7f8c8d').text(`${label}: ${value}`, 70, yPos);
       yPos += 15;
     });
 
     yPos += 30;
 
     // Configuration used
-    doc.fontSize(14)
-       .fillColor('#34495e')
-       .text('Report Configuration', 50, yPos);
+    doc.fontSize(14).fillColor('#34495e').text('Report Configuration', 50, yPos);
     yPos += 25;
-    
+
     const configDetails = [
       ['Include Charts', config.includeCharts ? 'Yes' : 'No'],
       ['Include Raw Data', config.includeRawData ? 'Yes' : 'No'],
@@ -968,16 +1025,15 @@ private repo: FormRepository;
     ];
 
     configDetails.forEach(([label, value]) => {
-      doc.fontSize(10)
-         .fillColor('#7f8c8d')
-         .text(`${label}: ${value}`, 70, yPos);
+      doc.fontSize(10).fillColor('#7f8c8d').text(`${label}: ${value}`, 70, yPos);
       yPos += 15;
     });
-    
+
     if (config.filters) {
-      doc.fontSize(10)
-         .fillColor('#7f8c8d')
-         .text(`Filters Applied: ${Object.keys(config.filters).join(', ')}`, 70, yPos);
+      doc
+        .fontSize(10)
+        .fillColor('#7f8c8d')
+        .text(`Filters Applied: ${Object.keys(config.filters).join(', ')}`, 70, yPos);
     }
   }
 
@@ -1023,7 +1079,7 @@ private repo: FormRepository;
         fieldName: field.fieldName,
         fieldLabel: field.fieldLabel,
         fieldType: field.fieldType,
-        categoryName:field.categoryName,
+        categoryName: field.categoryName,
         responseCount: field.responseCount,
         responseRate: field.responseRate,
         statistics: field.statistics,
@@ -1038,7 +1094,10 @@ private repo: FormRepository;
   /**
    * Schedule a report for regular generation
    */
-  async scheduleReport(formId: string, scheduleConfig: ScheduledReportConfig): Promise<ScheduledReport> {
+  async scheduleReport(
+    formId: string,
+    scheduleConfig: ScheduledReportConfig
+  ): Promise<ScheduledReport> {
     const scheduledReport: ScheduledReport = {
       id: this.generateId(),
       formId,
@@ -1054,7 +1113,7 @@ private repo: FormRepository;
 
     // Store in memory (in production, save to database)
     this.scheduledReports.set(scheduledReport.id, scheduledReport);
-    
+
     console.log(`Report scheduled: ${scheduledReport.name} for form ${formId}`);
     return scheduledReport;
   }
@@ -1063,8 +1122,7 @@ private repo: FormRepository;
    * Get all scheduled reports for a form
    */
   async getScheduledReports(formId: string): Promise<ScheduledReport[]> {
-    return Array.from(this.scheduledReports.values())
-      .filter(report => report.formId === formId);
+    return Array.from(this.scheduledReports.values()).filter(report => report.formId === formId);
   }
 
   /**
@@ -1082,7 +1140,10 @@ private repo: FormRepository;
   /**
    * Update a scheduled report
    */
-  async updateScheduledReport(scheduleId: string, updates: Partial<ScheduledReportConfig>): Promise<ScheduledReport> {
+  async updateScheduledReport(
+    scheduleId: string,
+    updates: Partial<ScheduledReportConfig>
+  ): Promise<ScheduledReport> {
     const report = this.scheduledReports.get(scheduleId);
     if (!report) {
       throw new Error('Scheduled report not found');
@@ -1101,7 +1162,10 @@ private repo: FormRepository;
   /**
    * Get report generation history
    */
-  async getReportHistory(formId: string, query: ReportHistoryQuery): Promise<{
+  async getReportHistory(
+    formId: string,
+    query: ReportHistoryQuery
+  ): Promise<{
     data: ReportHistoryItem[];
     total: number;
     page: number;
@@ -1141,7 +1205,7 @@ private repo: FormRepository;
       const buffer = await this.generateFormReport(reportHistory.formId, reportHistory.config);
       return {
         filename: reportHistory.filename,
-        buffer
+        buffer,
       };
     } catch (error) {
       console.error('Error retrieving report from history:', error);
@@ -1154,7 +1218,7 @@ private repo: FormRepository;
    */
   async exportReportToExcel(formId: string, config: ReportConfig): Promise<Buffer> {
     const reportData = await this.gatherReportData(formId, config);
-    
+
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Form Analytics System';
     workbook.created = new Date();
@@ -1165,12 +1229,22 @@ private repo: FormRepository;
     summarySheet.addRow(['Form Title', reportData.form.title]);
     summarySheet.addRow(['Total Submissions', reportData.summary.totalSubmissions]);
     summarySheet.addRow(['Completion Rate', `${reportData.summary.completionRate.toFixed(1)}%`]);
-    summarySheet.addRow(['Average Time', `${Math.round(reportData.summary.averageTime / 60)} minutes`]);
+    summarySheet.addRow([
+      'Average Time',
+      `${Math.round(reportData.summary.averageTime / 60)} minutes`,
+    ]);
 
     // Field Analysis sheet
     const fieldSheet = workbook.addWorksheet('Field Analysis');
-    fieldSheet.addRow(['Field Name', 'Field Type', 'Response Count', 'Response Rate %', 'Most Common', 'Unique Values']);
-    
+    fieldSheet.addRow([
+      'Field Name',
+      'Field Type',
+      'Response Count',
+      'Response Rate %',
+      'Most Common',
+      'Unique Values',
+    ]);
+
     reportData.fieldAnalysis.forEach(field => {
       fieldSheet.addRow([
         field.fieldName,
@@ -1178,33 +1252,33 @@ private repo: FormRepository;
         field.responseCount,
         field.responseRate.toFixed(1),
         field.mostCommon || '',
-        field.uniqueValues || ''
+        field.uniqueValues || '',
       ]);
     });
 
     // Raw data sheet (if requested)
     if (config.includeRawData && reportData.submissions.length <= 1000) {
       const dataSheet = workbook.addWorksheet('Raw Data');
-      
+
       if (reportData.submissions.length > 0) {
         const headers = ['ID', 'Status', 'Submitted By', 'Created At'];
         const allFields = this.extractAllFormFields(reportData.form);
         headers.push(...allFields.map(f => f.name));
-        
+
         dataSheet.addRow(headers);
-        
+
         reportData.submissions.forEach(submission => {
           const row = [
             submission.id,
             submission.status,
             submission.submittedBy || 'Anonymous',
-            submission.createdAt
+            submission.createdAt,
           ];
-          
+
           allFields.forEach(field => {
             row.push(submission.data?.[field.name] || '');
           });
-          
+
           dataSheet.addRow(row);
         });
       }
@@ -1227,10 +1301,13 @@ private repo: FormRepository;
   }
 
   private getFieldTypeDistribution(fieldAnalysis: any[]): Record<string, number> {
-    return fieldAnalysis.reduce((acc, field) => {
-      acc[field.fieldType] = (acc[field.fieldType] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    return fieldAnalysis.reduce(
+      (acc, field) => {
+        acc[field.fieldType] = (acc[field.fieldType] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
   }
 
   private estimatePdfPages(reportData: ReportData, config: ReportConfig): number {
@@ -1301,26 +1378,26 @@ private repo: FormRepository;
    */
   async processScheduledReports(): Promise<void> {
     const now = new Date();
-    const dueReports = Array.from(this.scheduledReports.values())
-      .filter(report => report.isActive && report.nextRun <= now);
+    const dueReports = Array.from(this.scheduledReports.values()).filter(
+      report => report.isActive && report.nextRun <= now
+    );
 
     for (const report of dueReports) {
       try {
         console.log(`Processing scheduled report: ${report.name}`);
-        
+
         const pdfBuffer = await this.generateFormReport(report.formId, report.config);
-        
+
         // In production, send email here
         console.log(`Report would be sent to: ${report.recipients.join(', ')}`);
-        
+
         // Update next run time
         report.lastRun = now;
         report.nextRun = this.calculateNextRun(report.schedule);
         this.scheduledReports.set(report.id, report);
-        
+
         // Save to history
         await this.saveReportToHistory(report.formId, pdfBuffer, report.config, 'system');
-        
       } catch (error) {
         console.error(`Error processing scheduled report ${report.id}:`, error);
       }

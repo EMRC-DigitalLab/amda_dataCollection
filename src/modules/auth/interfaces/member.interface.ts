@@ -1,38 +1,44 @@
-import { BusinessModel, CompanyType, Member, MembershipStatus, MembershipType } from '../../../database/entities/member.entity';
+import {
+  BusinessModel,
+  CompanyType,
+  Member,
+  MembershipStatus,
+  MembershipType,
+} from '../../../database/entities/member.entity';
 import { User } from '../../../database/entities/user.entity';
 
 export interface IMember {
   id?: string;
   userId: string;
   user?: User;
-  
+
   // Company Information
   companyName: string;
   companyType: CompanyType;
   registrationNumber: string;
   yearEstablished: string;
   website?: string;
-  
+
   // Primary Contact Information
   primaryContactName: string;
   primaryContactTitle: string;
   primaryContactEmail: string;
   primaryContactPhone: string;
-  
+
   // Company Address
   headOfficeAddress: string;
   city: string;
   state: string;
   country: string;
   postalCode?: string;
-  
+
   // AMDA Membership Details
   membershipType: MembershipType;
   membershipStartDate: Date;
   membershipStatus: MembershipStatus;
   annualDues: string;
   countriesOfOperation: string;
-  
+
   // Business Information
   businessModel: BusinessModel;
   targetMarkets: string;
@@ -40,13 +46,13 @@ export interface IMember {
   minigridCount: string;
   totalCapacityInstalled: string;
   customerConnections: string;
-  
+
   // Additional Information
   companyMission: string;
   keyProjects: string;
   partnerships: string;
   certifications: string;
-  
+
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -120,6 +126,8 @@ export interface IMemberRepository {
   findAll(): Promise<Member[]>;
   findById(id: string): Promise<Member | null>;
   findByUserId(userId: string): Promise<Member | null>;
+  findByCompanyName(companyName: string): Promise<Member | null>;
+  findByMemberId(memberId: string): Promise<Member | null>;
   findByEmail(email: string): Promise<Member | null>;
   findByRegistrationNumber(registrationNumber: string): Promise<Member | null>;
   create(memberData: Partial<IMember>): Promise<Member>;
@@ -128,7 +136,11 @@ export interface IMemberRepository {
   findByMembershipStatus(status: MembershipStatus): Promise<Member[]>;
   findByCountry(country: string): Promise<Member[]>;
   searchMembers(query: string): Promise<Member[]>;
-  findWithPagination(page: number, limit: number): Promise<{
+
+  findWithPagination(
+    page: number,
+    limit: number
+  ): Promise<{
     members: Member[];
     total: number;
     totalPages: number;

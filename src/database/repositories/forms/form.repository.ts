@@ -185,7 +185,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     const whereConditions: any = {};
 
     if (status) whereConditions.status = status;
-    if (formType) whereConditions.formType = formType;
     if (adminId) whereConditions.adminId = adminId;
 
     return this.findAndCount({
@@ -438,7 +437,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
 
     return result.length > 0 ? result[0] : null;
   }
-
 
   async getSubmissionByMinigridSiteId(formId: string, siteId: string): Promise<any | null> {
     const form = await this.findFormById(formId);
@@ -1186,8 +1184,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
 
     let sql: string;
 
-
-    console.log(populate, formId)
+    console.log(populate, formId);
 
     if (populate) {
       // SQL with JOINs to populate related data
@@ -1238,7 +1235,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         const columnName = key;
 
         if (populate) {
-          // When populating, prefix with table alias
+          // When populating, prefix with table aliasd
           sql += ` AND s."${columnName}" = $${paramIndex}`;
         } else {
           sql += ` AND "${columnName}" = $${paramIndex}`;
@@ -1367,15 +1364,14 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     let sql = `CREATE TABLE "${tableName}" (\n`;
     sql += `  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`;
     sql += `  "form_id" UUID NOT NULL REFERENCES forms(id) ON DELETE CASCADE,\n`;
-    sql += `  "submitted_by" UUID REFERENCES users(id) ON DELETE SET NULL,\n`;
+    sql += `  "submitted_by" UUID REFERENCES members(id) ON DELETE SET NULL,\n`; // Members submit forms
     sql += `  "minigrid_siteId" UUID REFERENCES minigrid_sites(id) ON DELETE SET NULL,\n`;
-    // sql += `  "minigrid_siteId" UUID REFERENCES minigrid_sites(id) ON DELETE SET NULL,\n`;
     sql += `  "submitted_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n`;
     sql += `  "status" VARCHAR(20) DEFAULT 'SUBMITTED',\n`;
 
     sql += `  "admin_status" VARCHAR(20) DEFAULT 'PENDING' CHECK (admin_status IN ('PENDING', 'APPROVED', 'REJECTED')),\n`;
     sql += `  "admin_comment" TEXT NULL,\n`;
-    sql += `  "reviewed_by" UUID REFERENCES users(id) ON DELETE SET NULL,\n`;
+    sql += `  "reviewed_by" UUID REFERENCES users(id) ON DELETE SET NULL,\n`; // Admins (users) review forms
     sql += `  "reviewed_at" TIMESTAMP NULL,\n`;
 
     // Add columns for each question

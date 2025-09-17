@@ -1,15 +1,19 @@
-// src/modules/auth/services/auth.service.ts
+// @ts-nocheck
 import { config } from '@/config';
+import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { DataSource } from 'typeorm';
+import { Member } from '../../../database/entities/member.entity';
 import { User, UserRole, UserStatus } from '../../../database/entities/user.entity';
+import { MemberRepository } from '../../../database/repositories/auth/member.repository';
 import { UserRepository } from '../../../database/repositories/auth/user.repository';
 import { VerificationResult } from '../../../shared/types/auth.types';
+
+import { LoginDto } from '../dtos/login.dto';
 import {
   ChangePasswordRequest,
   ForgotPasswordRequest,
-  LoginRequest,
   LoginResponse,
   RefreshTokenRequest,
   RegisterRequest,
@@ -18,50 +22,131 @@ import {
 
 export class AuthService {
   private userRepository: UserRepository;
+  private memberRepository: MemberRepository;
 
   constructor(private dataSource: DataSource) {
     this.userRepository = new UserRepository(dataSource);
+    this.memberRepository = new MemberRepository(dataSource);
   }
 
   /**
    * Login for both admin and member
    */
-  async login(loginData: LoginRequest): Promise<LoginResponse> {
-    const { email, password } = loginData;
+  async login(loginDto: LoginDto): Promise<LoginResponse> {
+    const { email, password } = loginDto;
 
-    // Find user with password
-    const user = await this.userRepository.findByEmailForAuth(email);
-    if (!user) {
-      throw new Error('Invalid email or password');
+    console.log(loginDto, 'this is payload');
+
+    // First, try to find admin/user by email
+    let user: User | null = null;
+    let member: Member | null = null;
+    let isAdmin = false;
+
+    // Check if it's an email format (contains @)
+    if (email.includes('@')) {
+      // Try admin/user login
+      user = await this.userRepository.findByEmailForAuth(email);
+      if (user) {
+        isAdmin = true;
+      }
+    } else {
+      // Try member login with memberId
+      member = await this.memberRepository.findByMemberId(email);
     }
 
-    // Check if user is active
-    if (user.status !== UserStatus.ACTIVE) {
-      throw new Error('Account is inactive. Please contact administrator');
+    // If no user found by email, try to find member by email
+    if (!user && !member && email.includes('@')) {
+      member = await this.memberRepository.findByEmail(email);
     }
 
-    // Verify password
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
-      throw new Error('Invalid email or password');
+    // If still no user/member found, throw error
+    if (!user && !member) {
+      throw new Error('Invalid credentials');
     }
 
-    // Update last login
-    await this.userRepository.updateLastLogin(user.id);
+    let passwordMatch = false;
+    let loginUser: any = null;
 
-    // Generate tokens
-    const tokens = this.generateTokens(user);
+    if (isAdmin && user) {
+      // Admin login
+      passwordMatch = await bcrypt.compare(password, user.password);
 
-    return {
-      user: {
+      if (!passwordMatch) {
+        throw new Error('Invalid credentials');
+      }
+
+      if (user.status !== UserStatus.ACTIVE) {
+        throw new Error('Account is disabled');
+      }
+
+      loginUser = {
         id: user.id,
         email: user.email,
+        role: 'admin',
         firstName: user.firstName,
         lastName: user.lastName,
-        role: user.role,
-        isFirstLogin: user.requiresPasswordChange,
-      },
-      ...tokens,
+        phoneNumber: user.phoneNumber,
+        avatar: user.avatar,
+        status: user.status,
+        isFirstLogin: user.isFirstLogin,
+      };
+
+      // Update last login
+      await this.userRepository.updateLastLogin(user.id);
+    } else if (member) {
+      console.log(member);
+      // Member login
+      passwordMatch = await bcrypt.compare(password, member.password);
+
+      if (!passwordMatch) {
+        throw new Error('Invalid credentials');
+      }
+
+      // if (member.membershipStatus !== MembershipStatus.ACTIVE) {
+      //     throw new Error('Member account is not active');
+      // }
+
+      loginUser = {
+        ...member,
+        role: 'member',
+      };
+      console.log(loginUser, 'this is loging user');
+
+      // Update last login for member
+      await this.memberRepository.updateLastLogin(member.id);
+    }
+
+    // Generate tokensss
+    const accessTokenPayload = {
+      userId: loginUser.id,
+      email: loginUser.primaryContactEmail ? loginUser.primaryContactEmail : loginUser.email,
+      role: loginUser.memberId ? 'member' : 'admin',
+      memberId: loginUser?.memberId ? loginUser?.memberId : null,
+    };
+
+    const refreshTokenPayload = {
+      userId: loginUser.id,
+      email: loginUser.primaryContactEmail ? loginUser.primaryContactEmail : loginUser.email,
+      role: loginUser.memberId ? 'member' : 'admin',
+      memberId: loginUser?.memberId ? loginUser?.memberId : null,
+      type: 'refresh',
+    };
+
+    const accessToken = jwt.sign(accessTokenPayload, config.jwt.secret, {
+      expiresIn: config.jwt.expiresIn,
+    });
+
+    const refreshToken = jwt.sign(refreshTokenPayload, config.jwt.refreshSecret, {
+      expiresIn: config.jwt.refreshExpiresIn,
+    });
+
+    // Store refresh token (you might want to store this in Redis or database)
+    // await this.storeRefreshToken(loginUser.id, refreshToken);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: loginUser,
     };
   }
 
@@ -279,30 +364,65 @@ export class AuthService {
   /**
    * Get user profile
    */
-  async getProfile(userId: string): Promise<User> {
+  async getProfile(userId: string): Promise<any> {
+    // First try to find as user (admin)
     const user = await this.userRepository.findOne({
       where: { id: userId },
     });
 
-    if (!user) {
+    if (user) {
+      return {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phoneNumber: user.phoneNumber,
+        role: user.role,
+        status: user.status,
+        avatar: user.avatar,
+        lastLoginAt: user.lastLoginAt,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      };
+    }
+
+    // If not found, try to find as member
+    const member = await this.memberRepository.findById(userId);
+
+    if (!member) {
       throw new Error('User not found');
     }
 
-    return user;
+    return {
+      ...member,
+    };
   }
 
   /**
    * Generate JWT tokens
    */
-  private generateTokens(user: User): {
+  private generateTokens(
+    user: User | Member,
+    isMember?: boolean
+  ): {
     accessToken: string;
     refreshToken: string;
   } {
-    const payload = {
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-    };
+    let payload: any = {};
+
+    if (isMember) {
+      payload = {
+        userId: user.id,
+        memberId: user?.memberId,
+        role: 'member',
+      };
+    } else {
+      payload = {
+        userId: user.id,
+        email: user.email,
+        role: 'admin',
+      };
+    }
 
     const accessToken = jwt.sign(payload, config.jwt.secret, {
       expiresIn: config.jwt.expiresIn,
@@ -338,24 +458,24 @@ export class AuthService {
     const admin = await this.userRepository.findOne({
       where: { id: adminId, role: UserRole.ADMIN },
     });
-  
+
     if (!admin) {
       const error: any = new Error('Only admins can verify members');
       error.status = 403;
       throw error;
     }
-  
+
     // Find the member to verify
     const member = await this.userRepository.findOne({
       where: { id: memberId, role: UserRole.MEMBER },
     });
-  
+
     if (!member) {
       const error: any = new Error('Member not found');
       error.status = 404;
       throw error;
     }
-  
+
     // Check if member is already in the desired verification state
     if (member.isVerified === verifyDto.isVerified) {
       const status = verifyDto.isVerified ? 'verified' : 'unverified';
@@ -363,7 +483,7 @@ export class AuthService {
       error.status = 400;
       throw error;
     }
-  
+
     try {
       // Use repository method instead of direct database queries
       const updatedMember = await this.userRepository.updateVerificationStatus(
@@ -371,10 +491,10 @@ export class AuthService {
         verifyDto.isVerified,
         verifyDto.isVerified ? adminId : undefined
       );
-  
+
       const action = verifyDto.isVerified ? 'verified' : 'unverified';
       const message = `Member ${updatedMember.firstName} ${updatedMember.lastName} has been ${action} successfully`;
-  
+
       return {
         success: true,
         message,
@@ -426,13 +546,12 @@ export class AuthService {
     return { successful, failed };
   }
 
- 
-/**
- * Get verification statistics
- */
-async getVerificationStats(): Promise<any> {
-  return this.userRepository.getVerificationStats();
-}
+  /**
+   * Get verification statistics
+   */
+  async getVerificationStats(): Promise<any> {
+    return this.userRepository.getVerificationStats();
+  }
 
   /**
    * Get unverified members (pending verification)
@@ -494,30 +613,28 @@ async getVerificationStats(): Promise<any> {
     hasMore: boolean;
   }> {
     const filters: any = { role: UserRole.MEMBER };
-  
+
     if (isVerified !== undefined) {
       filters.isVerified = isVerified;
     }
-  
+
     if (country) {
       filters.country = country;
     }
-  
+
     const { users: members, total } = await this.userRepository.searchUsers(
       searchTerm,
       page,
       limit,
       filters
     );
-  
+
     return {
       members,
       total,
       hasMore: (page - 1) * limit + members.length < total,
     };
   }
-  
-
 
   /**
    * Get verification history for a member

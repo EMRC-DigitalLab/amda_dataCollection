@@ -82,7 +82,6 @@ export class FormService {
       skip: queryDto.page ? (queryDto.page - 1) * (queryDto.limit || 50) : 0,
       take: queryDto.limit || 50,
       status: queryDto.status as FormStatus,
-      formType: queryDto.formType,
       adminId: queryDto.adminId,
     };
 
@@ -387,7 +386,7 @@ export class FormService {
       { page: 1, limit: 1 }
     );
 
-    console.log(formId, siteId, submissions, "this is the paramasnsnns")
+    console.log(formId, siteId, submissions, 'this is the paramasnsnns');
 
     if (submissions.length === 0) {
       throw new Error('Submission not found');
@@ -536,7 +535,7 @@ export class FormService {
 
   async exportSubmissionsExcel(formId: string): Promise<Buffer> {
     const submissions = await this.repo.getFormSubmissions(formId);
-console.log(submissions, "exce; sss")
+    console.log(submissions, 'exce; sss');
     if (submissions.length === 0) {
       // Create empty workbook with headers
       const form = await this.findById(formId);

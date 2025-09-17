@@ -349,6 +349,7 @@ export class FormController {
   };
 
   submitForm = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    console.log(req.params.id, req.user.id, req.body.data);
     try {
       // Check if user has already submitted to this form
       const existingSubmission = await this.service.getUserSubmission(
@@ -495,8 +496,7 @@ export class FormController {
 
   getAllSubmissions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-
-      console.log("Reached controller")
+      console.log('Reached controller');
       const { page = 1, limit = 10, status, dateFrom, dateTo, ...filters } = req.query;
 
       const queryDto: SubmissionQueryDto = {
@@ -542,7 +542,11 @@ export class FormController {
       ResponseHelper.error(res, err.message, 400);
     }
   };
-  getSubmissionByMinigridSiteId = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  getSubmissionByMinigridSiteId = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ) => {
     try {
       const submission = await this.service.getSubmissionByMinigridSiteId(
         req.params.id,

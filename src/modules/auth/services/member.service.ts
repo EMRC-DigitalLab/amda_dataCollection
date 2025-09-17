@@ -1,8 +1,8 @@
-import { Member, MembershipStatus } from "../../../database/entities/member.entity";
-import { MemberRepository } from "../../../database/repositories/auth/member.repository";
-import { UserRepository } from "../../../database/repositories/auth/user.repository";
-import { AppError } from "../../../shared/middleware/error.middleware";
-import { CreateMemberDto, IMemberService, UpdateMemberDto } from "../interfaces/member.interface";
+import { Member, MembershipStatus } from '../../../database/entities/member.entity';
+import { MemberRepository } from '../../../database/repositories/auth/member.repository';
+import { UserRepository } from '../../../database/repositories/auth/user.repository';
+import { AppError } from '../../../shared/middleware/error.middleware';
+import { CreateMemberDto, IMemberService, UpdateMemberDto } from '../interfaces/member.interface';
 
 export class MemberService implements IMemberService {
   constructor(
@@ -10,7 +10,6 @@ export class MemberService implements IMemberService {
     private readonly userRepository: UserRepository
   ) {}
 
-  
   async getAllMembers(): Promise<Member[]> {
     return await this.memberRepository.findAll();
   }
@@ -40,13 +39,17 @@ export class MemberService implements IMemberService {
   }
 
   async createMember(memberData: CreateMemberDto): Promise<Member> {
-   
-    // Check if user already has a member profile
-    const existingMemberByUser = await this.memberRepository.findByUserId(memberData.userId);
-    if (existingMemberByUser) {
+    console.log(memberData, 'this is member data');
+
+    // Check if user already has a member profiled
+    const existingMemberByCompanyName = await this.memberRepository.findByCompanyName(
+      memberData.companyName
+    );
+    if (existingMemberByCompanyName) {
       throw new AppError('User already has a member profile', 409);
     }
 
+    console.log('reached 1');
     // Check if email already exists
     const existingMemberByEmail = await this.memberRepository.findByEmail(
       memberData.primaryContactEmail
@@ -55,17 +58,11 @@ export class MemberService implements IMemberService {
       throw new AppError('Member with this email already exists', 409);
     }
 
-    // Check if registration number already exists
-    const existingMemberByRegNo = await this.memberRepository.findByRegistrationNumber(
-      memberData.registrationNumber
-    );
-    if (existingMemberByRegNo) {
-      throw new AppError('Member with this registration number already exists', 409);
-    }
+    console.log('reached 2');
 
-    const memberToCreate: Partial<Member> = {
+    const memberToCreate: Partial<Member | any> = {
       ...memberData,
-      membershipStartDate: new Date(memberData.membershipStartDate),
+      // membershipStartDate: new Date(memberData.membershipStartDate),
     };
 
     return await this.memberRepository.create(memberToCreate);
@@ -75,8 +72,10 @@ export class MemberService implements IMemberService {
     const existingMember = await this.getMemberById(id);
 
     // Check if email is being updated and if it already exists
-    if (memberData.primaryContactEmail && 
-        memberData.primaryContactEmail !== existingMember.primaryContactEmail) {
+    if (
+      memberData.primaryContactEmail &&
+      memberData.primaryContactEmail !== existingMember.primaryContactEmail
+    ) {
       const memberWithEmail = await this.memberRepository.findByEmail(
         memberData.primaryContactEmail
       );
@@ -86,8 +85,10 @@ export class MemberService implements IMemberService {
     }
 
     // Check if registration number is being updated and if it already exists
-    if (memberData.registrationNumber && 
-        memberData.registrationNumber !== existingMember.registrationNumber) {
+    if (
+      memberData.registrationNumber &&
+      memberData.registrationNumber !== existingMember.registrationNumber
+    ) {
       const memberWithRegNo = await this.memberRepository.findByRegistrationNumber(
         memberData.registrationNumber
       );
@@ -137,11 +138,80 @@ export class MemberService implements IMemberService {
     return await this.updateMember(id, { membershipStatus: status });
   }
 
+  // NEW VERIFICATION METHODS
+  async verifyMember(id: string, adminId?: string): Promise<Member> {
+    const member = await this.getMemberById(id);
+
+    // Use the entity method to mark as verified
+    member.markAsVerified(adminId);
+
+    const updatedMember = await this.memberRepository.update(id, {
+      isVerified: member.isVerified,
+      verifiedAt: member.verifiedAt,
+      verifiedByAdminId: member.verifiedByAdminId,
+    });
+
+    if (!updatedMember) {
+      throw new AppError(`Failed to verify member with ID ${id}`, 500);
+    }
+
+    return updatedMember;
+  }
+
+  async unverifyMember(id: string): Promise<Member> {
+    const member = await this.getMemberById(id);
+
+    // Use the entity method to mark as unverified
+    member.markAsUnverified();
+
+    const updatedMember = await this.memberRepository.update(id, {
+      isVerified: member.isVerified,
+      verifiedAt: member.verifiedAt,
+      verifiedByAdminId: member.verifiedByAdminId,
+    });
+
+    if (!updatedMember) {
+      throw new AppError(`Failed to unverify member with ID ${id}`, 500);
+    }
+
+    return updatedMember;
+  }
+
+  async getAllMembersWithVerificationStatus(): Promise<{
+    verified: Member[];
+    unverified: Member[];
+    total: number;
+    verifiedCount: number;
+    unverifiedCount: number;
+  }> {
+    const allMembers = await this.memberRepository.findAll();
+
+    const verified = allMembers.filter(member => member.isVerified);
+    const unverified = allMembers.filter(member => !member.isVerified);
+
+    return {
+      verified,
+      unverified,
+      total: allMembers.length,
+      verifiedCount: verified.length,
+      unverifiedCount: unverified.length,
+    };
+  }
+
+  async getVerifiedMembers(): Promise<Member[]> {
+    return await this.memberRepository.findByVerificationStatus(true);
+  }
+
+  async getUnverifiedMembers(): Promise<Member[]> {
+    return await this.memberRepository.findByVerificationStatus(false);
+  }
+
   async getMembersWithFilters(filters: {
     status?: MembershipStatus;
     country?: string;
     membershipType?: string;
     search?: string;
+    isVerified?: boolean;
     page?: number;
     limit?: number;
   }): Promise<{
@@ -151,10 +221,7 @@ export class MemberService implements IMemberService {
     currentPage?: number;
   }> {
     if (filters.page && filters.limit) {
-      const result = await this.memberRepository.findWithPagination(
-        filters.page,
-        filters.limit
-      );
+      const result = await this.memberRepository.findWithPagination(filters.page, filters.limit);
       return {
         ...result,
         currentPage: filters.page,
@@ -167,9 +234,7 @@ export class MemberService implements IMemberService {
 
   async validateMembershipData(data: Partial<Member>): Promise<void> {
     if (data.primaryContactEmail) {
-      const existingMember = await this.memberRepository.findByEmail(
-        data.primaryContactEmail
-      );
+      const existingMember = await this.memberRepository.findByEmail(data.primaryContactEmail);
       if (existingMember) {
         throw new AppError('Email already exists', 409);
       }
