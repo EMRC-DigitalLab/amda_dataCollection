@@ -11,31 +11,27 @@ export class FormTypeService {
   }
 
   async create(data: FormTypeCreateData): Promise<FormType> {
-    const formType = await this.formTypeRepository.create(data);
-
-    // Generate slug if not provided
-    if (!formType.slug) {
-      formType.generateSlug();
-    }
+    console.log(data,"this is stye form tyoe")
+ 
 
     // Check for duplicate name/year combination
-    const existing = await this.formTypeRepository.findByNameAndYear(formType.name, formType.year);
+    const existing = await this.formTypeRepository.findByNameAndYear(data.name, data.year);
 
     if (existing) {
       throw new Error(
-        `Form type with name "${formType.name}" already exists for year ${formType.year}`
+        `Form type with name "${data.name}" already exists for year ${data.year}`
       );
     }
 
     // Check for duplicate slug
-    const existingSlug = await this.formTypeRepository.findBySlug(formType.slug);
+    const existingSlug = await this.formTypeRepository.findBySlug(data.slug!);
 
     if (existingSlug) {
       // Append year to make slug unique
-      formType.slug = `${formType.slug}-${formType.year}`;
+      data.slug = `${data.slug}-${data.year}`;
     }
 
-    return this.formTypeRepository.save(formType);
+    return await this.formTypeRepository.save(data!);
   }
 
   async findAll(query: FormTypeQuery = {}): Promise<{

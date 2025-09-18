@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextFunction, Request, Response } from 'express';
 import { DataSource } from 'typeorm';
+import { ResponseHelper } from '../../../shared/utils/response';
 import { FormTypeService } from '../services/form-type.service';
 
 export class FormTypeController {
@@ -19,7 +20,7 @@ export class FormTypeController {
         data: formType,
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -31,7 +32,7 @@ export class FormTypeController {
         data: result,
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -53,7 +54,7 @@ export class FormTypeController {
         data: formType,
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -75,7 +76,7 @@ export class FormTypeController {
         data: formType,
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -89,7 +90,7 @@ export class FormTypeController {
         data: formTypes,
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -104,7 +105,7 @@ export class FormTypeController {
         data: formType,
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -115,7 +116,7 @@ export class FormTypeController {
 
       res.status(204).send();
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -129,7 +130,7 @@ export class FormTypeController {
         message: 'Sort order updated successfully',
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -143,7 +144,7 @@ export class FormTypeController {
         data: formTypes,
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -156,7 +157,7 @@ export class FormTypeController {
         data: statistics,
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 
@@ -170,7 +171,7 @@ export class FormTypeController {
         data: formTypes,
       });
     } catch (error) {
-      next(error);
+      ResponseHelper.error(res, error.message, 400);
     }
   };
 }

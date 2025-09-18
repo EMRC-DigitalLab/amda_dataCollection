@@ -1,6 +1,6 @@
 
 import { DataSource, Not, Repository, SelectQueryBuilder } from 'typeorm';
-import { FormTypeQuery, FormTypeStatistics, IFormTypeRepository, SortOrderUpdate } from '../../../modules/forms/interfaces/form-type.interface';
+import { FormTypeCreateData, FormTypeQuery, FormTypeStatistics, IFormTypeRepository, SortOrderUpdate } from '../../../modules/forms/interfaces/form-type.interface';
 import { FormType, FormTypeStatus } from '../../entities/form-type.entity';
 
 export class FormTypeRepository implements IFormTypeRepository {
@@ -17,7 +17,7 @@ export class FormTypeRepository implements IFormTypeRepository {
     return this.repository.save(formType);
   }
 
-  async save(formType: FormType): Promise<FormType> {
+  async save(formType: FormTypeCreateData): Promise<FormType> {
     return this.repository.save(formType);
   }
 

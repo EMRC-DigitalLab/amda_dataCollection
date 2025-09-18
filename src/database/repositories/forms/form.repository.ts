@@ -5,6 +5,7 @@ import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { IFormRepository } from '../../../modules/forms/interfaces/form.interface';
 import { CreateCategoryDto, CreateFormDto, UpdateFormDto } from '../../../shared/types/form.types';
 import { Category } from '../../entities/category.entity';
+import { FormType, FormTypeStatus } from '../../entities/form-type.entity';
 import { Form, FormStatus } from '../../entities/form.entity';
 import { Question } from '../../entities/question.entity';
 
@@ -18,6 +19,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     super(Form, dataSource.manager);
     this.categoryRepo = dataSource.getRepository(Category);
     this.questionRepo = dataSource.getRepository(Question);
+    this.formTypeRepo = dataSource.getRepository(FormType);
     this.dataSource = dataSource;
   }
 
@@ -38,7 +40,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         title: dto.title,
         slug: dto.slug,
         description: dto.description,
-        formType: dto.formType,
+        formTypeId: dto.formTypeId,
         status: dto.status || FormStatus.DRAFT,
         adminId: dto.adminId,
         parentId: dto.parentId,
@@ -63,7 +65,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
 
   async updateForm({ id, ...changes }: UpdateFormDto): Promise<Form> {
     const form = await this.findFormByIdOrFail(id);
-    console.log(form, changes, 'this are updates');
 
     if (changes.slug && changes.slug !== form.slug) {
       await this.assertSlugUnique(changes.slug);
@@ -80,7 +81,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         slug: changes.slug ?? form.slug,
         description: changes.description ?? form.description,
         status: changes.status ?? form.status,
-        formType: changes.formType ?? form.formType,
+        formTypeId: changes.formTypeId ?? form.formTypeId,
       });
 
       await queryRunner.manager.save(Form, form);
@@ -201,25 +202,16 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     });
   }
 
-  async getPublishedFormTypes(): Promise<{ formType: string; count: number }[]> {
-    const query = `
-    SELECT 
-      "formType" as "formType",
-      "id" as "id",
-      COUNT(*) as count
-    FROM forms 
-    WHERE status = 'PUBLISHED' 
-    GROUP BY "formType", "id"
-    ORDER BY "formType"
-  `;
 
-    const result = await this.dataSource.query(query);
-    return result.map((row: any) => ({
-      formType: row.formType,
-      formId: row.id,
-      count: parseInt(row.count, 10),
-    }));
+  async getPublishedFormTypes(): Promise<FormType[]> {
+    return await this.formTypeRepo
+      .createQueryBuilder('formType')
+      .leftJoinAndSelect('formType.forms', 'form')
+      .where('formType.status = :status', { status: FormTypeStatus.ACTIVE })
+      .andWhere('form.status = :formStatus', { formStatus: FormStatus.PUBLISHED })
+      .getMany();
   }
+
 
   async getFormTypesByStatus(status: FormStatus): Promise<{ formType: string; count: number }[]> {
     const query = `
@@ -1196,7 +1188,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
           f.title as form_title,
           f.slug as form_slug,
           f.description as form_description,
-          f."formType" as form_type,
           f.status as form_status,
           f."admin_id" as form_admin_id,
           -- User data (submitted_by)
