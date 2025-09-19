@@ -1,5 +1,4 @@
-﻿# docker/docker-compose.dev.yml (Development)
-version: '3.8'
+﻿version: '3.8'
 
 services:
  amda-api-dev:
@@ -8,24 +7,21 @@ services:
      dockerfile: docker/Dockerfile.dev
    container_name: amda-collection-api-dev
    ports:
-     - "3000:3000"
+     - "5000:5000"
    environment:
      - NODE_ENV=development
-     - DATABASE_HOST=amda-postgres-dev
+     - DATABASE_HOST=31.97.56.29
      - REDIS_HOST=amda-redis-dev
    env_file:
      - ../.env.development
    command: sh -c "cd /app && npm run start:dev"
    volumes:
      - ../src:/app/src
-     - ../scripts:/app/scripts  # Add this line
+     - ../scripts:/app/scripts
      - ../package.json:/app/package.json
      - ../package-lock.json:/app/package-lock.json
      - ../tsconfig.json:/app/tsconfig.json
-     - /app/node_modules
    depends_on:
-     amda-postgres-dev:
-       condition: service_healthy
      amda-redis-dev:
        condition: service_healthy
    networks:
@@ -38,44 +34,15 @@ services:
    container_name: amda-seed-admin
    environment:
      - NODE_ENV=development
-     - DATABASE_HOST=amda-postgres-dev
+     - DATABASE_HOST=31.97.56.29
    env_file:
      - ../.env.development
    command: npm run seed:admin
-   depends_on:
-     amda-postgres-dev:
-       condition: service_healthy
    networks:
      - amda-dev-network
    restart: "no"
    profiles:
      - seed
-
- amda-postgres-dev:
-   image: postgres:15-alpine
-   container_name: amda-postgres-dev
-   environment:
-     POSTGRES_DB: amda_collection_dev
-     POSTGRES_USER: amda_user
-     POSTGRES_PASSWORD: amda_password
-   ports:
-     - "5432:5432"
-   volumes:
-     - postgres_dev_data:/var/lib/postgresql/data
-   networks:
-     - amda-dev-network
-   develop:
-    watch:
-      - action: sync
-        path: ../src
-        target: /app/src
-      - action: rebuild
-        path: ../package.json
-   healthcheck:
-     test: ["CMD-SHELL", "pg_isready -U amda_user -d amda_collection_dev"]
-     interval: 5s
-     timeout: 5s
-     retries: 5
 
  amda-redis-dev:
    image: redis:7-alpine
@@ -102,7 +69,6 @@ services:
      - amda-dev-network
 
 volumes:
- postgres_dev_data:
  redis_dev_data:
 
 networks:

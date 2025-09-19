@@ -72,6 +72,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/lodash": "^4.14.202",
+    "@types/module-alias": "^2.0.4",
     "@types/morgan": "^1.9.9",
     "@types/node": "^20.19.11",
     "@types/nodemailer": "^6.4.14",
@@ -105,10 +106,20 @@
     ]
   },
   "_moduleAliases": {
+    "@": "./src",
+    "@/config": "./src/config",
+    "@/shared": "./src/shared",
+    "@/database": "./src/database",
+    "@/modules": "./src/modules",
+    "@/api": "./src/api"
+  },
+  "_moduleAliasesProduction": {
     "@": "./dist/src",
     "@/config": "./dist/src/config",
     "@/shared": "./dist/src/shared",
-    "@/database": "./dist/src/database"
+    "@/database": "./dist/src/database",
+    "@/modules": "./dist/src/modules",
+    "@/api": "./dist/src/api"
   },
   "keywords": [
     "nodejs",

@@ -1,5 +1,30 @@
 // src/main.ts (Updated with enhanced Swagger setup and Secure CORS)
-import 'module-alias/register';
+import path from 'path';
+import moduleAlias from 'module-alias';
+
+// Smart environment detection
+const isProduction = process.env.NODE_ENV === 'production' || __filename.includes('/dist/');
+
+if (isProduction) {
+  moduleAlias.addAliases({
+    '@': path.resolve(__dirname, '.'),
+    '@/config': path.resolve(__dirname, 'config'),
+    '@/shared': path.resolve(__dirname, 'shared'),
+    '@/database': path.resolve(__dirname, 'database'),
+    '@/modules': path.resolve(__dirname, 'modules'),
+    '@/api': path.resolve(__dirname, 'api'),
+  });
+} else {
+  const srcPath = path.resolve(__dirname);
+  moduleAlias.addAliases({
+    '@': srcPath,
+    '@/config': path.resolve(srcPath, 'config'),
+    '@/shared': path.resolve(srcPath, 'shared'),
+    '@/database': path.resolve(srcPath, 'database'),
+    '@/modules': path.resolve(srcPath, 'modules'),
+    '@/api': path.resolve(srcPath, 'api'),
+  });
+}
 import 'reflect-metadata';
 import express from 'express';
 import cors from 'cors';
