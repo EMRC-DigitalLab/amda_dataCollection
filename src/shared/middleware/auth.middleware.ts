@@ -22,6 +22,7 @@ export interface AuthenticatedRequest extends Request {
     lastLoginAt?: Date;
     createdAt?: Date;
     updatedAt?: Date;
+
   };
 }
 
@@ -116,6 +117,7 @@ export const authMiddleware = async (
     }
 
     req.user = authenticatedUser;
+
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);

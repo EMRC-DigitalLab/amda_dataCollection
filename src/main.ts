@@ -1,5 +1,8 @@
 // src/main.ts (Updated with enhanced Swagger setup and Secure CORS)
-import compression from 'compression';
+import compression from 'compression'
+import 'module-alias/register';
+import 'reflect-metadata';
+import express from 'express';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
