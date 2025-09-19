@@ -1,12 +1,11 @@
-
 // src/shared/constants/cache.constants.ts
 export const CACHE_TTL = {
-  SHORT: 300,        // 5 minutes
-  MEDIUM: 1800,      // 30 minutes  
-  LONG: 3600,        // 1 hour
-  VERY_LONG: 21600,  // 6 hours
-  DAY: 86400,        // 24 hours
-  WEEK: 604800,      // 7 days
+  SHORT: 300, // 5 minutes
+  MEDIUM: 1800, // 30 minutes
+  LONG: 3600, // 1 hour
+  VERY_LONG: 21600, // 6 hours
+  DAY: 86400, // 24 hours
+  WEEK: 604800, // 7 days
 } as const;
 
 export const CACHE_PREFIX = {
@@ -23,8 +22,8 @@ export const CACHE_PREFIX = {
 export class CompletionCacheKeys {
   // Member completion rates
   static memberCompletionRates(
-    memberId: string, 
-    formType?: string, 
+    memberId: string,
+    formType?: string,
     status: string = 'PUBLISHED'
   ): string {
     return `completion:member:${memberId}:rates:${formType || 'all'}:${status}`;
@@ -36,30 +35,18 @@ export class CompletionCacheKeys {
   }
 
   // Member sites completion
-  static memberSitesCompletion(
-    memberId: string, 
-    formId?: string, 
-    formType?: string
-  ): string {
+  static memberSitesCompletion(memberId: string, formId?: string, formType?: string): string {
     return `completion:member:${memberId}:sites:${formId || 'all'}:${formType || 'all'}`;
   }
 
   // Site completion
-  static siteCompletion(
-    siteId: string, 
-    formId?: string, 
-    formType?: string
-  ): string {
+  static siteCompletion(siteId: string, formId?: string, formType?: string): string {
     return `completion:site:${siteId}:${formId || 'all'}:${formType || 'all'}`;
   }
 
   // Overall completion stats
-  static overallStats(filters?: {
-    formType?: string;
-    dateFrom?: string;
-    dateTo?: string;
-  }): string {
-    const filterKey = filters 
+  static overallStats(filters?: { formType?: string; dateFrom?: string; dateTo?: string }): string {
+    const filterKey = filters
       ? `${filters.formType || 'all'}:${filters.dateFrom || 'all'}:${filters.dateTo || 'all'}`
       : 'all';
     return `completion:stats:overall:${filterKey}`;
@@ -71,11 +58,7 @@ export class CompletionCacheKeys {
   }
 
   // Member incomplete forms
-  static memberIncompleteForms(
-    memberId: string, 
-    formType?: string, 
-    priority?: string
-  ): string {
+  static memberIncompleteForms(memberId: string, formType?: string, priority?: string): string {
     return `completion:member:${memberId}:incomplete:${formType || 'all'}:${priority || 'all'}`;
   }
 
@@ -120,11 +103,7 @@ export class CompletionCacheKeys {
   }
 
   // Form submissions up to date
-  static formSubmissionsUpToDate(
-    tableName: string, 
-    memberId: string, 
-    date: string
-  ): string {
+  static formSubmissionsUpToDate(tableName: string, memberId: string, date: string): string {
     return `submissions:${tableName}:member:${memberId}:until:${date}`;
   }
 

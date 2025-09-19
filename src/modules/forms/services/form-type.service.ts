@@ -1,6 +1,11 @@
 import { DataSource } from 'typeorm';
 import { FormType, FormTypeStatus } from '../../../database/entities/form-type.entity';
-import { FormTypeCreateData, FormTypeQuery, FormTypeStatistics, FormTypeUpdateData } from '../interfaces/form-type.interface';
+import {
+  FormTypeCreateData,
+  FormTypeQuery,
+  FormTypeStatistics,
+  FormTypeUpdateData,
+} from '../interfaces/form-type.interface';
 import { FormTypeRepository } from './../../../database/repositories/forms/form-type.repository';
 
 export class FormTypeService {
@@ -11,16 +16,13 @@ export class FormTypeService {
   }
 
   async create(data: FormTypeCreateData): Promise<FormType> {
-    console.log(data,"this is stye form tyoe")
- 
+    console.log(data, 'this is stye form tyoe');
 
     // Check for duplicate name/year combination
     const existing = await this.formTypeRepository.findByNameAndYear(data.name, data.year);
 
     if (existing) {
-      throw new Error(
-        `Form type with name "${data.name}" already exists for year ${data.year}`
-      );
+      throw new Error(`Form type with name "${data.name}" already exists for year ${data.year}`);
     }
 
     // Check for duplicate slug
@@ -193,13 +195,18 @@ export class FormTypeService {
   }
 
   // Additional utility methods
-  async getFormTypeOptions(year?: number, activeOnly = true): Promise<Array<{
-    id: string;
-    name: string;
-    slug: string;
-    color?: string;
-    icon?: string;
-  }>> {
+  async getFormTypeOptions(
+    year?: number,
+    activeOnly = true
+  ): Promise<
+    Array<{
+      id: string;
+      name: string;
+      slug: string;
+      color?: string;
+      icon?: string;
+    }>
+  > {
     return this.formTypeRepository.getFormTypeOptions(year, activeOnly);
   }
 

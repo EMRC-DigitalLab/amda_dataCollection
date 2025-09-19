@@ -1,8 +1,33 @@
 // src/main.ts (Updated with enhanced Swagger setup and Secure CORS)
-import compression from 'compression'
-import 'module-alias/register';
+import path from 'path';
+import moduleAlias from 'module-alias';
+import compression from 'compression';
+import { WebSocketService } from '@/shared/websocket/websocket.service';
+
+// Smart environment detection
+const isProduction = process.env.NODE_ENV === 'production' || __filename.includes('/dist/');
+
+if (isProduction) {
+  moduleAlias.addAliases({
+    '@': path.resolve(__dirname, '.'),
+    '@/config': path.resolve(__dirname, 'config'),
+    '@/shared': path.resolve(__dirname, 'shared'),
+    '@/database': path.resolve(__dirname, 'database'),
+    '@/modules': path.resolve(__dirname, 'modules'),
+    '@/api': path.resolve(__dirname, 'api'),
+  });
+} else {
+  const srcPath = path.resolve(__dirname);
+  moduleAlias.addAliases({
+    '@': srcPath,
+    '@/config': path.resolve(srcPath, 'config'),
+    '@/shared': path.resolve(srcPath, 'shared'),
+    '@/database': path.resolve(srcPath, 'database'),
+    '@/modules': path.resolve(srcPath, 'modules'),
+    '@/api': path.resolve(srcPath, 'api'),
+  });
+}
 import 'reflect-metadata';
-import express from 'express';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
@@ -20,6 +45,7 @@ import { logger } from '@/shared/utils/logger';
 
 class Application {
   public app: express.Application;
+  private webSocketService!: WebSocketService;
 
   constructor() {
     this.app = express();
@@ -261,7 +287,7 @@ class Application {
       await connectRedis();
 
       // Start server
-      this.app.listen(config.port, () => {
+      const server = this.app.listen(config.port, () => {
         logger.info(`🚀 AMDA Collection API started successfully!`);
         logger.info(`🌍 Environment: ${config.environment}`);
         logger.info(`📡 Server running on port: ${config.port}`);
@@ -279,6 +305,9 @@ class Application {
           logger.info(`🎯 API Routes: ${baseUrl}${config.apiPrefix}`);
         }
       });
+      // Initialize WebSocket server
+      this.webSocketService = new WebSocketService(server);
+      logger.info(`🔌 WebSocket server initialized`);
     } catch (error) {
       logger.error('❌ Failed to start application:', error);
       process.exit(1);

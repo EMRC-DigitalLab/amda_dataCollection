@@ -1,6 +1,6 @@
 // src/shared/services/cache.service.ts
 
-import { redisClient } from "../../config";
+import { redisClient } from '../../config';
 
 export interface CacheOptions {
   ttl?: number; // Time to live in seconds
@@ -39,19 +39,12 @@ export class CacheService {
   /**
    * Set a value in cache
    */
-  async set<T>(
-    key: string, 
-    value: T, 
-    options: CacheOptions = {}
-  ): Promise<void> {
+  async set<T>(key: string, value: T, options: CacheOptions = {}): Promise<void> {
     try {
-      const {
-        ttl = this.defaultTTL,
-        serialize = true
-      } = options;
+      const { ttl = this.defaultTTL, serialize = true } = options;
 
-      const finalValue = serialize ? JSON.stringify(value) : value as string;
-      
+      const finalValue = serialize ? JSON.stringify(value) : (value as string);
+
       if (ttl > 0) {
         await redisClient.setEx(key, ttl, finalValue);
       } else {
@@ -66,18 +59,15 @@ export class CacheService {
   /**
    * Get a value from cache
    */
-  async get<T>(
-    key: string, 
-    options: CacheOptions = {}
-  ): Promise<T | null> {
+  async get<T>(key: string, options: CacheOptions = {}): Promise<T | null> {
     try {
       const { serialize = true } = options;
-      
+
       const value = await redisClient.get(key);
-      
+
       if (value === null) return null;
-      
-      return serialize ? JSON.parse(value) : value as T;
+
+      return serialize ? JSON.parse(value) : (value as T);
     } catch (error) {
       console.error(`Cache GET error for key ${key}:`, error);
       return null;
@@ -100,10 +90,10 @@ export class CacheService {
 
     // If not in cache, fetch the data
     const data = await fetchFn();
-    
+
     // Store in cache for next time
     await this.set(key, data, options);
-    
+
     return data;
   }
 
@@ -174,18 +164,18 @@ export class CacheService {
   async mSet<T>(keyValues: Record<string, T>, options: CacheOptions = {}): Promise<void> {
     try {
       const { serialize = true } = options;
-      
+
       const pipeline = redisClient.multi();
-      
+
       Object.entries(keyValues).forEach(([key, value]) => {
-        const finalValue = serialize ? JSON.stringify(value) : value as string;
+        const finalValue = serialize ? JSON.stringify(value) : (value as string);
         pipeline.set(key, finalValue);
-        
+
         if (options.ttl) {
           pipeline.expire(key, options.ttl);
         }
       });
-      
+
       await pipeline.exec();
     } catch (error) {
       console.error('Cache MSET error:', error);
@@ -198,12 +188,12 @@ export class CacheService {
   async mGet<T>(keys: string[], options: CacheOptions = {}): Promise<(T | null)[]> {
     try {
       const { serialize = true } = options;
-      
+
       const values = await redisClient.mGet(keys);
-      
+
       return values.map(value => {
         if (value === null) return null;
-        return serialize ? JSON.parse(value) : value as T;
+        return serialize ? JSON.parse(value) : (value as T);
       });
     } catch (error) {
       console.error('Cache MGET error:', error);

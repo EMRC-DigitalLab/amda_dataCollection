@@ -10,6 +10,7 @@ import { createFormSettingsRoutes } from '../../modules/forms/routes/form-settin
 import { createFormTypeRoutes } from '../../modules/forms/routes/form-type.route';
 import { createFormRoutes } from '../../modules/forms/routes/form.route';
 import { createMinigridRoutes } from '../../modules/forms/routes/minigrid-site.route';
+import { createNotificationRoutes } from '../../modules/notifications/routes/notification.routes';
 
 export function createApiRouter(): Router {
   const router = Router();
@@ -24,6 +25,7 @@ export function createApiRouter(): Router {
     { path: '/analytics/sites', factory: createSiteRoutes },
     { path: '/completion', factory: createCompletionRoutes },
     { path: '/form-types', factory: createFormTypeRoutes },
+    { path: '/notifications', factory: createNotificationRoutes },
   ];
 
   for (const { path, factory } of modules) {

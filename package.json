@@ -12,7 +12,7 @@
     "test:watch": "jest --watch",
     "test:e2e": "jest --config ./tests/e2e/jest.config.js",
     "migration:generate": "bash -c 'typeorm-ts-node-commonjs migration:generate src/database/migrations/${1:-Migration} -d src/database/connection.ts' --",
-    "migration:run": "typeorm-ts-node-commonjs migration:run -d src/database/connection.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d dist/src/database/connection.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert",
     "seed": "ts-node scripts/seed-db.ts",
     "docker:dev:no-build": "docker-compose -f docker/docker-compose.dev.yml up --watch",
@@ -62,6 +62,7 @@
     "pdfkit": "^0.17.2",
     "pg": "^8.11.3",
     "redis": "^4.6.10",
+    "socket.io": "^4.8.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
     "typeorm": "^0.3.17",
@@ -78,6 +79,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/lodash": "^4.14.202",
+    "@types/module-alias": "^2.0.4",
     "@types/morgan": "^1.9.9",
     "@types/node": "^20.19.11",
     "@types/nodemailer": "^6.4.14",
@@ -112,10 +114,20 @@
     ]
   },
   "_moduleAliases": {
+    "@": "./src",
+    "@/config": "./src/config",
+    "@/shared": "./src/shared",
+    "@/database": "./src/database",
+    "@/modules": "./src/modules",
+    "@/api": "./src/api"
+  },
+  "_moduleAliasesProduction": {
     "@": "./dist/src",
     "@/config": "./dist/src/config",
     "@/shared": "./dist/src/shared",
-    "@/database": "./dist/src/database"
+    "@/database": "./dist/src/database",
+    "@/modules": "./dist/src/modules",
+    "@/api": "./dist/src/api"
   },
   "keywords": [
     "nodejs",
