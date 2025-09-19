@@ -1,6 +1,8 @@
 // src/main.ts (Updated with enhanced Swagger setup and Secure CORS)
 import path from 'path';
 import moduleAlias from 'module-alias';
+import compression from 'compression';
+import { WebSocketService } from '@/shared/websocket/websocket.service';
 
 // Smart environment detection
 const isProduction = process.env.NODE_ENV === 'production' || __filename.includes('/dist/');
@@ -26,7 +28,6 @@ if (isProduction) {
   });
 }
 import 'reflect-metadata';
-import express from 'express';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
@@ -44,6 +45,7 @@ import { logger } from '@/shared/utils/logger';
 
 class Application {
   public app: express.Application;
+  private webSocketService!: WebSocketService;
 
   constructor() {
     this.app = express();
@@ -285,7 +287,7 @@ class Application {
       await connectRedis();
 
       // Start server
-      this.app.listen(config.port, () => {
+      const server = this.app.listen(config.port, () => {
         logger.info(`🚀 AMDA Collection API started successfully!`);
         logger.info(`🌍 Environment: ${config.environment}`);
         logger.info(`📡 Server running on port: ${config.port}`);
@@ -303,6 +305,9 @@ class Application {
           logger.info(`🎯 API Routes: ${baseUrl}${config.apiPrefix}`);
         }
       });
+      // Initialize WebSocket server
+      this.webSocketService = new WebSocketService(server);
+      logger.info(`🔌 WebSocket server initialized`);
     } catch (error) {
       logger.error('❌ Failed to start application:', error);
       process.exit(1);

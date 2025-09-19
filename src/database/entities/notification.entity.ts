@@ -10,6 +10,9 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
+// Add these imports
+import { NotificationTemplate } from './notification-template.entity';
+import { NotificationDelivery } from './notification-delivery.entity';
 
 export enum NotificationStatus {
   PENDING = 'pending',
@@ -41,37 +44,37 @@ export enum NotificationChannel {
 @Index(['scheduledAt'])
 export class Notification {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ type: 'varchar', length: 255 })
-  type: string; // e.g., 'payment_reminder', 'welcome_email'
+  type!: string; // e.g., 'payment_reminder', 'welcome_email'
 
   @Column({ type: 'enum', enum: NotificationChannel })
-  channel: NotificationChannel;
+  channel!: NotificationChannel;
 
   @Column({ type: 'enum', enum: NotificationStatus, default: NotificationStatus.PENDING })
-  status: NotificationStatus;
+  status!: NotificationStatus;
 
   @Column({ type: 'enum', enum: NotificationPriority, default: NotificationPriority.NORMAL })
-  priority: NotificationPriority;
+  priority!: NotificationPriority;
 
   // Recipient information
   @Column({ type: 'uuid' })
   @Index()
-  recipientId: string;
+  recipientId!: string;
 
   @Column({ type: 'varchar', length: 255 })
-  recipientEmail: string;
+  recipientEmail!: string;
 
   @Column({ type: 'varchar', length: 20, nullable: true })
   recipientPhone?: string;
 
   // Content
   @Column({ type: 'varchar', length: 500 })
-  subject: string;
+  subject!: string;
 
   @Column({ type: 'text' })
-  content: string;
+  content!: string;
 
   @Column({ type: 'jsonb', nullable: true })
   metadata?: Record<string, any>;
@@ -99,10 +102,10 @@ export class Notification {
 
   // Retry logic
   @Column({ type: 'int', default: 0 })
-  retryCount: number;
+  retryCount!: number;
 
   @Column({ type: 'int', default: 3 })
-  maxRetries: number;
+  maxRetries!: number;
 
   @Column({ type: 'timestamp', nullable: true })
   nextRetryAt?: Date;
@@ -116,56 +119,29 @@ export class Notification {
 
   // Delivery tracking
   @OneToMany(() => NotificationDelivery, delivery => delivery.notification)
-  deliveries: NotificationDelivery[];
+  deliveries!: NotificationDelivery[];
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
-}
+  updatedAt!: Date;
 
+  @Column({ type: 'boolean', default: false })
+  isRead!: boolean;
 
+  @Column({ type: 'timestamp', nullable: true })
+  readAt?: Date;
 
-// src/database/entities/notification-preference.entity.ts
-@Entity('notification_preferences')
-@Index(['userId', 'type', 'channel'])
-export class NotificationPreference {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @Column({ type: 'boolean', default: false })
+  isDeleted!: boolean;
 
-  @Column({ type: 'uuid' })
-  @Index()
-  userId: string;
+  @Column({ type: 'timestamp', nullable: true })
+  deletedAt?: Date;
 
-  @Column({ type: 'varchar', length: 255 })
-  type: string; // e.g., 'payment_reminder', 'marketing'
+  @Column({ type: 'boolean', default: false })
+  isArchived!: boolean;
 
-  @Column({ type: 'enum', enum: NotificationChannel })
-  channel: NotificationChannel;
-
-  @Column({ type: 'boolean', default: true })
-  enabled: boolean;
-
-  @Column({ type: 'jsonb', nullable: true })
-  settings?: Record<string, any>; // Channel-specific settings
-
-  // Scheduling preferences
-  @Column({ type: 'time', nullable: true })
-  preferredTimeStart?: string; // '09:00:00'
-
-  @Column({ type: 'time', nullable: true })
-  preferredTimeEnd?: string; // '18:00:00'
-
-  @Column({ type: 'varchar', length: 50, nullable: true })
-  timezone?: string;
-
-  @Column({ type: 'simple-array', nullable: true })
-  blockedDays?: string[]; // ['saturday', 'sunday']
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
+  @Column({ type: 'timestamp', nullable: true })
+  archivedAt?: Date;
 }

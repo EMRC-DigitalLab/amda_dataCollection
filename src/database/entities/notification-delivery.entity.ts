@@ -1,4 +1,16 @@
 // src/database/entities/notification-delivery.entity.ts
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import { Notification } from './notification.entity';
+
 export enum DeliveryStatus {
   PENDING = 'pending',
   SENT = 'sent',
@@ -14,18 +26,18 @@ export enum DeliveryStatus {
 @Index(['providerId'])
 export class NotificationDelivery {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ type: 'uuid' })
   @Index()
-  notificationId: string;
+  notificationId!: string;
 
   @ManyToOne(() => Notification, notification => notification.deliveries)
   @JoinColumn({ name: 'notificationId' })
-  notification: Notification;
+  notification!: Notification;
 
   @Column({ type: 'enum', enum: DeliveryStatus, default: DeliveryStatus.PENDING })
-  status: DeliveryStatus;
+  status!: DeliveryStatus;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   providerId?: string; // External provider's ID (SendGrid, Twilio, etc.)
@@ -58,8 +70,8 @@ export class NotificationDelivery {
   webhookData?: Record<string, any>;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }

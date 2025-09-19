@@ -8,42 +8,30 @@ services:
     container_name: amda-collection-api-dev
     ports:
       - "5000:5000"
-      - "9229:9229" # Debug port for Node.js inspector
     environment:
       - NODE_ENV=development
       - DATABASE_HOST=31.97.56.29
       - REDIS_HOST=amda-redis-dev
-      - CHOKIDAR_USEPOLLING=true # Enable polling for file watching in Docker
-      - WATCHPACK_POLLING=true
+      - RUN_MIGRATIONS_ON_STARTUP=true
     env_file:
       - ../.env.development
     command: sh -c "cd /app && npm run start:dev"
     volumes:
-      - ../src:/app/src:cached # Use cached for better performance
-      - ../scripts:/app/scripts:cached
-      - ../package.json:/app/package.json:delegated
-      - ../package-lock.json:/app/package-lock.json:delegated
-      - ../tsconfig.json:/app/tsconfig.json:delegated
-      - ../nodemon.json:/app/nodemon.json:delegated # If you have nodemon config
-      - ../.env.development:/app/.env.development:delegated
-      - /app/node_modules # Anonymous volume to preserve node_modules
+      - ../src:/app/src
+      - ../scripts:/app/scripts
+      - ../package.json:/app/package.json
+      - ../package-lock.json:/app/package-lock.json
+      - ../tsconfig.json:/app/tsconfig.json
     depends_on:
-      amda-postgres-dev:
-        condition: service_healthy
       amda-redis-dev:
         condition: service_healthy
     networks:
       - amda-dev-network
-    # Docker Compose Watch configuration (requires Docker Compose v2.22+)
     develop:
       watch:
         - action: sync
           path: ../src
           target: /app/src
-          ignore:
-            - node_modules/
-            - "*.log"
-            - "*.tmp"
         - action: sync
           path: ../package.json
           target: /app/package.json
@@ -52,64 +40,51 @@ services:
         - action: sync
           path: ../tsconfig.json
           target: /app/tsconfig.json
-    # Restart policy for development
-    restart: unless-stopped
-    # Resource limits for development
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 512M
 
- amda-seed-admin:
-   build:
-     context: ..
-     dockerfile: docker/Dockerfile.dev
-   container_name: amda-seed-admin
-   environment:
-     - NODE_ENV=development
-     - DATABASE_HOST=31.97.56.29
-   env_file:
-     - ../.env.development
-   command: npm run seed:admin
-   networks:
-     - amda-dev-network
-   restart: "no"
-   profiles:
-     - seed
+  amda-seed-admin:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+    container_name: amda-seed-admin
+    environment:
+      - NODE_ENV=development
+      - DATABASE_HOST=31.97.56.29
+    env_file:
+      - ../.env.development
+    command: npm run seed:admin
+    networks:
+      - amda-dev-network
+    restart: "no"
+    profiles:
+      - seed
 
- amda-redis-dev:
-   image: redis:7-alpine
-   container_name: amda-redis-dev
-   ports:
-     - "6379:6379"
-   volumes:
-     - redis_dev_data:/data
-   networks:
-     - amda-dev-network
-   healthcheck:
-     test: ["CMD", "redis-cli", "ping"]
-     interval: 5s
-     timeout: 5s
-     retries: 5
+  amda-redis-dev:
+    image: redis:7-alpine
+    container_name: amda-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - amda-dev-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
- amda-mailhog:
-   image: mailhog/mailhog:latest
-   container_name: amda-mailhog
-   ports:
-     - "1025:1025"
-     - "8025:8025"
-   networks:
-     - amda-dev-network
+  amda-mailhog:
+    image: mailhog/mailhog:latest
+    container_name: amda-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - amda-dev-network
 
 volumes:
- postgres_dev_data:
- redis_dev_data:
+  redis_dev_data:
 
 networks:
   amda-dev-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16

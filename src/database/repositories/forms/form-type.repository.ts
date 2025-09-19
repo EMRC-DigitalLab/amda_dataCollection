@@ -1,6 +1,11 @@
-
 import { DataSource, Not, Repository, SelectQueryBuilder } from 'typeorm';
-import { FormTypeCreateData, FormTypeQuery, FormTypeStatistics, IFormTypeRepository, SortOrderUpdate } from '../../../modules/forms/interfaces/form-type.interface';
+import {
+  FormTypeCreateData,
+  FormTypeQuery,
+  FormTypeStatistics,
+  IFormTypeRepository,
+  SortOrderUpdate,
+} from '../../../modules/forms/interfaces/form-type.interface';
 import { FormType, FormTypeStatus } from '../../entities/form-type.entity';
 
 export class FormTypeRepository implements IFormTypeRepository {
@@ -265,9 +270,7 @@ export class FormTypeRepository implements IFormTypeRepository {
       queryBuilder.andWhere('formType.year = :year', { year });
     }
 
-    queryBuilder
-      .orderBy('formType.sortOrder', 'ASC')
-      .addOrderBy('formType.name', 'ASC');
+    queryBuilder.orderBy('formType.sortOrder', 'ASC').addOrderBy('formType.name', 'ASC');
 
     const formTypes = await queryBuilder.getMany();
 

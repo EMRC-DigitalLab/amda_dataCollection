@@ -22,7 +22,6 @@ export interface AuthenticatedRequest extends Request {
     lastLoginAt?: Date;
     createdAt?: Date;
     updatedAt?: Date;
-
   };
 }
 

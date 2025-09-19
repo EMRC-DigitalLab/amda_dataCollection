@@ -1,4 +1,4 @@
-// src/database/entities/notification-template.entity.ts
+// src/database/entities/notification-preference.entity.ts
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -32,41 +32,40 @@ export enum NotificationChannel {
   IN_APP = 'in_app',
 }
 
-@Entity('notification_templates')
-@Index(['type', 'channel'])
-export class NotificationTemplate {
+@Entity('notification_preferences')
+@Index(['userId', 'type', 'channel'])
+export class NotificationPreference {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar', length: 255, unique: true })
-  name!: string;
+  @Column({ type: 'uuid' })
+  @Index()
+  userId!: string;
 
   @Column({ type: 'varchar', length: 255 })
-  type!: string;
+  type!: string; // e.g., 'payment_reminder', 'marketing'
 
   @Column({ type: 'enum', enum: NotificationChannel })
   channel!: NotificationChannel;
 
-  @Column({ type: 'varchar', length: 500 })
-  subject!: string;
-
-  @Column({ type: 'text' })
-  content!: string;
-
-  @Column({ type: 'text', nullable: true })
-  htmlContent?: string;
-
-  @Column({ type: 'jsonb', nullable: true })
-  defaultData?: Record<string, any>;
-
-  @Column({ type: 'jsonb', nullable: true })
-  variables?: string[]; // List of template variables
-
   @Column({ type: 'boolean', default: true })
-  isActive!: boolean;
+  enabled!: boolean;
 
-  @Column({ type: 'varchar', length: 50, default: '1.0.0' })
-  version!: string;
+  @Column({ type: 'jsonb', nullable: true })
+  settings?: Record<string, any>; // Channel-specific settings
+
+  // Scheduling preferences
+  @Column({ type: 'time', nullable: true })
+  preferredTimeStart?: string; // '09:00:00'
+
+  @Column({ type: 'time', nullable: true })
+  preferredTimeEnd?: string; // '18:00:00'
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  timezone?: string;
+
+  @Column({ type: 'simple-array', nullable: true })
+  blockedDays?: string[]; // ['saturday', 'sunday']
 
   @CreateDateColumn()
   createdAt!: Date;

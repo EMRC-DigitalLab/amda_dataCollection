@@ -202,7 +202,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     });
   }
 
-
   async getPublishedFormTypes(): Promise<FormType[]> {
     return await this.formTypeRepo
       .createQueryBuilder('formType')
@@ -211,7 +210,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       .andWhere('form.status = :formStatus', { formStatus: FormStatus.PUBLISHED })
       .getMany();
   }
-
 
   async getFormTypesByStatus(status: FormStatus): Promise<{ formType: string; count: number }[]> {
     const query = `
