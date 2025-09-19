@@ -1,12 +1,12 @@
 // src/shared/utils/response.ts
 import { Response } from 'express';
+import { HTTP_STATUS } from '../constants/http-status';
 import {
   ApiResponse,
   ErrorResponse,
-  ValidationErrorResponse,
   PaginationMeta,
+  ValidationErrorResponse,
 } from '../types/api.types';
-import { HTTP_STATUS } from '../constants/http-status';
 
 export class ResponseHelper {
   static success<T>(
@@ -36,7 +36,7 @@ export class ResponseHelper {
 
   static error(
     res: Response,
-    message: string,
+    message: string | any,
     statusCode: number = HTTP_STATUS.INTERNAL_SERVER_ERROR,
     error?: string,
     code?: string,

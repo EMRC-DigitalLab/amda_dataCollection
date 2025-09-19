@@ -1,8 +1,15 @@
 // src/api/routes/index.ts
 // src/api/routes/index.ts (UPDATED)
-import { Router } from 'express';
-import { createAuthRoutes } from '@/modules/auth/routes/auth.routes';
 import { AppDataSource } from '@/config/database';
+import { createAuthRoutes } from '@/modules/auth/routes/auth.routes';
+import { Router } from 'express';
+import { createSiteRoutes } from '../../modules/analytics/routes/site.route';
+import { createMemberRoutes } from '../../modules/auth/routes/member.route';
+import { createCompletionRoutes } from '../../modules/forms/routes/completion.route';
+import { createFormSettingsRoutes } from '../../modules/forms/routes/form-settings.route';
+import { createFormTypeRoutes } from '../../modules/forms/routes/form-type.route';
+import { createFormRoutes } from '../../modules/forms/routes/form.route';
+import { createMinigridRoutes } from '../../modules/forms/routes/minigrid-site.route';
 
 export function createApiRouter(): Router {
   const router = Router();
@@ -10,8 +17,13 @@ export function createApiRouter(): Router {
   // register all modules here
   const modules = [
     { path: '/auth', factory: createAuthRoutes },
-    // { path: '/users', factory: createUserRoutes },
-    // { path: '/orders', factory: createOrderRoutes },
+    { path: '/forms', factory: createFormRoutes },
+    { path: '/minigrid-sites', factory: createMinigridRoutes },
+    { path: '/form-settings', factory: createFormSettingsRoutes },
+    { path: '/members', factory: createMemberRoutes },
+    { path: '/analytics/sites', factory: createSiteRoutes },
+    { path: '/completion', factory: createCompletionRoutes },
+    { path: '/form-types', factory: createFormTypeRoutes },
   ];
 
   for (const { path, factory } of modules) {

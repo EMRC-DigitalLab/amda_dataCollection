@@ -1,9 +1,9 @@
 // src/api/swagger/swagger.config.ts
-import swaggerJSDoc from 'swagger-jsdoc';
 import { config } from '@/config';
 import * as fs from 'fs';
-import * as path from 'path';
 import * as yaml from 'js-yaml';
+import * as path from 'path';
+import swaggerJSDoc from 'swagger-jsdoc';
 
 // Dynamic server configuration based on environment
 const getServerConfig = () => {
@@ -369,7 +369,7 @@ class SwaggerMerger {
   }
 
   public generateSpec(): object {
-    // Set APIs for JSDoc scanning
+    // Set APIs for JSDoc scanningddd
     swaggerOptions.apis = this.modulePaths;
 
     // Generate base spec
