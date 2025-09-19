@@ -2,7 +2,7 @@
 import { AppDataSource } from '@/config/database';
 import { User, UserRole } from '@/database/entities/user.entity';
 
-async function seedAdmin() {
+export async function seedAdmin() {
   await AppDataSource.initialize();
 
   const userRepo = AppDataSource.getRepository(User);
@@ -18,7 +18,6 @@ async function seedAdmin() {
   });
 
   await userRepo.save(admin);
-  console.log('Admin user created');
   process.exit(0);
 }
 

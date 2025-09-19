@@ -1,13 +1,13 @@
 // src/modules/auth/controllers/auth.controller.ts
+import { asyncHandler } from '@/shared/middleware/error.middleware';
+import { ResponseHelper } from '@/shared/utils/response';
 import { Request, Response } from 'express';
 import { DataSource } from 'typeorm';
 import { AuthService } from '../services/auth.service';
-import { ResponseHelper } from '@/shared/utils/response';
-import { asyncHandler } from '@/shared/middleware/error.middleware';
 
 interface AuthenticatedRequest extends Request {
   user?: {
-    userId: string;
+    id: string;
     email: string;
     role: string;
   };
@@ -31,7 +31,8 @@ export class AuthController {
 
   createMember = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const adminId = req.user?.userId;
+      // THis is an hardcsoded adminId, since we no ,longer create a member from the admin dashboard
+      const adminId = '40d13800-6ba2-4bea-9298-d53334e600cf';
       if (!adminId) {
         return ResponseHelper.error(res, 'Admin authentication required', 401);
       }
@@ -54,7 +55,7 @@ export class AuthController {
 
   changePassword = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       if (!userId) {
         return ResponseHelper.error(res, 'Authentication required', 401);
       }
@@ -77,7 +78,7 @@ export class AuthController {
 
   logout = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       if (!userId) {
         return ResponseHelper.error(res, 'Authentication required', 401);
       }
@@ -109,30 +110,270 @@ export class AuthController {
 
   getProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       if (!userId) {
         return ResponseHelper.error(res, 'Authentication required', 401);
       }
 
       const user = await this.authService.getProfile(userId);
 
-      const profileData = {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phoneNumber: user.phoneNumber,
-        role: user.role,
-        status: user.status,
-        avatar: user.avatar,
-        lastLoginAt: user.lastLoginAt,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      };
-
-      ResponseHelper.success(res, profileData, 'Profile retrieved successfully');
+      ResponseHelper.success(res, user, 'Profile retrieved successfully');
     } catch (error: any) {
       ResponseHelper.error(res, error.message, 404);
     }
   });
+
+  /**
+   * Verify or unverify a member
+   * PATCH /admin/members/:memberId/verify
+   */
+  verifyMember = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const adminId = req.user?.id;
+      if (!adminId) {
+        return ResponseHelper.error(res, 'Admin authentication required', 401);
+      }
+
+      const { memberId } = req.params;
+      const { isVerified } = req.body;
+
+      if (typeof isVerified !== 'boolean') {
+        return ResponseHelper.error(res, 'isVerified field is required and must be boolean', 400);
+      }
+
+      const result = await this.authService.verifyMember(memberId, adminId, { isVerified });
+
+      ResponseHelper.success(res, result, result.message);
+    } catch (error: any) {
+      ResponseHelper.error(res, error.message, error.status || 400);
+    }
+  });
+
+  getVerifiedMembers = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const adminId = req.user?.id;
+      if (!adminId) {
+        return ResponseHelper.error(res, 'Admin authentication required', 401);
+      }
+
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const country = req.query.country as string;
+
+      const result = await this.authService.getVerifiedMembers(page, limit, country);
+
+      ResponseHelper.success(
+        res,
+        {
+          ...result,
+          pagination: {
+            page,
+            limit,
+            total: result.total,
+            hasMore: result.hasMore,
+          },
+        },
+        'Verified members retrieved successfully'
+      );
+    } catch (error: any) {
+      ResponseHelper.error(res, error.message, 400);
+    }
+  });
+
+  /**
+   * Get members verified by current admin
+   * GET /admin/members/verify/my-verifications
+   */
+  getMyVerifications = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const adminId = req.user?.id;
+      if (!adminId) {
+        return ResponseHelper.error(res, 'Admin authentication required', 401);
+      }
+
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+
+      const result = await this.authService.getMembersVerifiedByAdmin(adminId, page, limit);
+
+      ResponseHelper.success(
+        res,
+        {
+          ...result,
+          pagination: {
+            page,
+            limit,
+            total: result.total,
+            hasMore: result.hasMore,
+          },
+        },
+        'Your verifications retrieved successfully'
+      );
+    } catch (error: any) {
+      ResponseHelper.error(res, error.message, 400);
+    }
+  });
+
+  /**
+   * Get pending verifications (unverified members)
+   * GET /admin/members/verify/pending
+   */
+  getPendingVerifications = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const adminId = req.user?.id;
+      if (!adminId) {
+        return ResponseHelper.error(res, 'Admin authentication required', 401);
+      }
+
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const country = req.query.country as string;
+
+      const result = await this.authService.getPendingVerifications(page, limit, country);
+
+      ResponseHelper.success(
+        res,
+        {
+          ...result,
+          pagination: {
+            page,
+            limit,
+            total: result.total,
+            hasMore: result.hasMore,
+          },
+        },
+        'Pending verifications retrieved successfully'
+      );
+    } catch (error: any) {
+      ResponseHelper.error(res, error.message, 400);
+    }
+  });
+
+  /**
+   * Search members by verification status
+   * GET /admin/members/verify/search
+   */
+  searchMembers = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const adminId = req.user?.id;
+      if (!adminId) {
+        return ResponseHelper.error(res, 'Admin authentication required', 401);
+      }
+
+      const searchTerm = req.query.q as string;
+      if (!searchTerm || searchTerm.trim().length === 0) {
+        return ResponseHelper.error(res, 'Search term (q) is required', 400);
+      }
+
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const country = req.query.country as string;
+
+      // Handle verified query parameter
+      let isVerified: boolean | undefined;
+      if (req.query.verified !== undefined) {
+        if (req.query.verified === 'true') {
+          isVerified = true;
+        } else if (req.query.verified === 'false') {
+          isVerified = false;
+        }
+      }
+
+      const result = await this.authService.searchMembers(
+        searchTerm.trim(),
+        isVerified,
+        country,
+        page,
+        limit
+      );
+
+      ResponseHelper.success(
+        res,
+        {
+          ...result,
+          pagination: {
+            page,
+            limit,
+            total: result.total,
+            hasMore: result.hasMore,
+          },
+        },
+        'Search completed successfully'
+      );
+    } catch (error: any) {
+      ResponseHelper.error(res, error.message, 400);
+    }
+  });
+
+  /**
+   * Get member verification history
+   * GET /admin/members/:memberId/verify/history
+   */
+  getMemberVerificationHistory = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const adminId = req.user?.id;
+      if (!adminId) {
+        return ResponseHelper.error(res, 'Admin authentication required', 401);
+      }
+
+      const { memberId } = req.params;
+
+      const result = await this.authService.getMemberVerificationHistory(memberId);
+      ResponseHelper.success(res, result, 'Member verification history retrieved successfully');
+    } catch (error: any) {
+      ResponseHelper.error(res, error.message, error.status || 400);
+    }
+  });
+
+  /**
+   * Get all members with verification status (for admin dashboard)
+   * GET /admin/members/verify/all
+   */
+  getAllMembersWithVerificationStatus = asyncHandler(
+    async (req: AuthenticatedRequest, res: Response) => {
+      console.log('reaches this page');
+      try {
+        const adminId = req.user?.id;
+        if (!adminId) {
+          return ResponseHelper.error(res, 'Admin authentication required', 401);
+        }
+
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const country = req.query.country as string;
+        const status = req.query.status as string; // 'verified' | 'unvedddrified' | 'all'
+
+        let isVerified: boolean | undefined;
+        if (status === 'verified') {
+          isVerified = true;
+        } else if (status === 'unverified') {
+          isVerified = false;
+        }
+
+        const result = await this.authService.searchMembers(
+          '', // Empty search term to get all
+          isVerified,
+          country,
+          page,
+          limit
+        );
+
+        ResponseHelper.success(
+          res,
+          {
+            ...result,
+            pagination: {
+              page,
+              limit,
+              total: result.total,
+              hasMore: result.hasMore,
+            },
+          },
+          'Members retrieved successfully'
+        );
+      } catch (error: any) {
+        ResponseHelper.error(res, error.message, 400);
+      }
+    }
+  );
 }

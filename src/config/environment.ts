@@ -78,6 +78,7 @@ if (error) {
   throw new Error(`Config validation error: ${error.message}`);
 }
 
+console.log(envVars.DATABASE_HOST, 'databse host');
 export const config = {
   environment: envVars.NODE_ENV,
   port: envVars.PORT,
