@@ -118,6 +118,7 @@ export class CompletionService {
   ): Promise<Omit<SiteCompletion, 'siteId' | 'siteName' | 'memberId'>> {
     let forms: Form[];
 
+    // Get the Current Form Structure
     if (formId) {
       const form = await this.formRepository.findFormById(formId);
       forms = form ? [form] : [];
@@ -137,6 +138,7 @@ export class CompletionService {
     const formBreakdown: FormCompletionBreakdown[] = [];
     let completedFormsCount = 0;
 
+    console.log(forms, siteId,"this is the ifnormation to fgetch complete info for site")
     for (const form of forms) {
       const formCompletion = await this.getFormCompletionForSite(form, siteId);
       formBreakdown.push(formCompletion);
@@ -410,10 +412,11 @@ export class CompletionService {
     }
 
     try {
+      console.log(form, entityColumn, "this is the params")
       // Get the latest submission for this entity
       const submissionQuery = `
         SELECT * FROM "${form.tableName}" 
-        WHERE ${entityColumn} = $1 
+        WHERE "${entityColumn}" = $1 
         ORDER BY submitted_at DESC 
         LIMIT 1
       `;
@@ -588,7 +591,7 @@ export class CompletionService {
   private async getMemberInfo(memberId: string): Promise<{ id: string; name: string } | null> {
     try {
       const result = await this.dataSource.query(
-        'SELECT id, "organizationName" as name FROM members WHERE id = $1',
+        'SELECT id, "companyName" as name FROM members WHERE id = $1',
         [memberId]
       );
       return result.length > 0 ? result[0] : null;

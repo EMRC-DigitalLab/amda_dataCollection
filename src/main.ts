@@ -9,7 +9,7 @@ import swaggerUi from 'swagger-ui-express';
 
 import { createApiRouter } from '@/api/routes';
 import { getSwaggerInfo, swaggerSpec } from '@/api/swagger/schemas/swagger.config';
-import { config, connectRedis } from '@/config';
+import { config } from '@/config';
 import { AppDataSource, connectDatabase } from '@/config/database';
 import { errorHandler, notFoundHandler } from '@/shared/middleware/error.middleware';
 import { generalRateLimit } from '@/shared/middleware/rate-limit.middleware';
@@ -255,7 +255,7 @@ class Application {
       }
 
       // Connect to Redis
-      await connectRedis();
+      // await connectRedis();
 
       // Start server
       this.app.listen(config.port, () => {
