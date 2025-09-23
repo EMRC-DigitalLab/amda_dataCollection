@@ -1,6 +1,7 @@
 // src/main.ts (Updated with enhanced Swagger setup and Secure CORS)
 import path from 'path';
 import moduleAlias from 'module-alias';
+import 'module-alias/register';
 import compression from 'compression';
 import { WebSocketService } from '@/shared/websocket/websocket.service';
 
