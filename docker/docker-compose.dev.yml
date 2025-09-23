@@ -73,14 +73,14 @@ services:
       timeout: 5s
       retries: 5
 
-  amda-mailhog:
-    image: mailhog/mailhog:latest
-    container_name: amda-mailhog
-    ports:
-      - "1025:1025"
-      - "8025:8025"
-    networks:
-      - amda-dev-network
+  # amda-mailhog:
+  #   image: mailhog/mailhog:latest
+  #   container_name: amda-mailhog
+  #   ports:
+  #     - "1025:1025"
+  #     - "8025:8025"
+  #   networks:
+  #     - amda-dev-network
 
 volumes:
   redis_dev_data:
