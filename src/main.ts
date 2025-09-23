@@ -348,6 +348,3 @@ const app = new Application();
 app.start();
 
 export default app;
-/ /   C I / C D   t e s t   0 9 / 2 3 / 2 0 2 5   2 3 : 1 3 : 2 4  
- / /   C I / C D   t e s t   0 9 / 2 3 / 2 0 2 5   2 3 : 1 3 : 5 8  
- 
