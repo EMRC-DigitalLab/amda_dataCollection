@@ -1,5 +1,5 @@
 # .github/workflows/deploy.yml
-name: 🚀 Deploy to Production
+name: Deploy to Production
 
 on:
   push:
@@ -15,120 +15,121 @@ env:
 
 jobs:
   deploy:
-    name: 🔄 Deploy to Hostinger
+    name: Deploy to Hostinger
     runs-on: ubuntu-latest
     
     steps:
-    - name: 📝 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: 🔐 Setup SSH
-      uses: webfactory/ssh-agent@v0.7.0
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.9.0
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
         
-    - name: 📋 Add Server to Known Hosts
+    - name: Add Server to Known Hosts
       run: |
+        mkdir -p ~/.ssh
         ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
         
-    - name: 🚀 Deploy to Server
+    - name: Deploy to Server
       run: |
         ssh ${{ secrets.SSH_USER }}@${{ secrets.HOST }} << 'EOF'
           set -e  # Exit on any error
           
           # Create logs directory
-          mkdir -p ${{ env.LOG_PATH }}
+          mkdir -p /srv/amda/logs
           
           # Function to log with timestamp
           log() {
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a ${{ env.LOG_PATH }}/deployment.log
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a /srv/amda/logs/deployment.log
           }
           
           # Function to rollback
           rollback() {
-            log "🔄 STARTING ROLLBACK PROCESS"
+            log "STARTING ROLLBACK PROCESS"
             
             # Stop current container
-            if docker ps -q -f name=${{ env.CONTAINER_NAME }} | grep -q .; then
+            if docker ps -q -f name=amda-collection-api | grep -q .; then
               log "Stopping failed container..."
-              docker stop ${{ env.CONTAINER_NAME }} || true
-              docker rm ${{ env.CONTAINER_NAME }} || true
+              docker stop amda-collection-api || true
+              docker rm amda-collection-api || true
             fi
             
             # Restore backup container if it exists
-            if docker ps -a -q -f name=${{ env.BACKUP_CONTAINER_NAME }} | grep -q .; then
+            if docker ps -a -q -f name=amda-collection-api-backup | grep -q .; then
               log "Restoring backup container..."
-              docker rename ${{ env.BACKUP_CONTAINER_NAME }} ${{ env.CONTAINER_NAME }}
-              docker start ${{ env.CONTAINER_NAME }}
-              log "✅ ROLLBACK COMPLETED - Service restored to previous version"
+              docker rename amda-collection-api-backup amda-collection-api
+              docker start amda-collection-api
+              log "ROLLBACK COMPLETED - Service restored to previous version"
             else
-              log "❌ NO BACKUP CONTAINER FOUND - Manual intervention required"
+              log "NO BACKUP CONTAINER FOUND - Manual intervention required"
               exit 1
             fi
           }
           
           # Function to health check
           health_check() {
-            log "🔍 Starting health check..."
+            log "Starting health check..."
             local max_attempts=30
             local attempt=1
             
             while [ $attempt -le $max_attempts ]; do
-              if docker ps | grep -q ${{ env.CONTAINER_NAME }}; then
-                # Check if container is actually healthy (you can customize this)
-                if docker exec ${{ env.CONTAINER_NAME }} curl -f http://localhost:3000/health 2>/dev/null || \
-                   docker logs ${{ env.CONTAINER_NAME }} 2>&1 | tail -10 | grep -v "Error\|error" >/dev/null; then
-                  log "✅ Health check passed (attempt $attempt/$max_attempts)"
+              if docker ps | grep -q amda-collection-api; then
+                # Check if container is actually healthy
+                if docker exec amda-collection-api curl -f http://localhost:3000/health 2>/dev/null || \
+                   docker logs amda-collection-api 2>&1 | tail -10 | grep -v "Error\|error" >/dev/null; then
+                  log "Health check passed (attempt $attempt/$max_attempts)"
                   return 0
                 fi
               fi
               
-              log "⏳ Health check attempt $attempt/$max_attempts failed, waiting..."
+              log "Health check attempt $attempt/$max_attempts failed, waiting..."
               sleep 10
               attempt=$((attempt + 1))
             done
             
-            log "❌ Health check failed after $max_attempts attempts"
+            log "Health check failed after $max_attempts attempts"
             return 1
           }
           
           # Start deployment process
-          log "🚀 STARTING DEPLOYMENT PROCESS"
-          log "Deploying to: ${{ env.DEPLOY_PATH }}"
+          log "STARTING DEPLOYMENT PROCESS"
+          log "Deploying to: /srv/amda/prod/app"
           
           # Navigate to app directory
-          cd ${{ env.DEPLOY_PATH }}
+          cd /srv/amda/prod/app
           
           # Backup current running container
-          if docker ps -q -f name=${{ env.CONTAINER_NAME }} | grep -q .; then
-            log "📦 Creating backup of current container..."
+          if docker ps -q -f name=amda-collection-api | grep -q .; then
+            log "Creating backup of current container..."
             
             # Remove old backup if exists
-            if docker ps -a -q -f name=${{ env.BACKUP_CONTAINER_NAME }} | grep -q .; then
-              docker stop ${{ env.BACKUP_CONTAINER_NAME }} || true
-              docker rm ${{ env.BACKUP_CONTAINER_NAME }} || true
+            if docker ps -a -q -f name=amda-collection-api-backup | grep -q .; then
+              docker stop amda-collection-api-backup || true
+              docker rm amda-collection-api-backup || true
             fi
             
             # Create backup
-            docker stop ${{ env.CONTAINER_NAME }}
-            docker rename ${{ env.CONTAINER_NAME }} ${{ env.BACKUP_CONTAINER_NAME }}
-            log "✅ Backup created successfully"
+            docker stop amda-collection-api
+            docker rename amda-collection-api amda-collection-api-backup
+            log "Backup created successfully"
           else
-            log "ℹ️ No running container found to backup"
+            log "No running container found to backup"
           fi
           
           # Pull latest code
-          log "📥 Pulling latest code from GitHub..."
+          log "Pulling latest code from GitHub..."
           if ! git pull origin main; then
-            log "❌ Git pull failed"
+            log "Git pull failed"
             rollback
             exit 1
           fi
           
           # Build and deploy new container
-          log "🔨 Building new Docker container..."
+          log "Building new Docker container..."
           if ! npm run docker:prod; then
-            log "❌ Docker build failed"
+            log "Docker build failed"
             rollback
             exit 1
           fi
@@ -138,33 +139,33 @@ jobs:
           
           # Perform health check
           if ! health_check; then
-            log "❌ Health check failed - initiating rollback"
+            log "Health check failed - initiating rollback"
             # Capture logs before rollback
-            docker logs ${{ env.CONTAINER_NAME }} > ${{ env.LOG_PATH }}/failed_deployment_logs_$(date +%Y%m%d_%H%M%S).log 2>&1 || true
+            docker logs amda-collection-api > /srv/amda/logs/failed_deployment_logs_$(date +%Y%m%d_%H%M%S).log 2>&1 || true
             rollback
             exit 1
           fi
           
           # Clean up old backup if deployment successful
-          if docker ps -a -q -f name=${{ env.BACKUP_CONTAINER_NAME }} | grep -q .; then
-            log "🧹 Cleaning up old backup container..."
-            docker stop ${{ env.BACKUP_CONTAINER_NAME }} || true
-            docker rm ${{ env.BACKUP_CONTAINER_NAME }} || true
+          if docker ps -a -q -f name=amda-collection-api-backup | grep -q .; then
+            log "Cleaning up old backup container..."
+            docker stop amda-collection-api-backup || true
+            docker rm amda-collection-api-backup || true
           fi
           
           # Clean up old images
-          log "🧹 Cleaning up old Docker images..."
+          log "Cleaning up old Docker images..."
           docker image prune -f || true
           
-          log "🎉 DEPLOYMENT COMPLETED SUCCESSFULLY"
-          log "Container: ${{ env.CONTAINER_NAME }} is now running"
+          log "DEPLOYMENT COMPLETED SUCCESSFULLY"
+          log "Container: amda-collection-api is now running"
           
           # Final status check
-          docker ps | grep ${{ env.CONTAINER_NAME }} || true
+          docker ps | grep amda-collection-api || true
           
         EOF
         
-    - name: 📊 Deployment Status
+    - name: Deployment Status
       if: always()
       run: |
         ssh ${{ secrets.SSH_USER }}@${{ secrets.HOST }} << 'EOF'
@@ -177,14 +178,14 @@ jobs:
           tail -10 /srv/amda/logs/deployment.log 2>/dev/null || echo "No deployment log found"
         EOF
         
-    - name: 🚨 Notify on Failure
+    - name: Notify on Failure
       if: failure()
       run: |
-        echo "❌ Deployment failed! Check the logs for details."
+        echo "Deployment failed! Check the logs for details."
         echo "The system should have automatically rolled back to the previous version."
         
-    - name: ✅ Notify on Success  
+    - name: Notify on Success  
       if: success()
       run: |
-        echo "🎉 Deployment successful!"
+        echo "Deployment successful!"
         echo "Application is now running with the latest code."
