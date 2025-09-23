@@ -27,12 +27,13 @@ jobs:
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
         
-    - name: Add Server to Known Hosts
+    - name: Configure SSH
       run: |
         mkdir -p ~/.ssh
-        echo "srv880665.hstgr.cloud ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC4HctfceQ5ielMHhWkvzhouYBu0wcLoFUAOf+q2KUrlbBBB5IwtBsAP73K1fUj9L4zYTQOom/3RU4S+D4N3IT414Xgqh0JWj/9clGZq9wboW7z9rqT2YKaEQBzg5Jwmvonu4Qp+z8xNZbBUw8tqZzDZ5vmKauBnxDzBgcOud77cpFmW3h83bI1zFdg00MXDFMoToF7osd6ylY+z+IxCnesNEXEEwdmRRKbnsAq/QHUTlO3TzYWZu0IkuN8MSpbIxeYm2F5FqdyTG8Ho6cfkZdXFLQx4cdipQG3GKTBvXwp/hl/NG0GQnakNWhdt0dN8y5dCBg1yL+IhVupSL+Me6goc2XuYDdrWCZjynpjezLu2GJvk9+/5KP9aDx7a+RFLlM3r/IONLsGA4uUur8/iEbVPste3J3WQRYwnQBbqBpXqaUAMQVTTrxgMViXgHNNXbVDZOXGqlBcO4Kecq83EPT8gDmqbMKGANc27gfaqmT5l5anImwPITRn6gZMNS9FTqk=" >> ~/.ssh/known_hosts
-        echo "srv880665.hstgr.cloud ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBHxwhfcx1ccibf2VcUprsdZbKkvKppZ79Ioqszm574qvbjlrf9CvJGd0VGdSplCcwniqV5opE7UfOBvibRsNlRc=" >> ~/.ssh/known_hosts
-        echo "srv880665.hstgr.cloud ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPYGYUTvkxtNWWvV/jMFdYQd3gR55W5tdjo16e62KOrc" >> ~/.ssh/known_hosts
+        echo "Host ${{ secrets.HOST }}" >> ~/.ssh/config
+        echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+        echo "  UserKnownHostsFile /dev/null" >> ~/.ssh/config
+        chmod 600 ~/.ssh/config
         
     - name: Deploy to Server
       run: |
