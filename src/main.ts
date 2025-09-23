@@ -3,7 +3,6 @@ import path from 'path';
 import moduleAlias from 'module-alias';
 import 'module-alias/register';
 import compression from 'compression';
-import { WebSocketService } from '@/shared/websocket/websocket.service';
 
 // Smart environment detection
 const isProduction = process.env.NODE_ENV === 'production' || __filename.includes('/dist/');
@@ -42,6 +41,7 @@ import { config, connectRedis } from '@/config';
 import { AppDataSource, connectDatabase } from '@/config/database';
 import { errorHandler, notFoundHandler } from '@/shared/middleware/error.middleware';
 import { generalRateLimit } from '@/shared/middleware/rate-limit.middleware';
+import { WebSocketService } from '@/shared/websocket/websocket.service';
 import { logger } from '@/shared/utils/logger';
 
 class Application {
