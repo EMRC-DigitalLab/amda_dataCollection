@@ -132,7 +132,9 @@ class Application {
           'https://amda.com',
           'https://www.amda.com',
           'https://app.amda.com',
-          'https://admin.amda.com'
+          'https://admin.amda.com',
+          'http://amda.raven-emrc.com',
+          'https://amda.raven-emrc.com/'
         );
         break;
 
