@@ -136,7 +136,8 @@ class Application {
           'http://amda.raven-emrc.com',
           'https://amda.raven-emrc.com/',
           'http://127.0.0.1:5173',
-          'http://localhost:5173'
+          'http://localhost:5173',
+          'https://amda.energymrc.ng/'
         );
         break;
 
