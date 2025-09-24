@@ -9,7 +9,7 @@ export class NotificationQueueService {
 
   constructor() {
     this.notificationQueue = new Queue('notification processing', {
-      redis: 'redis://localhost:6379',
+      redis: 'redis://amda-redis-dev:6379',
       defaultJobOptions: {
         removeOnComplete: 100,
         removeOnFail: 50,
