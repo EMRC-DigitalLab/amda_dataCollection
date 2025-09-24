@@ -35,7 +35,6 @@ export class AuthService {
   async login(loginDto: LoginDto): Promise<LoginResponse> {
     const { email, password } = loginDto;
 
-    console.log(loginDto, 'this is payload');
 
     // First, try to find admin/user by email
     let user: User | null = null;
@@ -110,7 +109,6 @@ export class AuthService {
         ...member,
         role: 'member',
       };
-      console.log(loginUser, 'this is loging user');
 
       // Update last login for member
       await this.memberRepository.updateLastLogin(member.id);

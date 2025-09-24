@@ -116,6 +116,7 @@ export const authMiddleware = async (
     }
 
     req.user = authenticatedUser;
+
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);
