@@ -134,7 +134,9 @@ class Application {
           'https://app.amda.com',
           'https://admin.amda.com',
           'http://amda.raven-emrc.com',
-          'https://amda.raven-emrc.com/'
+          'https://amda.raven-emrc.com/',
+          'http://127.0.0.1:5173',
+          'http://localhost:5173'
         );
         break;
 
