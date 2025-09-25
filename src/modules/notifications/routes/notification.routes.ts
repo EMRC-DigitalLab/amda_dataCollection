@@ -5,6 +5,7 @@ import { authMiddleware } from '@/shared/middleware/auth.middleware';
 import { adminMiddleware } from '@/shared/middleware/admin.middleware';
 import { NotificationController } from '../controllers/notification.controller';
 import { NotificationService } from '../services/notification.service';
+import { NotificationChannel, NotificationPriority } from '@/database/entities/notification.entity';
 import { NotificationQueueService } from '../services/notification-queue.service';
 import { TemplateService } from '../services/template.service';
 import { NotificationChannelFactory } from '../services/channel-factory.service';
@@ -121,6 +122,167 @@ export function createNotificationRoutes(_dataSource: DataSource): Router {
   router.get('/users/:userId/preferences', authMiddleware, (req, res, next) =>
     notificationController.getPreferences(req, res, next)
   );
+
+  // TEST ROUTES - Remove in production
+  router.post('/test/email', async (req, res) => {
+    try {
+      const { recipientEmail, subject, content } = req.body;
+
+      // Test direct email channel
+      const emailChannel = new EmailChannel();
+      const result = await emailChannel.send({
+        id: 'test-' + Date.now(),
+        type: 'test',
+        channel: NotificationChannel.EMAIL,
+        recipientId: 'test-user',
+        recipientEmail: recipientEmail,
+        subject: subject || 'Test Email Notification',
+        content: content || 'This is a test email from your notification system.',
+      });
+
+      res.json({
+        success: true,
+        message: 'Email test completed',
+        result: result,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  router.post('/test/full-pipeline', async (req, res) => {
+    try {
+      const {
+        recipientId = 'test-user-123',
+        recipientEmail,
+        type = 'test_notification',
+        subject = 'Test Pipeline Notification',
+        content = 'Testing the full notification pipeline',
+      } = req.body;
+
+      // Test full notification pipeline
+      const notification = await notificationService.sendNotification({
+        type,
+        channel: NotificationChannel.EMAIL,
+        recipientId,
+        recipientEmail,
+        subject,
+        content,
+        priority: NotificationPriority.NORMAL,
+      });
+
+      res.json({
+        success: true,
+        message: 'Full pipeline test initiated',
+        notification: {
+          id: notification.id,
+          status: notification.status,
+          type: notification.type,
+          channel: notification.channel,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  router.post('/test/in-app', async (req, res) => {
+    try {
+      const {
+        recipientId = 'test-user-123',
+        subject = 'Test In-App Notification',
+        content = 'This is a test in-app notification',
+      } = req.body;
+
+      // Test in-app notification
+      const notification = await notificationService.sendNotification({
+        type: 'test_in_app',
+        channel: NotificationChannel.IN_APP,
+        recipientId,
+        recipientEmail: 'test@example.com',
+        subject,
+        content,
+        priority: NotificationPriority.NORMAL,
+      });
+
+      res.json({
+        success: true,
+        message: 'In-app notification test completed',
+        notification: {
+          id: notification.id,
+          status: notification.status,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  router.post('/test/template', async (req, res) => {
+    try {
+      // First create a test template
+      const template = await templateService.createTemplate({
+        name: 'test_welcome',
+        type: 'welcome',
+        channel: NotificationChannel.EMAIL,
+        subject: 'Welcome {{userName}}!',
+        content: 'Hello {{userName}}, welcome to {{appName}}! Your account is ready.',
+        htmlContent:
+          '<h1>Welcome {{userName}}!</h1><p>Hello {{userName}}, welcome to <strong>{{appName}}</strong>! Your account is ready.</p>',
+        variables: ['userName', 'appName'],
+      });
+
+      // Test template rendering
+      const rendered = await templateService.renderTemplate({
+        templateId: template.id,
+        channel: NotificationChannel.EMAIL,
+        data: {
+          userName: req.body.userName || 'John Doe',
+          appName: 'AMDA Platform',
+        },
+      });
+
+      res.json({
+        success: true,
+        message: 'Template test completed',
+        template: {
+          id: template.id,
+          name: template.name,
+        },
+        rendered: rendered,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  router.get('/test/queue-stats', async (req, res) => {
+    try {
+      const stats = await queueService.getQueueStats();
+      res.json({
+        success: true,
+        message: 'Queue statistics retrieved',
+        stats: stats,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
 
   return router;
 }

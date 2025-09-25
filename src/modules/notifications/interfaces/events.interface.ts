@@ -1,4 +1,6 @@
 // src/modules/notifications/interfaces/events.interface.ts
+// src/modules/notifications/interfaces/notification.interface.ts
+import { NotificationChannel, NotificationPriority } from '@/database/entities/notification.entity';
 export interface NotificationEvent {
   type: string;
   recipientId: string;

@@ -883,4 +883,9 @@ This project is proprietary software owned by AMDA. All rights reserved. Unautho
 
 ---
 
-**Made with ❤️ by the EMRC Digital System Unit (DSU)**
+**Made with ❤️ by the EMRC Digital System Unit (DSU)**# #   D e p l o y m e n t 
+ 
+ S e e   [ D E P L O Y M E N T . m d ] ( D E P L O Y M E N T . m d )   f o r   C I / C D   s e t u p   i n s t r u c t i o n s . 
+ 
+ 
+
