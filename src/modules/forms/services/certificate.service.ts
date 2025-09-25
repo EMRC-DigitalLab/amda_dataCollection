@@ -477,15 +477,20 @@ export class CertificateService {
   private async loadImageAsBase64(imagePath: string): Promise<string | null> {
     // Primary path: public folder in the same directory as this service file
     const publicPath = path.join(__dirname, 'public', imagePath);
-    
+
     try {
       console.log(`Loading image from: ${publicPath}`);
       const imageBuffer = await fs.readFile(publicPath);
       const base64 = imageBuffer.toString('base64');
       const ext = path.extname(imagePath).toLowerCase();
-      const mimeType = ext === '.png' ? 'image/png' : 
-                      ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' :
-                      ext === '.gif' ? 'image/gif' : 'image/png';
+      const mimeType =
+        ext === '.png'
+          ? 'image/png'
+          : ext === '.jpg' || ext === '.jpeg'
+            ? 'image/jpeg'
+            : ext === '.gif'
+              ? 'image/gif'
+              : 'image/png';
       console.log(`Successfully loaded image from: ${publicPath}`);
       return `data:${mimeType};base64,${base64}`;
     } catch (error) {
@@ -497,7 +502,7 @@ export class CertificateService {
   private async loadFontsFromPublic(pdf: jsPDF): Promise<boolean> {
     try {
       console.log('Starting font loading process from public folder...');
-      
+
       // Font file names and configurations
       const fontConfigs = [
         { filename: 'ClashGrotesk-Regular.ttf', family: 'ClashGrotesk', style: 'normal' },
@@ -508,7 +513,7 @@ export class CertificateService {
 
       const fontPromises = fontConfigs.map(config => this.loadFontFromFile(config.filename));
       const responses = await Promise.all(fontPromises);
-      
+
       let fontsLoaded = 0;
 
       responses.forEach((base64, index) => {
@@ -536,7 +541,7 @@ export class CertificateService {
   private async loadFontFromFile(fontFilename: string): Promise<string | null> {
     // Load fonts from public/fonts folder in the same directory as this service file
     const fontPath = path.join(__dirname, 'public', 'fonts', fontFilename);
-    
+
     try {
       console.log(`Loading font from: ${fontPath}`);
       const fontBuffer = await fs.readFile(fontPath);

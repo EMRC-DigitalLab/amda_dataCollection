@@ -108,12 +108,10 @@ export class MinigridSiteController {
   // Alternative method: Get current authenticated user's minigrid sites
   getMyMinigridSites = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-
-      console.log(req.user, "this is the user")
+      console.log(req.user, 'this is the user');
       // Assuming you have user info in req.user from auth middleware
-   
+
       const userId = (req as any).user?.id;
-  
 
       if (!userId) {
         throw new AppError('User not authenticated', 401);
