@@ -263,7 +263,7 @@ export class MemberController {
         search,
         isVerified,
         page = '1',
-        limit = '10',
+        limit = '1000000',
       } = req.query;
 
       const filters = {

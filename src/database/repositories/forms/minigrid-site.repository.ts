@@ -27,7 +27,7 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
   async findById(id: string): Promise<MinigridSite | null> {
     return await this.repository.findOne({
       where: { id },
-      relations: ['forms'],
+      relations: ['member'],
     });
   }
 
@@ -43,8 +43,8 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
     options?: FindManyOptions<MinigridSite>
   ): Promise<MinigridSite[]> {
     return await this.repository.find({
-      where: { memberId: userId },
-      // relations: ['forms', 'user'],
+      where: { memberUuid: userId },
+      relations: ['member'],      
       ...options,
     });
   }

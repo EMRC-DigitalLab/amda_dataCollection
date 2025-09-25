@@ -17,8 +17,8 @@ import { MinigridSite } from './minigrid-site.entity';
 export enum MembershipType {
   FULL_MEMBER = 'FULL',
   ASSOCIATE_MEMBER = 'ASSOCIATE',
-  STUDENT_MEMBER = 'student-member',
-  CORPORATE_MEMBER = 'corporate-member',
+  STUDENT_MEMBER = 'STUDENT_MEMBER',
+  CORPORATE_MEMBER = 'CORPORATE_MEMBER',
 }
 
 export enum MembershipStatus {
@@ -29,17 +29,18 @@ export enum MembershipStatus {
 }
 
 export enum CompanyType {
-  PRIVATE = 'PRIVATE',
+
   PRIVATE_LIMITED = 'PRIVATE_LIMITED',
-  PUBLIC_LIMITED = 'PUBLIC',
+  PUBLIC_LIMITED = 'PUBLIC_LIMITED',
   PARTNERSHIP = 'PARTNERSHIP',
-  SOLE_PROPRIETORSHIP = 'sole-proprietorship',
-  LIMITED_LIABILITY = 'limited-liability',
-  CORPORATION = 'corporation',
-  COOPERATIVE = 'cooperative',
-  NON_PROFIT = 'non-profit',
-  GOVERNMENT = 'government',
-  NGO = 'ngo',
+  SOLE_PROPRIETORSHIP = 'SOLE_PROPRIETORSHIP',
+  LIMITED_LIABILITY = 'LIMITED_LIABILITY',
+  CORPORATION = 'CORPORATION',
+  // COOPERATIVE = 'COOPERATIVE',
+  NON_PROFIT = 'NON_PROFIT',
+  GOVERNMENT = 'GOVERNMENT',
+  NGO = 'NGO',
+
   OTHER = 'OTHER',
 }
 
