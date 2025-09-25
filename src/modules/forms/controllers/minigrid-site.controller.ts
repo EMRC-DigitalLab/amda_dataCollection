@@ -19,7 +19,6 @@ export class MinigridSiteController {
 
   createMinigridSite = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      console.log(req.body, 'this is the request body');
       // Validate input
       const dto = plainToClass(CreateMinigridSiteDto, req.body);
       const errors = await validate(dto);
@@ -87,7 +86,7 @@ export class MinigridSiteController {
     try {
       const { userId } = req.params;
       const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 10;
+      const limit = parseInt(req.query.limit as string) || 10000;
 
       const result = await this.minigridSiteService.getMinigridSitesByUserId(userId, page, limit);
 
@@ -109,10 +108,12 @@ export class MinigridSiteController {
   // Alternative method: Get current authenticated user's minigrid sites
   getMyMinigridSites = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+
+      console.log(req.user, "this is the user")
       // Assuming you have user info in req.user from auth middleware
-      console.log(req.user);
-      const userId = (req as any).user?.memberId;
-      console.log(userId, 'this is userId');
+   
+      const userId = (req as any).user?.id;
+  
 
       if (!userId) {
         throw new AppError('User not authenticated', 401);

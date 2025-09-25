@@ -1,8 +1,14 @@
 // src/main.ts (Updated with enhanced Swagger setup and Secure CORS)
-import path from 'path';
-import moduleAlias from 'module-alias';
-import compression from 'compression';
 import { WebSocketService } from '@/shared/websocket/websocket.service';
+import compression from 'compression';
+import cors from 'cors';
+import express from 'express';
+import helmet from 'helmet';
+import moduleAlias from 'module-alias';
+import morgan from 'morgan';
+import path from 'path';
+import 'reflect-metadata';
+import swaggerUi from 'swagger-ui-express';
 
 // Smart environment detection
 const isProduction = process.env.NODE_ENV === 'production' || __filename.includes('/dist/');
@@ -27,13 +33,6 @@ if (isProduction) {
     '@/api': path.resolve(srcPath, 'api'),
   });
 }
-import 'reflect-metadata';
-import cors from 'cors';
-import express from 'express';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import 'reflect-metadata';
-import swaggerUi from 'swagger-ui-express';
 
 import { createApiRouter } from '@/api/routes';
 import { getSwaggerInfo, swaggerSpec } from '@/api/swagger/schemas/swagger.config';
@@ -121,6 +120,8 @@ class Application {
     this.app.use(generalRateLimit);
   }
 
+  
+
   private getAllowedOrigins(): string[] {
     const origins: string[] = [];
 
@@ -131,7 +132,7 @@ class Application {
           'https://amda.com',
           'https://www.amda.com',
           'https://app.amda.com',
-          'https://admin.amda.com'
+          'https://admin.amda.com/'
         );
         break;
 
@@ -148,7 +149,7 @@ class Application {
           'http://localhost:3000',
           'http://localhost:3001',
           'http://localhost:4200',
-          'http://localhost:5173', // Vite
+          'http://localhost:5173/', // Vite
           'http://localhost:8080', // Vue CLI
           'http://127.0.0.1:3000',
           'http://127.0.0.1:5173'
@@ -265,6 +266,7 @@ class Application {
 
   public async start(): Promise<void> {
     try {
+      this.app.use('/public', express.static(path.join(__dirname, '../public')));
       // Connect to database
       await connectDatabase();
 

@@ -35,7 +35,6 @@ export class AuthService {
   async login(loginDto: LoginDto): Promise<LoginResponse> {
     const { email, password } = loginDto;
 
-
     // First, try to find admin/user by email
     let user: User | null = null;
     let member: Member | null = null;
