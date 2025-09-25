@@ -44,7 +44,7 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
   ): Promise<MinigridSite[]> {
     return await this.repository.find({
       where: { memberUuid: userId },
-      relations: ['member'],      
+      relations: ['member'],
       ...options,
     });
   }
