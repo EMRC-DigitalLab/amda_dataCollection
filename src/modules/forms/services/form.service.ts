@@ -581,6 +581,335 @@ export class FormService {
     };
   }
 
+  // Add these methods to your FormService class
+
+async getAllSubmissionsFromAllForms(queryDto: {
+  page: number;
+  limit: number;
+  formType?: string;
+  status?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  adminId?: string;
+  search?: string;
+  formStatus?: string;
+}): Promise<{
+  submissions: any[];
+  total: number;
+  summary: {
+    totalForms: number;
+    formsWithSubmissions: number;
+    submissionsByFormType: { formType: string; count: number }[];
+    submissionsByStatus: { status: string; count: number }[];
+  };
+}> {
+  // STEP 1: Get ALL forms (regardless of type by default)
+  const formFilters: any = {
+    status: queryDto.formStatus || 'PUBLISHED', // Only published forms can have submissions
+  };
+
+  // Optional filters - only apply if provided
+  if (queryDto.formType) {
+    formFilters.formType = queryDto.formType;
+  }
+
+  if (queryDto.adminId) {
+    formFilters.adminId = queryDto.adminId;
+  }
+
+  if (queryDto.search) {
+    formFilters.search = queryDto.search;
+  }
+
+  // Get all forms that match criteria (or ALL published forms if no filters)
+  const [forms] = await this.findAll(formFilters);
+  
+  // STEP 2: Filter to only forms that have submission tables created
+  const formsWithTables = forms.filter(form => form.tableCreated && form.tableName);
+
+  if (formsWithTables.length === 0) {
+    return {
+      submissions: [],
+      total: 0,
+      summary: {
+        totalForms: forms.length,
+        formsWithSubmissions: 0,
+        submissionsByFormType: [],
+        submissionsByStatus: [],
+      },
+    };
+  }
+
+  // STEP 3: Collect ALL submissions from ALL forms
+  let allSubmissions: any[] = [];
+  const submissionsByFormType: Record<string, number> = {};
+  const submissionsByStatus: Record<string, number> = {};
+  let formsWithSubmissions = 0;
+
+  // Loop through EVERY form and get ALL its submissions
+  for (const form of formsWithTables) {
+    try {
+      // Build submission filters (optional - only if provided)
+      const submissionFilters: any = {};
+      
+      if (queryDto.status) {
+        submissionFilters.status = queryDto.status;
+      }
+
+      if (queryDto.dateFrom || queryDto.dateTo) {
+        submissionFilters.submitted_at = {};
+        if (queryDto.dateFrom) {
+          submissionFilters.submitted_at.$gte = queryDto.dateFrom;
+        }
+        if (queryDto.dateTo) {
+          submissionFilters.submitted_at.$lte = queryDto.dateTo;
+        }
+      }
+
+      // Get ALL submissions for this form (with optional filters)
+      const submissions = await this.repo.getFormSubmissions(form.id, submissionFilters);
+      
+      if (submissions.length > 0) {
+        formsWithSubmissions++;
+        
+        // Add form metadata to each submission so you know which form it came from
+        const enhancedSubmissions = submissions.map(submission => ({
+          ...submission, // Original submission data
+          // Additional metadata about the form
+          form_id: form.id,
+          form_title: form.title,
+          form_slug: form.slug,
+          form_type: form.formType?.name || 'Unknown',
+          form_admin_id: form.adminId,
+          form_created_at: form.createdAt,
+          form_status: form.status,
+        }));
+
+        // Add ALL submissions from this form to the master array
+        allSubmissions = [...allSubmissions, ...enhancedSubmissions];
+
+        // Count submissions by form type for summary
+        const formTypeName = form.formType?.name || 'Unknown';
+        submissionsByFormType[formTypeName] = (submissionsByFormType[formTypeName] || 0) + submissions.length;
+
+        // Count submissions by status for summary
+        submissions.forEach(submission => {
+          const status = submission.status || 'PENDING';
+          submissionsByStatus[status] = (submissionsByStatus[status] || 0) + 1;
+        });
+      }
+    } catch (error) {
+      console.error(`Error getting submissions for form ${form.id}:`, error);
+      // Continue with other forms even if one fails
+    }
+  }
+
+  // STEP 4: Sort ALL submissions by date (newest first)
+  allSubmissions.sort((a, b) => 
+    new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
+  );
+
+  // STEP 5: Apply pagination to the complete set
+  const total = allSubmissions.length;
+  const startIndex = (queryDto.page - 1) * queryDto.limit;
+  const endIndex = startIndex + queryDto.limit;
+  const paginatedSubmissions = allSubmissions.slice(startIndex, endIndex);
+
+  // STEP 6: Build summary statistics
+  const summary = {
+    totalForms: forms.length,
+    formsWithSubmissions,
+    submissionsByFormType: Object.entries(submissionsByFormType)
+      .map(([formType, count]) => ({ formType, count }))
+      .sort((a, b) => b.count - a.count),
+    submissionsByStatus: Object.entries(submissionsByStatus)
+      .map(([status, count]) => ({ status, count }))
+      .sort((a, b) => b.count - a.count),
+  };
+
+  return {
+    submissions: paginatedSubmissions, // ALL submissions from ALL forms (paginated)
+    total, // Total count across ALL forms
+    summary, // Breakdown statistics
+  };
+}
+
+async getAllSubmissionsGroupedByFormType(queryDto: {
+  page: number;
+  limit: number;
+  status?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+}): Promise<{
+  [formType: string]: {
+    forms: {
+      id: string;
+      title: string;
+      slug: string;
+      submissions: any[];
+      submissionCount: number;
+    }[];
+    totalSubmissions: number;
+  };
+}> {
+  // Get all published forms
+  const [forms] = await this.findAll({ status: 'PUBLISHED' });
+  const formsWithTables = forms.filter(form => form.tableCreated && form.tableName);
+
+  const result: any = {};
+
+  for (const form of formsWithTables) {
+    try {
+      const formTypeName = form.formType?.name || 'Unknown';
+      
+      if (!result[formTypeName]) {
+        result[formTypeName] = {
+          forms: [],
+          totalSubmissions: 0,
+        };
+      }
+
+      // Build submission filters
+      const submissionFilters: any = {};
+      
+      if (queryDto.status) {
+        submissionFilters.status = queryDto.status;
+      }
+
+      if (queryDto.dateFrom || queryDto.dateTo) {
+        submissionFilters.submitted_at = {};
+        if (queryDto.dateFrom) {
+          submissionFilters.submitted_at.$gte = queryDto.dateFrom;
+        }
+        if (queryDto.dateTo) {
+          submissionFilters.submitted_at.$lte = queryDto.dateTo;
+        }
+      }
+
+      // Get submissions for this form
+      const submissions = await this.repo.getFormSubmissions(form.id, submissionFilters);
+
+      result[formTypeName].forms.push({
+        id: form.id,
+        title: form.title,
+        slug: form.slug,
+        submissions: submissions.slice(0, queryDto.limit), // Limit submissions per form
+        submissionCount: submissions.length,
+      });
+
+      result[formTypeName].totalSubmissions += submissions.length;
+    } catch (error) {
+      console.error(`Error getting submissions for form ${form.id}:`, error);
+    }
+  }
+
+  return result;
+}
+
+async exportAllSubmissionsCSV(filters: {
+  formType?: string;
+  status?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+}): Promise<string> {
+  const queryDto = {
+    page: 1,
+    limit: 10000, // Large limit for export
+    ...filters,
+  };
+
+  const { submissions } = await this.getAllSubmissionsFromAllForms(queryDto);
+
+  if (submissions.length === 0) {
+    return 'No submissions found';
+  }
+
+  // Get all unique column headers
+  const allHeaders = new Set<string>();
+  submissions.forEach(submission => {
+    Object.keys(submission).forEach(key => allHeaders.add(key));
+  });
+
+  const headers = Array.from(allHeaders).sort();
+  const csvRows = [headers.join(',')];
+
+  submissions.forEach(submission => {
+    const values = headers.map(header => {
+      const value = submission[header];
+      // Handle null/undefined values
+      if (value === null || value === undefined) return '';
+      
+      // Escape commas and quotes in CSV
+      const stringValue = String(value);
+      return stringValue.includes(',') || stringValue.includes('"')
+        ? `"${stringValue.replace(/"/g, '""')}"`
+        : stringValue;
+    });
+    csvRows.push(values.join(','));
+  });
+
+  return csvRows.join('\n');
+}
+
+async exportAllSubmissionsExcel(filters: {
+  formType?: string;
+  status?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+}): Promise<Buffer> {
+  const queryDto = {
+    page: 1,
+    limit: 10000, // Large limit for export
+    ...filters,
+  };
+
+  const { submissions, summary } = await this.getAllSubmissionsFromAllForms(queryDto);
+
+  // Create workbook
+  const workbook = XLSX.utils.book_new();
+
+  if (submissions.length === 0) {
+    // Create empty worksheet
+    const worksheet = XLSX.utils.aoa_to_sheet([['No submissions found']]);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'All Submissions');
+  } else {
+    // Create main submissions worksheet
+    const worksheet = XLSX.utils.json_to_sheet(submissions);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'All Submissions');
+
+    // Create summary worksheet
+    const summaryData = [
+      { Metric: 'Total Forms', Value: summary.totalForms },
+      { Metric: 'Forms with Submissions', Value: summary.formsWithSubmissions },
+      { Metric: 'Total Submissions', Value: submissions.length },
+      ...summary.submissionsByFormType.map(item => ({
+        Metric: `${item.formType} Forms`,
+        Value: item.count,
+      })),
+      ...summary.submissionsByStatus.map(item => ({
+        Metric: `${item.status} Status`,
+        Value: item.count,
+      })),
+    ];
+
+    const summaryWorksheet = XLSX.utils.json_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(workbook, summaryWorksheet, 'Summary');
+
+    // Create form type breakdown worksheet
+    if (summary.submissionsByFormType.length > 0) {
+      const formTypeWorksheet = XLSX.utils.json_to_sheet(
+        summary.submissionsByFormType.map(item => ({
+          'Form Type': item.formType,
+          'Submission Count': item.count,
+          'Percentage': ((item.count / submissions.length) * 100).toFixed(2) + '%',
+        }))
+      );
+      XLSX.utils.book_append_sheet(workbook, formTypeWorksheet, 'By Form Type');
+    }
+  }
+
+  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+}
   /* ============================================================================ */
   /* Templates & Versioning                                                       */
   /* ============================================================================ */

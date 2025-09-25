@@ -220,6 +220,38 @@ export function createFormRoutes(dataSource: DataSource): Router {
     formController.rejectSubmission
   );
 
+
+  router.get(
+    '/all/submissions',
+    authMiddleware,
+    adminMiddleware,
+    formController.getAllFormSubmissions
+  );
+
+  // Get all submissions grouped by form type (admin only)
+  router.get(
+    '/all/submissions/by-form-type',
+    authMiddleware,
+    adminMiddleware,
+    formController.getAllSubmissionsByFormType
+  );
+
+  // Export all submissions from all forms as CSV/Excel
+  router.get(
+    '/all/submissions/export',
+    authMiddleware,
+    adminMiddleware,
+    formController.exportAllSubmissions
+  );
+
+  // Global dashboard for admin overview (optional)
+  // router.get(
+  //   '/all/dashboard',
+  //   authMiddleware,
+  //   adminMiddleware,
+  //   formController.getGlobalDashboard
+  // );
+
   /* ============================================================================ */
   /* Analytics & Reporting Routes                                                 */
   /* ============================================================================ */

@@ -496,7 +496,6 @@ export class FormController {
 
   getAllSubmissions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      console.log('Reached controller');
       const { page = 1, limit = 10, status, dateFrom, dateTo, ...filters } = req.query;
 
       const queryDto: SubmissionQueryDto = {
@@ -556,6 +555,110 @@ export class FormController {
         success: true,
         data: submission,
       });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+
+  getAllFormSubmissions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { 
+        page = 1, 
+        limit = 50, 
+        // Optional filters - but by default gets ALL submissions from ALL forms
+        formType, 
+        status, 
+        dateFrom, 
+        dateTo,
+        adminId,
+        search,
+        formStatus = 'PUBLISHED' // Only get submissions from published forms by default
+      } = req.query;
+  
+      const queryDto = {
+        page: Number(page),
+        limit: Number(limit),
+        // These are optional filters - remove them to get everything
+        formType: formType as string,
+        status: status as string,
+        dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
+        dateTo: dateTo ? new Date(dateTo as string) : undefined,
+        adminId: adminId as string,
+        search: search as string,
+        formStatus: formStatus as string,
+      };
+  
+      // This gets ALL submissions from ALL forms (with optional filtering)
+      const result = await this.service.getAllSubmissionsFromAllForms(queryDto);
+  
+      res.json({
+        success: true,
+        data: result.submissions, // Array of ALL submissions across ALL forms
+        pagination: {
+          total: result.total,
+          page: queryDto.page,
+          limit: queryDto.limit,
+          totalPages: Math.ceil(result.total / queryDto.limit),
+        },
+        summary: result.summary,
+        message: 'All submissions from all forms retrieved successfully',
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+  
+  // Optional: Get submissions grouped by form type
+  getAllSubmissionsByFormType = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { page = 1, limit = 50, status, dateFrom, dateTo } = req.query;
+  
+      const queryDto = {
+        page: Number(page),
+        limit: Number(limit),
+        status: status as string,
+        dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
+        dateTo: dateTo ? new Date(dateTo as string) : undefined,
+      };
+  
+      const result = await this.service.getAllSubmissionsGroupedByFormType(queryDto);
+  
+      res.json({
+        success: true,
+        data: result,
+        message: 'Submissions grouped by form type retrieved successfully',
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+  
+  // Export all submissions across all forms
+  exportAllSubmissions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { format = 'xlsx', formType, status, dateFrom, dateTo } = req.query;
+  
+      const filters = {
+        formType: formType as string,
+        status: status as string,
+        dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
+        dateTo: dateTo ? new Date(dateTo as string) : undefined,
+      };
+  
+      if (format === 'csv') {
+        const csvData = await this.service.exportAllSubmissionsCSV(filters);
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="all_submissions.csv"');
+        res.send(csvData);
+      } else {
+        const excelBuffer = await this.service.exportAllSubmissionsExcel(filters);
+        res.setHeader(
+          'Content-Type',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        res.setHeader('Content-Disposition', 'attachment; filename="all_submissions.xlsx"');
+        res.send(excelBuffer);
+      }
     } catch (err) {
       ResponseHelper.error(res, err.message, 400);
     }
