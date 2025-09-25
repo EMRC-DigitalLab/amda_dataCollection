@@ -1190,9 +1190,9 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
           f."admin_id" as form_admin_id,
           -- User data (submitted_by)
           u.id as submitted_by_id,
-          u.email as submitted_by_email,
-          u."firstName" as submitted_by_first_name,
-          u."lastName" as submitted_by_last_name,
+          u."companyName" as submitted_by_name,
+          u."primaryContactEmail" as submitted_by_contact_email,
+          u."memberId" as submitted_by_member_id,
           -- Admin data (form creator)
           admin.id as admin_user_id,
           admin.email as admin_email,
@@ -1204,7 +1204,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
           ms."siteId" as site_id
         FROM "${tableName}" s
         LEFT JOIN forms f ON s.form_id = f.id
-        LEFT JOIN users u ON s.submitted_by = u.id
+        LEFT JOIN members u ON s.submitted_by = u.id
         LEFT JOIN users admin ON f."admin_id" = admin.id
         LEFT JOIN minigrid_sites ms ON s."minigrid_siteId" = ms.id
         WHERE s.form_id = $1
@@ -1291,12 +1291,10 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         submittedBy: row.submitted_by_id
           ? {
               id: row.submitted_by_id,
-              email: row.submitted_by_email,
-              firstName: row.submitted_by_first_name,
-              lastName: row.submitted_by_last_name,
-              username: row.submitted_by_username,
-              fullName:
-                `${row.submitted_by_first_name || ''} ${row.submitted_by_last_name || ''}`.trim(),
+              email: row.submitted_by_contact_email,
+              name: row.submitted_by_name,
+              memberId: row.submitted_by_member_id,
+              
             }
           : null,
 

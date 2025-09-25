@@ -1,16 +1,16 @@
 // src/shared/utils/notification-helper.ts
+import { NotificationChannel, NotificationPriority } from '@/database/entities/notification.entity';
 import { NotificationEmitter } from '@/events/emitters/notification.emitter';
 import { NotificationEventHandler } from '@/events/handlers/notification.handler';
-import { NotificationChannel, NotificationPriority } from '@/database/entities/notification.entity';
-import { NotificationService } from '@/modules/notifications/services/notification.service';
-import { TemplateService } from '@/modules/notifications/services/template.service';
+import { EmailChannel } from '@/modules/notifications/channels/email.channel';
+import { InAppChannel } from '@/modules/notifications/channels/in-app.channel';
+import { PushChannel } from '@/modules/notifications/channels/push.channel';
+import { SmsChannel } from '@/modules/notifications/channels/sms.channel';
+import { WebhookChannel } from '@/modules/notifications/channels/webhook.channel';
 import { NotificationChannelFactory } from '@/modules/notifications/services/channel-factory.service';
 import { NotificationQueueService } from '@/modules/notifications/services/notification-queue.service';
-import { EmailChannel } from '@/modules/notifications/channels/email.channel';
-import { SmsChannel } from '@/modules/notifications/channels/sms.channel';
-import { PushChannel } from '@/modules/notifications/channels/push.channel';
-import { WebhookChannel } from '@/modules/notifications/channels/webhook.channel';
-import { InAppChannel } from '@/modules/notifications/channels/in-app.channel';
+import { NotificationService } from '@/modules/notifications/services/notification.service';
+import { TemplateService } from '@/modules/notifications/services/template.service';
 
 // Initialize dependencies
 const templateService = new TemplateService();
