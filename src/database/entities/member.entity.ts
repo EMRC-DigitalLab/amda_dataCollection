@@ -1,4 +1,4 @@
-// @ts-nocheck
+//  @ts-nocheck
 
 import * as bcrypt from 'bcryptjs';
 import {
@@ -29,6 +29,7 @@ export enum MembershipStatus {
 }
 
 export enum CompanyType {
+
   PRIVATE_LIMITED = 'PRIVATE_LIMITED',
   PUBLIC_LIMITED = 'PUBLIC_LIMITED',
   PARTNERSHIP = 'PARTNERSHIP',
@@ -39,6 +40,7 @@ export enum CompanyType {
   NON_PROFIT = 'NON_PROFIT',
   GOVERNMENT = 'GOVERNMENT',
   NGO = 'NGO',
+
   OTHER = 'OTHER',
 }
 

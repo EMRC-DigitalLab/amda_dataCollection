@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Notification Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .form-group {
+            margin: 15px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input,
+        select,
+        button {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            margin: 5px 0;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 0;
+        }
+
+        .log-entry.info {
+            color: #007bff;
+        }
+
+        .log-entry.success {
+            color: #28a745;
+        }
+
+        .log-entry.error {
+            color: #dc3545;
+        }
+
+        .log-entry.warning {
+            color: #ffc107;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>WebSocket Notification Test Client</h1>
+
+        <div id="status" class="status disconnected">
+            Status: Disconnected
+        </div>
+
+        <div class="form-group">
+            <label for="serverUrl">Server URL:</label>
+            <input type="text" id="serverUrl" value="http://localhost:5000" placeholder="http://localhost:5000">
+        </div>
+
+        <div class="form-group">
+            <label for="token">JWT Token:</label>
+            <input type="text" id="token" placeholder="Your JWT token here">
+        </div>
+
+        <div class="form-group">
+            <button id="connectBtn" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+        </div>
+
+        <h3>Test Actions</h3>
+
+        <div class="form-group">
+            <label for="notificationTypes">Subscribe to Notification Types:</label>
+            <input type="text" id="notificationTypes" value="payment_reminder,system_maintenance"
+                placeholder="Type1,Type2,Type3">
+            <button onclick="subscribeToTypes()" disabled id="subscribeBtn">Subscribe</button>
+        </div>
+
+        <div class="form-group">
+            <label for="notificationId">Mark Notification as Read:</label>
+            <input type="text" id="notificationId" placeholder="notification-id-here">
+            <button onclick="markAsRead()" disabled id="markReadBtn">Mark as Read</button>
+        </div>
+
+        <h3>Connection Log</h3>
+        <div id="log" class="log">
+            <div class="log-entry info">Ready to connect...</div>
+        </div>
+
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script>
+        let socket = null;
+        let isConnected = false;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(status, connected = false) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = `Status: ${status}`;
+            statusDiv.className = `status ${connected ? 'connected' : status.toLowerCase() === 'connecting' ? 'connecting' : 'disconnected'}`;
+
+            // Update button states
+            document.getElementById('connectBtn').disabled = connected;
+            document.getElementById('disconnectBtn').disabled = !connected;
+            document.getElementById('subscribeBtn').disabled = !connected;
+            document.getElementById('markReadBtn').disabled = !connected;
+
+            isConnected = connected;
+        }
+
+        function connect() {
+            const serverUrl = document.getElementById('serverUrl').value;
+            const token = document.getElementById('token').value;
+
+            if (!serverUrl) {
+                log('Please enter a server URL', 'error');
+                return;
+            }
+
+            if (!token) {
+                log('Please enter a JWT token', 'error');
+                return;
+            }
+
+            log(`Connecting to ${serverUrl}...`, 'info');
+            updateStatus('Connecting');
+
+            socket = io(serverUrl, {
+                auth: {
+                    token: token
+                },
+                transports: ['websocket', 'polling']
+            });
+
+            // Connection events
+            socket.on('connect', () => {
+                log('Connected successfully!', 'success');
+                updateStatus('Connected', true);
+            });
+
+            socket.on('connected', (data) => {
+                log(`Server confirmation: ${JSON.stringify(data)}`, 'success');
+            });
+
+            socket.on('disconnect', (reason) => {
+                log(`Disconnected: ${reason}`, 'warning');
+                updateStatus('Disconnected');
+            });
+
+            socket.on('connect_error', (error) => {
+                log(`Connection error: ${error.message}`, 'error');
+                updateStatus('Connection Failed');
+            });
+
+            // Notification events
+            socket.on('notification:new', (notification) => {
+                log(`New notification: ${JSON.stringify(notification)}`, 'success');
+            });
+
+            socket.on('notification:update', (update) => {
+                log(`Notification update: ${JSON.stringify(update)}`, 'info');
+            });
+
+            socket.on('notification:broadcast', (notification) => {
+                log(`Broadcast notification: ${JSON.stringify(notification)}`, 'success');
+            });
+
+            socket.on('notifications:subscribed', (data) => {
+                log(`Subscribed to: ${JSON.stringify(data)}`, 'success');
+            });
+
+            socket.on('notification:read:success', (data) => {
+                log(`Marked as read: ${JSON.stringify(data)}`, 'success');
+            });
+
+            socket.on('notification:read:error', (data) => {
+                log(`Read error: ${JSON.stringify(data)}`, 'error');
+            });
+
+            // Generic error handler
+            socket.on('error', (error) => {
+                log(`Socket error: ${error}`, 'error');
+            });
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                log('Manually disconnected', 'info');
+                updateStatus('Disconnected');
+            }
+        }
+
+        function subscribeToTypes() {
+            if (!socket || !isConnected) {
+                log('Not connected to server', 'error');
+                return;
+            }
+
+            const typesInput = document.getElementById('notificationTypes').value;
+            const types = typesInput.split(',').map(t => t.trim()).filter(t => t);
+
+            if (types.length === 0) {
+                log('Please enter at least one notification type', 'error');
+                return;
+            }
+
+            log(`Subscribing to types: ${types.join(', ')}`, 'info');
+            socket.emit('notifications:subscribe', { types });
+        }
+
+        function markAsRead() {
+            if (!socket || !isConnected) {
+                log('Not connected to server', 'error');
+                return;
+            }
+
+            const notificationId = document.getElementById('notificationId').value;
+
+            if (!notificationId) {
+                log('Please enter a notification ID', 'error');
+                return;
+            }
+
+            log(`Marking notification as read: ${notificationId}`, 'info');
+            socket.emit('notification:read', { notificationId });
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '<div class="log-entry info">Log cleared...</div>';
+        }
+
+        // Test with mock data button
+        function simulateNotification() {
+            if (!socket || !isConnected) return;
+
+            // This would normally come from your server
+            const mockNotification = {
+                id: 'test-' + Date.now(),
+                type: 'test',
+                subject: 'Test Notification',
+                content: 'This is a test notification',
+                priority: 'normal',
+                createdAt: new Date(),
+                timestamp: new Date().toISOString()
+            };
+
+            // Manually trigger the event handler to test UI
+            socket.emit('notification:new', mockNotification);
+        }
+    </script>
+</body>
+
+</html>
