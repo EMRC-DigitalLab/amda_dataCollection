@@ -141,7 +141,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         },
         admin: true,
         parent: true,
-        formType:true,
+        formType: true,
       },
       order: {
         categories: { sortOrder: 'ASC' },

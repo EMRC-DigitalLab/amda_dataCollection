@@ -562,19 +562,19 @@ export class FormController {
 
   getAllFormSubmissions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const { 
-        page = 1, 
-        limit = 50, 
+      const {
+        page = 1,
+        limit = 50,
         // Optional filters - but by default gets ALL submissions from ALL forms
-        formType, 
-        status, 
-        dateFrom, 
+        formType,
+        status,
+        dateFrom,
         dateTo,
         adminId,
         search,
-        formStatus = 'PUBLISHED' // Only get submissions from published forms by default
+        formStatus = 'PUBLISHED', // Only get submissions from published forms by default
       } = req.query;
-  
+
       const queryDto = {
         page: Number(page),
         limit: Number(limit),
@@ -587,10 +587,10 @@ export class FormController {
         search: search as string,
         formStatus: formStatus as string,
       };
-  
+
       // This gets ALL submissions from ALL forms (with optional filtering)
       const result = await this.service.getAllSubmissionsFromAllForms(queryDto);
-  
+
       res.json({
         success: true,
         data: result.submissions, // Array of ALL submissions across ALL forms
@@ -607,12 +607,16 @@ export class FormController {
       ResponseHelper.error(res, err.message, 400);
     }
   };
-  
+
   // Optional: Get submissions grouped by form type
-  getAllSubmissionsByFormType = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  getAllSubmissionsByFormType = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ) => {
     try {
       const { page = 1, limit = 50, status, dateFrom, dateTo } = req.query;
-  
+
       const queryDto = {
         page: Number(page),
         limit: Number(limit),
@@ -620,9 +624,9 @@ export class FormController {
         dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
         dateTo: dateTo ? new Date(dateTo as string) : undefined,
       };
-  
+
       const result = await this.service.getAllSubmissionsGroupedByFormType(queryDto);
-  
+
       res.json({
         success: true,
         data: result,
@@ -632,19 +636,19 @@ export class FormController {
       ResponseHelper.error(res, err.message, 400);
     }
   };
-  
+
   // Export all submissions across all forms
   exportAllSubmissions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { format = 'xlsx', formType, status, dateFrom, dateTo } = req.query;
-  
+
       const filters = {
         formType: formType as string,
         status: status as string,
         dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
         dateTo: dateTo ? new Date(dateTo as string) : undefined,
       };
-  
+
       if (format === 'csv') {
         const csvData = await this.service.exportAllSubmissionsCSV(filters);
         res.setHeader('Content-Type', 'text/csv');
