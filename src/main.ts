@@ -1,8 +1,5 @@
 // src/main.ts (Updated with enhanced Swagger setup and Secure CORS)
-import path from 'path';
-import moduleAlias from 'module-alias';
-import 'module-alias/register';
-import compression from 'compression';
+import { WebSocketService } from '@/shared/websocket/websocket.service';
 import compression from 'compression';
 import cors from 'cors';
 import express from 'express';
@@ -12,7 +9,6 @@ import morgan from 'morgan';
 import path from 'path';
 import 'reflect-metadata';
 import swaggerUi from 'swagger-ui-express';
-
 
 // Smart environment detection
 const isProduction = process.env.NODE_ENV === 'production' || __filename.includes('/dist/');
@@ -38,14 +34,12 @@ if (isProduction) {
   });
 }
 
-import { WebSocketService } from '@/shared/websocket/websocket.service';
 import { createApiRouter } from '@/api/routes';
 import { getSwaggerInfo, swaggerSpec } from '@/api/swagger/schemas/swagger.config';
 import { config } from '@/config';
 import { AppDataSource, connectDatabase } from '@/config/database';
 import { errorHandler, notFoundHandler } from '@/shared/middleware/error.middleware';
 import { generalRateLimit } from '@/shared/middleware/rate-limit.middleware';
-import { WebSocketService } from '@/shared/websocket/websocket.service';
 import { logger } from '@/shared/utils/logger';
 
 class Application {
@@ -138,13 +132,7 @@ class Application {
           'https://amda.com',
           'https://www.amda.com',
           'https://app.amda.com',
-          'https://admin.amda.com',
-          'http://amda.raven-emrc.com',
-          'https://amda.raven-emrc.com/',
-          'http://127.0.0.1:5173',
-          'http://localhost:5173',
-          'https://amda.energymrc.ng'
-
+          'https://admin.amda.com/'
         );
         break;
 

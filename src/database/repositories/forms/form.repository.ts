@@ -767,7 +767,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
             name: 'submitted_by',
             type: 'UUID',
             nullable: true,
-            references: 'users(id)',
+            references: 'members(id)',
             onDelete: 'SET NULL',
           },
           {
@@ -1007,7 +1007,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       {
         name: `fk_${tableName}_submitted_by`,
         column: 'submitted_by',
-        references: 'users(id)',
+        references: 'members(id)',
         onDelete: 'SET NULL',
       },
 
@@ -1059,9 +1059,9 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
             // For user references, just set to NULL for orphaned records
             await queryRunner.query(
               `UPDATE "${tableName}" 
-             SET "${constraint.column}" = NULL 
-             WHERE "${constraint.column}" IS NOT NULL 
-             AND "${constraint.column}" NOT IN (SELECT id FROM users)`
+              SET "${constraint.column}" = NULL 
+              WHERE "${constraint.column}" IS NOT NULL 
+                AND "${constraint.column}" NOT IN (SELECT id FROM members)`
             );
             issuesRepaired.push(`Cleaned up orphaned user references in ${constraint.column}`);
           }
