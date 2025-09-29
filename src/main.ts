@@ -317,6 +317,9 @@ class Application {
       });
       // Initialize WebSocket server
       this.webSocketService = new WebSocketService(server);
+      // Store globally so routes can access it
+      (global as any).webSocketService = this.webSocketService;
+      logger.info(`🔌 WebSocket server stored globally for routes`);
       logger.info(`🔌 WebSocket server initialized`);
     } catch (error) {
       logger.error('❌ Failed to start application:', error);
