@@ -141,7 +141,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         },
         admin: true,
         parent: true,
-        formType:true,
+        formType: true,
       },
       order: {
         categories: { sortOrder: 'ASC' },
@@ -1295,7 +1295,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
               email: row.submitted_by_contact_email,
               name: row.submitted_by_name,
               memberId: row.submitted_by_member_id,
-              
             }
           : null,
 

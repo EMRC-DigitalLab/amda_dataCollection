@@ -62,7 +62,7 @@ export class CertificateController {
     }
   };
 
-  getCertificateById=async(req: Request, res: Response): Promise<void> =>{
+  getCertificateById = async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
       const certificate = await this.service.getCertificateById(id);
@@ -79,13 +79,12 @@ export class CertificateController {
     } catch (error: any) {
       ResponseHelper.error(res, error.message, 400);
     }
-  }
+  };
 
-  getCertificateByCertificateId=async (req: Request, res: Response): Promise<void>=> {
+  getCertificateByCertificateId = async (req: Request, res: Response): Promise<void> => {
     try {
       const { certificateId } = req.params;
-      const certificate =
-        await this.service.getCertificateByCertificateId(certificateId);
+      const certificate = await this.service.getCertificateByCertificateId(certificateId);
 
       if (!certificate) {
         res.status(404).json({ error: 'Certificate not found' });
@@ -99,9 +98,9 @@ export class CertificateController {
     } catch (error: any) {
       ResponseHelper.error(res, error.message, 400);
     }
-  }
+  };
 
-  getCertificatesByMember=async (req: Request, res: Response): Promise<void>=> {
+  getCertificatesByMember = async (req: Request, res: Response): Promise<void> => {
     try {
       const { memberId } = req.params;
       const certificates = await this.service.getCertificatesByMember(memberId);
@@ -114,9 +113,9 @@ export class CertificateController {
     } catch (error: any) {
       ResponseHelper.error(res, error.message, 400);
     }
-  }
+  };
 
-  getCertificatesBySite=async (req: Request, res: Response): Promise<void> =>{
+  getCertificatesBySite = async (req: Request, res: Response): Promise<void> => {
     try {
       const { siteId } = req.params;
       const certificates = await this.service.getCertificatesBySite(siteId);
@@ -130,9 +129,9 @@ export class CertificateController {
       console.error('Error retrieving certificates:', error);
       ResponseHelper.error(res, error.message, 400);
     }
-  }
+  };
 
-  getAllCertificates=async (req: Request, res: Response): Promise<void> =>{
+  getAllCertificates = async (req: Request, res: Response): Promise<void> => {
     try {
       const certificates = await this.service.getAllCertificates();
 
@@ -145,7 +144,7 @@ export class CertificateController {
       console.error('Error retrieving certificates:', error);
       ResponseHelper.error(res, error.message, 400);
     }
-  }
+  };
 
   downloadCertificatePDF = async(req: Request, res: Response): Promise<void> => {
     // @ts-ignore
@@ -198,7 +197,7 @@ export class CertificateController {
     }
  }
 
-  previewCertificatePDF=async(req: Request, res: Response): Promise<void>=> {
+  previewCertificatePDF = async (req: Request, res: Response): Promise<void> => {
     try {
       const { certificateId } = req.params;
       const pdfBuffer = await this.service.generatePDF(certificateId);
@@ -217,9 +216,9 @@ export class CertificateController {
       console.error('Error previewing certificate PDF:', error);
       ResponseHelper.error(res, error.message, 400);
     }
-  }
+  };
 
-  deleteCertificate=async(req: Request, res: Response): Promise<void>=> {
+  deleteCertificate = async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
       const deleted = await this.service.deleteCertificate(id);
@@ -236,9 +235,9 @@ export class CertificateController {
       console.error('Error deleting certificate:', error);
       ResponseHelper.error(res, error.message, 400);
     }
-  }
+  };
 
-  generateQRCode=async(req: Request, res: Response): Promise<void> => {
+  generateQRCode = async (req: Request, res: Response): Promise<void> => {
     try {
       const { certificateId } = req.params;
       const qrCode = await this.service.generateQRCode(certificateId);
@@ -257,13 +256,12 @@ export class CertificateController {
       console.error('Error generating QR code:', error);
       ResponseHelper.error(res, error.message, 400);
     }
-  }
+  };
 
-  verifyCertificate=async(req: Request, res: Response): Promise<void> => {
+  verifyCertificate = async (req: Request, res: Response): Promise<void> => {
     try {
       const { certificateId } = req.params;
-      const certificate =
-        await this.service.getCertificateByCertificateId(certificateId);
+      const certificate = await this.service.getCertificateByCertificateId(certificateId);
 
       if (!certificate) {
         res.status(404).json({
@@ -290,5 +288,5 @@ export class CertificateController {
       console.error('Error verifying certificate:', error);
       ResponseHelper.error(res, error.message, 400);
     }
-  }
+  };
 }

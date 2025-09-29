@@ -29,7 +29,6 @@ export enum MembershipStatus {
 }
 
 export enum CompanyType {
-
   PRIVATE_LIMITED = 'PRIVATE_LIMITED',
   PUBLIC_LIMITED = 'PUBLIC_LIMITED',
   PARTNERSHIP = 'PARTNERSHIP',

@@ -8,7 +8,7 @@ export function createCertificateRoutes(dataSource: DataSource): Router {
   const certificateController = new CertificateController(dataSource);
 
   // Create a new certificate
-  router.post('/', authMiddleware,certificateController.createCertificate);
+  router.post('/', authMiddleware, certificateController.createCertificate);
 
   // Get all certificates
   router.get('/', certificateController.getAllCertificates);

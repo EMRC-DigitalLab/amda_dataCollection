@@ -220,7 +220,6 @@ export function createFormRoutes(dataSource: DataSource): Router {
     formController.rejectSubmission
   );
 
-
   router.get(
     '/all/submissions',
     authMiddleware,
