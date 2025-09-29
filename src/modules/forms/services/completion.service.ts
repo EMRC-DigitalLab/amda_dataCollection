@@ -138,7 +138,6 @@ export class CompletionService {
     const formBreakdown: FormCompletionBreakdown[] = [];
     let completedFormsCount = 0;
 
-    console.log(forms, siteId, 'this is the ifnormation to fgetch complete info for site');
     for (const form of forms) {
       const formCompletion = await this.getFormCompletionForSite(form, siteId);
       formBreakdown.push(formCompletion);
@@ -412,7 +411,6 @@ export class CompletionService {
     }
 
     try {
-      console.log(form, entityColumn, 'this is the params');
       // Get the latest submission for this entity
       const submissionQuery = `
         SELECT * FROM "${form.tableName}" 

@@ -37,7 +37,6 @@ if (isProduction) {
   });
 }
 
-import { WebSocketService } from '@/shared/websocket/websocket.service';
 import { createApiRouter } from '@/api/routes';
 import { getSwaggerInfo, swaggerSpec } from '@/api/swagger/schemas/swagger.config';
 import { config } from '@/config';
@@ -46,6 +45,7 @@ import { errorHandler, notFoundHandler } from '@/shared/middleware/error.middlew
 import { generalRateLimit } from '@/shared/middleware/rate-limit.middleware';
 // import { WebSocketService } from '@/shared/websocket/websocket.service';
 import { logger } from '@/shared/utils/logger';
+import { WebSocketService } from './shared/websocket/websocket.service';
 
 class Application {
   public app: express.Application;
