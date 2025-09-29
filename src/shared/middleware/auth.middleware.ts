@@ -82,7 +82,6 @@ export const authMiddleware = async (
         ...member,
       };
 
-      console.log(authenticatedUser, 'this is auth user');
     }
     // Handle admin/user authentication
     else {

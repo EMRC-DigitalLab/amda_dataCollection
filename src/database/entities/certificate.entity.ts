@@ -45,6 +45,32 @@ export class Certificate {
   })
   completionDate!: Date;
 
+  @Column({
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    nullable: true,
+  })
+  overallCompletionRate?: number;
+
+  @Column({
+    type: 'integer',
+    nullable: true,
+  })
+  totalSitesCount?: number;
+
+  @Column({
+    type: 'integer',
+    nullable: true,
+  })
+  completedFormsCount?: number;
+
+  @Column({
+    type: 'integer',
+    nullable: true,
+  })
+  totalFormsCount?: number;
+
   // Foreign Keys
   @Column({
     type: 'uuid',
