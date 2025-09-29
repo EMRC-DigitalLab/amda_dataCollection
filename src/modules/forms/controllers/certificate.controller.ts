@@ -274,15 +274,7 @@ export class CertificateController {
       res.status(200).json({
         message: 'Certificate verified successfully',
         valid: true,
-        data: {
-          certificateId: certificate.certificateId,
-          recipientName: certificate.recipientName,
-          badgeType: certificate.badgeType,
-          completionDate: certificate.completionDate,
-          siteName: certificate.site?.name,
-          memberCompany: certificate.member?.companyName,
-          issuedDate: certificate.createdAt,
-        },
+        data: certificate,
       });
     } catch (error: any) {
       console.error('Error verifying certificate:', error);

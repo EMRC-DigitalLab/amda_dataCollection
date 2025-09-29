@@ -147,7 +147,6 @@ export class FormService {
   /* ============================================================================ */
 
   async submitFormData(dto: FormSubmissionDto): Promise<any> {
-    console.log(dto, 'this is the real dto');
     const form = await this.findById(dto.formId);
 
     // Validate form is accepting submissions
