@@ -275,7 +275,6 @@ class Application {
   public async start(): Promise<void> {
     try {
       this.app.use('/public', express.static(path.join(__dirname, '../public')));
-      // Connect to database
       await connectDatabase();
 
       if (config.environment === 'development' && config.database.autoGenerateMigrations) {
@@ -284,19 +283,16 @@ class Application {
       } else if (config.database.runMigrationsOnStartup) {
         await AppDataSource.runMigrations();
         logger.info('Database migrations completed');
+
+        const { TemplateService } = await import(
+          '@/modules/notifications/services/template.service'
+        );
+        const templateService = new TemplateService();
+        await templateService.seedTemplatesFromFiles();
+        logger.info('Notification templates loaded');
       }
 
-      // Run migrations if configured
-      if (config.database.runMigrationsOnStartup) {
-        // const dataSource = await import('@/database/connection');
-        await AppDataSource.runMigrations();
-        logger.info('Database migrations completed');
-      }
-
-      // Connect to Redis
-      // await connectRedis();
-
-      // Start server
+      // Start server FIRST
       const server = this.app.listen(config.port, () => {
         logger.info(`🚀 AMDA Collection API started successfully!`);
         logger.info(`🌍 Environment: ${config.environment}`);
@@ -315,12 +311,12 @@ class Application {
           logger.info(`🎯 API Routes: ${baseUrl}${config.apiPrefix}`);
         }
       });
-      // Initialize WebSocket server
+
+      // Initialize WebSocket IMMEDIATELY after server creation (not in callback)
       this.webSocketService = new WebSocketService(server);
-      // Store globally so routes can access it
       (global as any).webSocketService = this.webSocketService;
-      logger.info(`🔌 WebSocket server stored globally for routes`);
       logger.info(`🔌 WebSocket server initialized`);
+      logger.info(`🔌 WebSocket server stored globally for routes`);
     } catch (error) {
       logger.error('❌ Failed to start application:', error);
       process.exit(1);
