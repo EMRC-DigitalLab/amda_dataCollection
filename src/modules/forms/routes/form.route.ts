@@ -18,9 +18,14 @@ import { FormService } from '../services/form.service';
 export function createFormRoutes(dataSource: DataSource): Router {
   const router = Router();
 
-  // Initialize services
   const formRepository = new FormRepository(dataSource);
   const webSocketService = (global as any).webSocketService;
+
+  // ADD THIS DEBUG
+  console.log('=== FORM ROUTES INIT ===');
+  console.log('WebSocket service available:', !!webSocketService);
+  console.log('========================');
+
   const formNotificationService = new FormNotificationService(webSocketService);
   const formService = new FormService(formRepository, formNotificationService);
 

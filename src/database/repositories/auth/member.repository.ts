@@ -89,6 +89,33 @@ export class MemberRepository implements IMemberRepository {
     return this.repository.updateVerificationStatus(memberId, true, adminId);
   }
 
+  async setResetPasswordToken(memberId: string, token: string, expires: Date): Promise<void> {
+    await this.repository.update(memberId, {
+      resetPasswordToken: token,
+      resetPasswordExpires: expires,
+    });
+  }
+
+  async findByResetToken(token: string): Promise<Member | null> {
+    const { MoreThan } = await import('typeorm');
+    return await this.repository.findOne({
+      where: {
+        resetPasswordToken: token,
+        resetPasswordExpires: MoreThan(new Date()),
+      },
+    });
+  }
+
+  async updatePassword(memberId: string, newPassword: string): Promise<void> {
+    const bcrypt = await import('bcryptjs');
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.repository.update(memberId, {
+      password: hashedPassword,
+      resetPasswordToken: null,
+      resetPasswordExpires: null,
+    });
+  }
+
   /**
    * Unverify a member - REFACTORED
    */
