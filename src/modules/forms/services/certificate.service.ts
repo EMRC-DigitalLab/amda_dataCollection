@@ -96,30 +96,30 @@ export class CertificateService {
       unit: 'pt',
       format: [792, 612],
     });
-  
+
     const pageWidth = 792;
     const pageHeight = 612;
-  
+
     // Check if this is a 100% completion certificate
     const isPerfectCompletion = data.overallCompletionRate === 100;
-  
+
     const [customFontsLoaded, logoBase64, badgeBase64] = await Promise.all([
       this.loadFontsFromPublic(pdf),
       this.loadImageAsBase64('amda-logo.png'),
       this.loadImageAsBase64('digital.png'),
     ]);
-  
+
     const addText = (text: string, x: number, y: number, options: any = {}) => {
       if (!text) return;
-  
+
       pdf.setFontSize(options.fontSize || 12);
-  
+
       let fontFamily = 'helvetica';
       let fontWeight = options.style || 'normal';
-  
+
       if (customFontsLoaded) {
         fontFamily = 'ClashGrotesk';
-  
+
         if (options.fontType === 'title') {
           if (options.style === 'bold') {
             fontWeight = 'bold';
@@ -140,16 +140,16 @@ export class CertificateService {
           fontFamily = 'helvetica';
         }
       }
-  
+
       try {
         pdf.setFont(fontFamily, fontWeight);
       } catch (fontError) {
         console.warn('Font setting failed, using default:', fontError);
         pdf.setFont('helvetica', 'normal');
       }
-  
+
       pdf.setTextColor(options.color || '#000000');
-  
+
       if (options.align === 'center') {
         const textWidth =
           (pdf.getStringUnitWidth(text) * (options.fontSize || 12)) / pdf.internal.scaleFactor;
@@ -159,59 +159,58 @@ export class CertificateService {
           (pdf.getStringUnitWidth(text) * (options.fontSize || 12)) / pdf.internal.scaleFactor;
         x = x - textWidth;
       }
-  
+
       pdf.text(text, x, y);
     };
-  
+
     // ============= BACKGROUND STYLING =============
     if (isPerfectCompletion) {
       // GOLD/PREMIUM BACKGROUND for 100% completion
       // Gradient effect using multiple rectangles
       pdf.setFillColor(255, 250, 240); // Warm cream
       pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-      
+
       // Gold accent corners (larger for perfect completion)
       pdf.setFillColor(251, 191, 36); // Gold color
       pdf.triangle(pageWidth - 180, 0, pageWidth, 0, pageWidth, 180, 'F');
       pdf.triangle(0, pageHeight - 180, 0, pageHeight, 180, pageHeight, 'F');
-      
+
       // Add decorative gold circles in corners
       pdf.setFillColor(251, 191, 36);
       pdf.circle(pageWidth - 100, 100, 15, 'F');
       pdf.circle(100, pageHeight - 100, 15, 'F');
-      
+
       // Premium border with gold accent
       pdf.setFillColor(255, 255, 255);
       pdf.setDrawColor(251, 191, 36); // Gold border
       pdf.setLineWidth(3);
       pdf.roundedRect(40, 40, pageWidth - 80, pageHeight - 80, 8, 8, 'FD');
-      
+
       // Inner decorative border
       pdf.setDrawColor(251, 191, 36);
       pdf.setLineWidth(1);
       pdf.roundedRect(50, 50, pageWidth - 100, pageHeight - 100, 8, 8, 'S');
-      
     } else {
       // STANDARD BACKGROUND for partial completion
       pdf.setFillColor(248, 250, 252);
       pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-  
+
       // Green corners (standard size)
       pdf.setFillColor(34, 197, 94);
       pdf.triangle(pageWidth - 150, 0, pageWidth, 0, pageWidth, 150, 'F');
       pdf.triangle(0, pageHeight - 150, 0, pageHeight, 150, pageHeight, 'F');
-  
+
       // Standard white content area
       pdf.setFillColor(255, 255, 255);
       pdf.setDrawColor(229, 231, 235);
       pdf.setLineWidth(1);
       pdf.roundedRect(40, 40, pageWidth - 80, pageHeight - 80, 8, 8, 'FD');
     }
-  
+
     // ============= HEADER SECTION =============
     const logoX = pageWidth / 2 - 60;
     const logoY = 100;
-  
+
     if (logoBase64) {
       try {
         const imageFormat = logoBase64.includes('data:image/png') ? 'PNG' : 'JPEG';
@@ -223,12 +222,16 @@ export class CertificateService {
     } else {
       this.drawColoredCircles(pdf, logoX, logoY);
     }
-  
+
     // Divider line - color changes based on completion
-    pdf.setDrawColor(isPerfectCompletion ? 251 : 107, isPerfectCompletion ? 191 : 114, isPerfectCompletion ? 36 : 128);
+    pdf.setDrawColor(
+      isPerfectCompletion ? 251 : 107,
+      isPerfectCompletion ? 191 : 114,
+      isPerfectCompletion ? 36 : 128
+    );
     pdf.setLineWidth(2);
     pdf.line(pageWidth / 2 + 30, logoY - 20, pageWidth / 2 + 30, logoY + 40);
-  
+
     // Header text
     addText('Data Compliance', pageWidth / 2 + 60, logoY - 5, {
       fontSize: 20,
@@ -236,27 +239,27 @@ export class CertificateService {
       style: 'bold',
       color: '#1f2937',
     });
-  
+
     addText('Certificate', pageWidth / 2 + 60, logoY + 15, {
       fontSize: 20,
       fontType: 'title',
       style: 'bold',
       color: '#1f2937',
     });
-  
+
     addText('African Mini-grid Developers Association', pageWidth / 2 + 60, logoY + 35, {
       fontSize: 12,
       fontType: 'body',
       color: '#6b7280',
     });
-  
+
     // ============= TITLE SECTION =============
     // Add "PERFECT COMPLETION" banner for 100%
     if (isPerfectCompletion) {
       // Gold banner background
       pdf.setFillColor(251, 191, 36);
       pdf.roundedRect(pageWidth / 2 - 150, 170, 300, 35, 5, 5, 'F');
-      
+
       addText('★ PERFECT COMPLETION ★', pageWidth / 2, 192, {
         fontSize: 18,
         fontType: 'title',
@@ -265,7 +268,7 @@ export class CertificateService {
         align: 'center',
       });
     }
-  
+
     // Main title - position adjusted if perfect completion
     addText('Certificate of Completion', pageWidth / 2, isPerfectCompletion ? 220 : 200, {
       fontSize: 40,
@@ -274,10 +277,10 @@ export class CertificateService {
       color: isPerfectCompletion ? '#b45309' : '#1f2937', // Darker gold for 100%
       align: 'center',
     });
-  
+
     // ============= RECIPIENT SECTION =============
     const recipientYStart = isPerfectCompletion ? 260 : 250;
-  
+
     if (data.siteName) {
       addText(data.siteName, pageWidth / 2, recipientYStart, {
         fontSize: 36,
@@ -286,14 +289,14 @@ export class CertificateService {
         color: isPerfectCompletion ? '#b45309' : '#059669',
         align: 'center',
       });
-  
+
       addText('Presented to', pageWidth / 2, recipientYStart + 35, {
         fontSize: 16,
         fontType: 'body',
         color: '#6b7280',
         align: 'center',
       });
-  
+
       addText(data.recipientName, pageWidth / 2, recipientYStart + 65, {
         fontSize: 24,
         fontType: 'normal',
@@ -301,15 +304,20 @@ export class CertificateService {
         color: '#1f2937',
         align: 'center',
       });
-  
+
       // Underline - gold for 100%, gray for others
-      const nameWidth = (pdf.getStringUnitWidth(data.recipientName) * 24) / pdf.internal.scaleFactor;
-      pdf.setDrawColor(isPerfectCompletion ? 251 : 209, isPerfectCompletion ? 191 : 213, isPerfectCompletion ? 36 : 219);
+      const nameWidth =
+        (pdf.getStringUnitWidth(data.recipientName) * 24) / pdf.internal.scaleFactor;
+      pdf.setDrawColor(
+        isPerfectCompletion ? 251 : 209,
+        isPerfectCompletion ? 191 : 213,
+        isPerfectCompletion ? 36 : 219
+      );
       pdf.setLineWidth(2);
       pdf.line(
-        pageWidth / 2 - nameWidth / 2, 
-        recipientYStart + 75, 
-        pageWidth / 2 + nameWidth / 2, 
+        pageWidth / 2 - nameWidth / 2,
+        recipientYStart + 75,
+        pageWidth / 2 + nameWidth / 2,
         recipientYStart + 75
       );
     } else {
@@ -319,7 +327,7 @@ export class CertificateService {
         color: '#6b7280',
         align: 'center',
       });
-  
+
       addText(data.recipientName, pageWidth / 2, recipientYStart + 40, {
         fontSize: 32,
         fontType: 'title',
@@ -327,23 +335,34 @@ export class CertificateService {
         color: '#1f2937',
         align: 'center',
       });
-  
-      const nameWidth = (pdf.getStringUnitWidth(data.recipientName) * 32) / pdf.internal.scaleFactor;
-      pdf.setDrawColor(isPerfectCompletion ? 251 : 209, isPerfectCompletion ? 191 : 213, isPerfectCompletion ? 36 : 219);
+
+      const nameWidth =
+        (pdf.getStringUnitWidth(data.recipientName) * 32) / pdf.internal.scaleFactor;
+      pdf.setDrawColor(
+        isPerfectCompletion ? 251 : 209,
+        isPerfectCompletion ? 191 : 213,
+        isPerfectCompletion ? 36 : 219
+      );
       pdf.setLineWidth(2);
       pdf.line(
-        pageWidth / 2 - nameWidth / 2, 
-        recipientYStart + 55, 
-        pageWidth / 2 + nameWidth / 2, 
+        pageWidth / 2 - nameWidth / 2,
+        recipientYStart + 55,
+        pageWidth / 2 + nameWidth / 2,
         recipientYStart + 55
       );
     }
-  
+
     // ============= DESCRIPTION SECTION =============
-    const descriptionYStart = data.siteName ? (isPerfectCompletion ? 370 : 360) : (isPerfectCompletion ? 330 : 340);
-  
+    const descriptionYStart = data.siteName
+      ? isPerfectCompletion
+        ? 370
+        : 360
+      : isPerfectCompletion
+        ? 330
+        : 340;
+
     let description: string;
-    
+
     if (isPerfectCompletion && data.totalSitesCount) {
       // Special message for 100% completion
       description = `This certifies that ${data.recipientName} has achieved PERFECT DATA COMPLIANCE\nwith 100% completion across ${data.totalSitesCount} minigrid site${data.totalSitesCount !== 1 ? 's' : ''}, successfully completing all ${data.totalFormsCount || 0} required forms,\ndemonstrating exceptional commitment to AMDA's data compliance standards.`;
@@ -354,7 +373,7 @@ export class CertificateService {
       // Fallback message
       description = `This certifies that the above-named individual has completed the required data\ncompliance steps in accordance with AMDA's policies.`;
     }
-  
+
     const lines = description.split('\n');
     let yPos = descriptionYStart;
     lines.forEach(line => {
@@ -366,37 +385,48 @@ export class CertificateService {
       });
       yPos += 20;
     });
-  
+
     // ============= BADGE SECTION =============
     const badgeX = pageWidth / 2;
-    const badgeY = isPerfectCompletion ? 460 : (data.siteName ? 420 : 440);
-  
+    const badgeY = isPerfectCompletion ? 460 : data.siteName ? 420 : 440;
+
     if (badgeBase64) {
       try {
         const imageFormat = badgeBase64.includes('data:image/png') ? 'PNG' : 'JPEG';
-        
+
         // Larger badge for 100% completion
         const badgeSize = isPerfectCompletion ? 100 : 80;
-        pdf.addImage(badgeBase64, imageFormat, badgeX - badgeSize/2, badgeY - badgeSize/2 + 10, badgeSize, badgeSize);
-        
+        pdf.addImage(
+          badgeBase64,
+          imageFormat,
+          badgeX - badgeSize / 2,
+          badgeY - badgeSize / 2 + 10,
+          badgeSize,
+          badgeSize
+        );
+
         // Add gold ring around badge for perfect completion
         if (isPerfectCompletion) {
           pdf.setDrawColor(251, 191, 36);
           pdf.setLineWidth(3);
-          pdf.circle(badgeX, badgeY + 10, badgeSize/2 + 5, 'S');
+          pdf.circle(badgeX, badgeY + 10, badgeSize / 2 + 5, 'S');
         }
       } catch (error) {
         console.warn('Failed to add badge image:', error);
       }
     }
-  
+
     // ============= SIGNATURE SECTION =============
     const signatureY = pageHeight - 100;
-  
-    pdf.setDrawColor(isPerfectCompletion ? 251 : 156, isPerfectCompletion ? 191 : 163, isPerfectCompletion ? 36 : 175);
+
+    pdf.setDrawColor(
+      isPerfectCompletion ? 251 : 156,
+      isPerfectCompletion ? 191 : 163,
+      isPerfectCompletion ? 36 : 175
+    );
     pdf.setLineWidth(1);
     pdf.line(80, signatureY, 250, signatureY);
-  
+
     if (data.signatoryName) {
       addText(data.signatoryName, 165, signatureY - 10, {
         fontSize: 12,
@@ -406,22 +436,22 @@ export class CertificateService {
         align: 'center',
       });
     }
-  
+
     addText(data.signatoryTitle || 'Signature', 165, signatureY + 20, {
       fontSize: 14,
       fontType: 'body',
       color: '#6b7280',
       align: 'center',
     });
-  
+
     pdf.line(540, signatureY, 710, signatureY);
-  
+
     const completedDate = new Date(data.completionDate).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
-  
+
     addText(completedDate, 625, signatureY - 10, {
       fontSize: 12,
       fontType: 'body',
@@ -429,19 +459,19 @@ export class CertificateService {
       color: '#374151',
       align: 'center',
     });
-  
+
     addText('Date', 625, signatureY + 20, {
       fontSize: 14,
       fontType: 'body',
       color: '#6b7280',
       align: 'center',
     });
-  
+
     // ============= QR CODE =============
     if (qrCodeDataUrl) {
       try {
         pdf.addImage(qrCodeDataUrl, 'PNG', pageWidth - 140, 60, 80, 80);
-  
+
         addText('Scan to Verify', pageWidth - 100, 150, {
           fontSize: 8,
           fontType: 'body',
@@ -452,20 +482,20 @@ export class CertificateService {
         console.warn('Failed to add QR code:', error);
       }
     }
-  
+
     // ============= FOOTER =============
     const footerCompletedDate = new Date(data.completionDate).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
-  
+
     addText(`Completion Date: ${footerCompletedDate}`, 60, pageHeight - 30, {
       fontSize: 9,
       fontType: 'body',
       color: '#9ca3af',
     });
-  
+
     if (data.certificateId) {
       addText(`Certificate ID: ${data.certificateId}`, 60, pageHeight - 15, {
         fontSize: 9,
@@ -473,13 +503,13 @@ export class CertificateService {
         color: '#9ca3af',
       });
     }
-  
+
     // Center footer - show completion stats
     if (data.overallCompletionRate !== undefined) {
       const footerText = isPerfectCompletion
         ? `★ PERFECT COMPLETION: 100% across ${data.totalSitesCount || 0} sites (${data.totalFormsCount || 0}/${data.totalFormsCount || 0} forms) ★`
         : `Completion: ${data.overallCompletionRate}% across ${data.totalSitesCount || 0} sites (${data.completedFormsCount || 0}/${data.totalFormsCount || 0} forms)`;
-  
+
       addText(footerText, pageWidth / 2, pageHeight - 22, {
         fontSize: 9,
         fontType: 'body',
@@ -487,14 +517,14 @@ export class CertificateService {
         align: 'center',
       });
     }
-  
+
     addText('Verify at: www.amda.org/verify', pageWidth - 60, pageHeight - 30, {
       fontSize: 9,
       fontType: 'body',
       color: '#9ca3af',
       align: 'right',
     });
-  
+
     addText(
       `© ${new Date().getFullYear()} African Mini-grid Developers Association`,
       pageWidth - 60,
@@ -506,7 +536,7 @@ export class CertificateService {
         align: 'right',
       }
     );
-  
+
     return pdf;
   }
   private async loadImageAsBase64(imagePath: string): Promise<string | null> {

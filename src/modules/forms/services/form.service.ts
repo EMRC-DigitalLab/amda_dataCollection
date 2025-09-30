@@ -104,6 +104,12 @@ export class FormService {
 
     const publishedForm = await this.repo.publishForm(formId);
 
+    // ADD THIS DEBUG BLOCK
+    console.log('=== PUBLISH FORM DEBUG ===');
+    console.log('formNotificationService exists:', !!this.formNotificationService);
+    console.log('publishedBy:', publishedBy);
+    console.log('==========================');
+
     // ADD NOTIFICATION HERE
     if (this.formNotificationService && publishedBy) {
       try {

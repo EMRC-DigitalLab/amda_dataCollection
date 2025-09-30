@@ -1,6 +1,5 @@
 // src/modules/notifications/services/notification-queue.service.ts
 import Queue, { Job } from 'bull';
-// import { redisClient } from '@/config/redis';
 import { Notification, NotificationPriority } from '@/database/entities/notification.entity';
 import { logger } from '@/shared/utils/logger';
 
@@ -9,7 +8,8 @@ export class NotificationQueueService {
 
   constructor() {
     this.notificationQueue = new Queue('notification processing', {
-      redis: 'redis://amda-redis-dev:6379',
+      redis: process.env.REDIS_URL || 'redis://amda-redis-dev:6379',
+      // redis: 'redis://amda-redis-dev:6379',
       defaultJobOptions: {
         removeOnComplete: 100,
         removeOnFail: 50,
@@ -21,7 +21,6 @@ export class NotificationQueueService {
       },
     });
 
-    // Add job processors
     this.setupProcessors();
   }
 
@@ -96,17 +95,18 @@ export class NotificationQueueService {
       const { notificationId } = job.data;
       logger.info(`Processing notification job: ${job.id}, Notification: ${notificationId}`);
 
-      // Import here to avoid circular dependency
-      // Import here to avoid circular dependency
+      // Import services dynamically to avoid circular dependency
       const { NotificationService } = await import('./notification.service');
       const { TemplateService } = await import('./template.service');
       const { NotificationChannelFactory } = await import('./channel-factory.service');
+      const { WebSocketNotificationService } = await import('./websocket-notification.service');
       const { EmailChannel } = await import('../channels/email.channel');
       const { SmsChannel } = await import('../channels/sms.channel');
       const { PushChannel } = await import('../channels/push.channel');
       const { WebhookChannel } = await import('../channels/webhook.channel');
       const { InAppChannel } = await import('../channels/in-app.channel');
 
+      // Create channel instances
       const templateService = new TemplateService();
       const emailChannel = new EmailChannel();
       const smsChannel = new SmsChannel();
@@ -122,8 +122,27 @@ export class NotificationQueueService {
         inAppChannel
       );
 
-      const notificationService = new NotificationService(templateService, channelFactory, this);
-      // Dependencies would be injected here
+      // Get WebSocket service from global (if available)
+      const webSocketService = (global as any).webSocketService;
+
+      // Create WebSocketNotificationService ONLY if WebSocket service exists
+      const webSocketNotificationService = webSocketService
+        ? new WebSocketNotificationService(webSocketService)
+        : undefined;
+
+      if (!webSocketNotificationService) {
+        logger.warn(
+          'WebSocket service not available in queue processor - real-time notifications disabled'
+        );
+      }
+
+      // Create NotificationService with WebSocket support
+      const notificationService = new NotificationService(
+        templateService,
+        channelFactory,
+        this,
+        webSocketNotificationService
+      );
 
       await notificationService.processNotification(notificationId);
     });
