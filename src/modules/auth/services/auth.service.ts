@@ -100,9 +100,6 @@ export class AuthService {
         throw new Error('Invalid credentials');
       }
 
-      // if (member.membershipStatus !== MembershipStatus.ACTIVE) {
-      //     throw new Error('Member account is not active');
-      // }
 
       loginUser = {
         ...member,
@@ -137,8 +134,6 @@ export class AuthService {
       expiresIn: config.jwt.refreshExpiresIn,
     });
 
-    // Store refresh token (you might want to store this in Redis or database)
-    // await this.storeRefreshToken(loginUser.id, refreshToken);
 
     return {
       accessToken,
