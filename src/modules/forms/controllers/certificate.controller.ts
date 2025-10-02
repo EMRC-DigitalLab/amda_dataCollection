@@ -28,14 +28,14 @@ export class CertificateController {
         completedFormsCount,
         totalFormsCount,
       } = req.body;
-  
+
       if (!recipientName || !badgeType || !completionDate || !memberId) {
         res.status(400).json({
           error: 'Missing required fields: recipientName, badgeType, completionDate, memberId',
         });
         return;
       }
-  
+
       const certificate = await this.service.createCertificate({
         recipientName,
         badgeType,
@@ -46,13 +46,13 @@ export class CertificateController {
         completionRate,
         signatoryName,
         signatoryTitle,
-    
+
         overallCompletionRate,
         totalSitesCount,
         completedFormsCount,
         totalFormsCount,
       });
-  
+
       res.status(201).json({
         message: 'Certificate created successfully',
         data: certificate,
@@ -146,56 +146,52 @@ export class CertificateController {
     }
   };
 
-  downloadCertificatePDF = async(req: Request, res: Response): Promise<void> => {
+  downloadCertificatePDF = async (req: Request, res: Response): Promise<void> => {
     // @ts-ignore
     try {
-       const { certificateId } = req.params;
-      
-       const pdfBuffer = await this.service.generatePDF(certificateId);
-     
-       if (!pdfBuffer || pdfBuffer.length === 0) {
-          return res.status(404).json({ 
-             error: 'Certificate not found or PDF generation failed' 
-          });
-       }
- 
-       // Get certificate for filename
-       const certificate = await this.service.getCertificateByCertificateId(certificateId);
-       
-       
-       if (!certificate?.recipientName) {
-          const fileName = `AMDA_Certificate_${certificateId}_${new Date().getFullYear()}.pdf`;
-          
-          res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
-          res.setHeader('Content-Type', 'application/pdf');
-          res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-          res.setHeader('Content-Length', pdfBuffer.length.toString());
-          
-          return res.send(pdfBuffer);
-       }
- 
-       const fileName = `AMDA_Certificate_${certificate.recipientName.replace(/\s+/g, '_')}_${new Date().getFullYear()}.pdf`;
- 
-       res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
-       res.setHeader('Content-Type', 'application/pdf');
-       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-       res.setHeader('Content-Length', pdfBuffer.length.toString());
- 
-       res.send(pdfBuffer);
-       console.log('11. PDF sent successfully');
-       console.log('=== DOWNLOAD CERTIFICATE END ===');
-       
+      const { certificateId } = req.params;
+
+      const pdfBuffer = await this.service.generatePDF(certificateId);
+
+      if (!pdfBuffer || pdfBuffer.length === 0) {
+        return res.status(404).json({
+          error: 'Certificate not found or PDF generation failed',
+        });
+      }
+
+      // Get certificate for filename
+      const certificate = await this.service.getCertificateByCertificateId(certificateId);
+
+      if (!certificate?.recipientName) {
+        const fileName = `AMDA_Certificate_${certificateId}_${new Date().getFullYear()}.pdf`;
+
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Content-Length', pdfBuffer.length.toString());
+
+        return res.send(pdfBuffer);
+      }
+
+      const fileName = `AMDA_Certificate_${certificate.recipientName.replace(/\s+/g, '_')}_${new Date().getFullYear()}.pdf`;
+
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.setHeader('Content-Length', pdfBuffer.length.toString());
+
+      res.send(pdfBuffer);
+      console.log('11. PDF sent successfully');
+      console.log('=== DOWNLOAD CERTIFICATE END ===');
     } catch (error: any) {
-       
-       
-       if (res.headersSent) {
-          console.log('Headers already sent, cannot send error response');
-          return;
-       }
-       
-       ResponseHelper.error(res, error.message, 500);
+      if (res.headersSent) {
+        console.log('Headers already sent, cannot send error response');
+        return;
+      }
+
+      ResponseHelper.error(res, error.message, 500);
     }
- }
+  };
 
   previewCertificatePDF = async (req: Request, res: Response): Promise<void> => {
     try {

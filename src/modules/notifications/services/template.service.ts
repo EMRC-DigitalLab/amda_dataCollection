@@ -6,6 +6,9 @@ import { NotificationChannel } from '@/database/entities/notification.entity';
 import { TemplateRenderRequest, TemplateRenderResult } from '../interfaces/notification.interface';
 import { logger } from '@/shared/utils/logger';
 
+import fs from 'fs';
+import path from 'path';
+
 export class TemplateService {
   private templateRepository: Repository<NotificationTemplate>;
 
@@ -161,5 +164,32 @@ export class TemplateService {
     );
 
     return rendered;
+  }
+
+  /**
+   * Load templates from JSON files
+   */
+  async seedTemplatesFromFiles(): Promise<void> {
+    const templatesDir = path.join(__dirname, '../templates');
+
+    if (!fs.existsSync(templatesDir)) {
+      logger.warn('Templates directory not found');
+      return;
+    }
+
+    const files = fs.readdirSync(templatesDir).filter(f => f.endsWith('.template.json'));
+
+    for (const file of files) {
+      const filePath = path.join(templatesDir, file);
+      const templateData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+      // Check if template exists
+      const existing = await this.getTemplate(templateData.name, templateData.channel);
+
+      if (!existing) {
+        await this.createTemplate(templateData);
+        logger.info(`Template loaded: ${templateData.name}`);
+      }
+    }
   }
 }

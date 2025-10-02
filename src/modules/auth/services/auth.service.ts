@@ -9,6 +9,8 @@ import { User, UserRole, UserStatus } from '../../../database/entities/user.enti
 import { MemberRepository } from '../../../database/repositories/auth/member.repository';
 import { UserRepository } from '../../../database/repositories/auth/user.repository';
 import { VerificationResult } from '../../../shared/types/auth.types';
+import { NotificationHelper } from '@/shared/utils/notification-helper';
+import { NotificationChannel, NotificationPriority } from '@/database/entities/notification.entity';
 
 import { LoginDto } from '../dtos/login.dto';
 import {
@@ -318,39 +320,113 @@ export class AuthService {
   async forgotPassword(forgotPasswordData: ForgotPasswordRequest): Promise<void> {
     const { email } = forgotPasswordData;
 
+    // Try user first
     const user = await this.userRepository.findOne({
       where: { email, status: UserStatus.ACTIVE },
     });
 
+    // Try member if not found
+    let member: Member | null = null;
     if (!user) {
-      // Don't reveal if email exists
+      member = await this.memberRepository.findByEmail(email);
+    }
+
+    // Don't reveal if email exists
+    if (!user && !member) {
       return;
     }
 
     // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    const resetExpires = new Date(Date.now() + 15 * 60 * 1000);
 
-    // Save reset token
-    await this.userRepository.setResetPasswordToken(user.id, resetToken, resetExpires);
+    const entityId = user?.id || member?.id;
+    if (!entityId) return;
 
-    // TODO: Send email with reset token
-    console.log(`Password reset token for ${email}: ${resetToken}`);
+    // Save token
+    if (user) {
+      await this.userRepository.setResetPasswordToken(entityId, resetToken, resetExpires);
+    } else if (member) {
+      await this.memberRepository.setResetPasswordToken(entityId, resetToken, resetExpires);
+    }
+
+    // Generate reset URL
+    const resetUrl = `${config.frontendUrl}/reset-password?token=${resetToken}`;
+
+    try {
+      await NotificationHelper.sendCustomNotification(
+        entityId,
+        'password_reset',
+        {
+          resetToken,
+          resetUrl,
+          email,
+          firstName: user?.firstName || member?.companyName || 'User',
+          expiresIn: '15 minutes',
+        },
+        {
+          channel: [NotificationChannel.EMAIL],
+          priority: NotificationPriority.HIGH,
+          recipientEmail: email,
+        }
+      );
+
+      logger.info(`Password reset email sent to: ${email}`);
+    } catch (error) {
+      logger.error('Failed to send password reset email:', error);
+      throw new Error('Failed to send password reset email');
+    }
   }
 
-  /**
-   * Reset password using token
-   */
   async resetPassword(resetPasswordData: ResetPasswordRequest): Promise<void> {
     const { token, newPassword } = resetPasswordData;
 
+    // Try user
     const user = await this.userRepository.findByResetToken(token);
+    let member: Member | null = null;
+
     if (!user) {
+      member = await this.memberRepository.findByResetToken(token);
+    }
+
+    if (!user && !member) {
       throw new Error('Invalid or expired reset token');
     }
 
+    const entityId = user?.id || member?.id;
+    if (!entityId) throw new Error('Invalid entity');
+
     // Update password
-    await this.userRepository.updatePassword(user.id, newPassword);
+    if (user) {
+      await this.userRepository.updatePassword(entityId, newPassword);
+    } else if (member) {
+      await this.memberRepository.updatePassword(entityId, newPassword);
+    }
+
+    // Send confirmation
+    const email = user?.email || member?.primaryContactEmail;
+    if (email) {
+      try {
+        await NotificationHelper.sendCustomNotification(
+          entityId,
+          'password_changed',
+          {
+            email,
+            firstName: user?.firstName || member?.companyName || 'User',
+            timestamp: new Date().toLocaleString(),
+          },
+          {
+            channel: [NotificationChannel.EMAIL],
+            priority: NotificationPriority.NORMAL,
+            recipientEmail: email,
+          }
+        );
+
+        logger.info(`Password change confirmation sent to: ${email}`);
+      } catch (error) {
+        logger.error('Failed to send confirmation email:', error);
+      }
+    }
   }
 
   /**

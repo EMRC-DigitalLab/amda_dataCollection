@@ -81,7 +81,6 @@ export const authMiddleware = async (
       authenticatedUser = {
         ...member,
       };
-
     }
     // Handle admin/user authentication
     else {

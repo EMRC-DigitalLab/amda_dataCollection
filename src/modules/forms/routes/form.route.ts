@@ -1,14 +1,36 @@
 // @ts-nocheck
 
+// src/modules/forms/routes/form.route.ts
 import { adminMiddleware } from '@/shared/middleware/admin.middleware';
 import { authMiddleware } from '@/shared/middleware/auth.middleware';
 import { Router } from 'express';
 import { DataSource } from 'typeorm';
 import { FormController } from '../controllers/form.controller';
+import { FormNotificationService } from '../services/form-notification.service';
+import { FormRepository } from '../../../database/repositories/forms/form.repository';
+import { FormService } from '../services/form.service';
+
+// // Global WebSocket service reference
+// declare global {
+//   var webSocketService: any;
+// }
 
 export function createFormRoutes(dataSource: DataSource): Router {
   const router = Router();
-  const formController = new FormController(dataSource);
+
+  const formRepository = new FormRepository(dataSource);
+  const webSocketService = (global as any).webSocketService;
+
+  // ADD THIS DEBUG
+  console.log('=== FORM ROUTES INIT ===');
+  console.log('WebSocket service available:', !!webSocketService);
+  console.log('========================');
+
+  const formNotificationService = new FormNotificationService(webSocketService);
+  const formService = new FormService(formRepository, formNotificationService);
+
+  // Create controller with services
+  const formController = new FormController(dataSource, formService);
 
   /* ============================================================================ */
   /* Public Form Schema Routes (Read-only)                                       */

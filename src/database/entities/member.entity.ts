@@ -143,6 +143,12 @@ export class Member {
   @Column({ type: 'varchar', length: 200, nullable: true })
   postalCode!: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  resetPasswordToken?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  resetPasswordExpires?: Date;
+
   // AMDA Membership Details
   @Column({
     type: 'enum',

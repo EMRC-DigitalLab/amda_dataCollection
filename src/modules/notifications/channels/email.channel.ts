@@ -27,7 +27,7 @@ export class EmailChannel implements INotificationChannel {
   async send(notification: NotificationRequest): Promise<NotificationResult> {
     try {
       const mailOptions = {
-        from: config.email.user,
+        from: `"AMDA DataCollection Tool" <${config.email.user}>`,
         to: notification.recipientEmail,
         subject: notification.subject,
         text: notification.content,
