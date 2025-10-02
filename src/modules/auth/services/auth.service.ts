@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { config } from '@/config';
+import { NotificationChannel, NotificationPriority } from '@/database/entities/notification.entity';
+import { NotificationHelper } from '@/shared/utils/notification-helper';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
@@ -9,9 +11,8 @@ import { User, UserRole, UserStatus } from '../../../database/entities/user.enti
 import { MemberRepository } from '../../../database/repositories/auth/member.repository';
 import { UserRepository } from '../../../database/repositories/auth/user.repository';
 import { VerificationResult } from '../../../shared/types/auth.types';
-import { NotificationHelper } from '@/shared/utils/notification-helper';
-import { NotificationChannel, NotificationPriority } from '@/database/entities/notification.entity';
 
+import { logger } from '../../../shared/utils/logger';
 import { LoginDto } from '../dtos/login.dto';
 import {
   ChangePasswordRequest,
@@ -202,15 +203,6 @@ export class AuthService {
   async registerAdmin(adminData: RegisterRequest): Promise<LoginResponse> {
     const { email, phoneNumber, password, firstName, lastName } = adminData;
 
-    // Check if this is the first admin (allow creation if no admins exist)
-    const adminCount = await this.userRepository.count({
-      where: { role: UserRole.ADMIN },
-    });
-
-    // For production, you might want to restrict this further
-    if (adminCount > 0) {
-      throw new Error('Admin registration is restricted');
-    }
 
     // Check if email already exists
     const emailExists = await this.userRepository.emailExists(email);
@@ -325,11 +317,16 @@ export class AuthService {
       where: { email, status: UserStatus.ACTIVE },
     });
 
+
+
     // Try member if not found
     let member: Member | null = null;
     if (!user) {
       member = await this.memberRepository.findByEmail(email);
     }
+
+    console.log(member, "this is member")
+
 
     // Don't reveal if email exists
     if (!user && !member) {
@@ -372,7 +369,9 @@ export class AuthService {
       );
 
       logger.info(`Password reset email sent to: ${email}`);
+      console.info(`Password reset email sent to: ${email}`);
     } catch (error) {
+      console.log(error);
       logger.error('Failed to send password reset email:', error);
       throw new Error('Failed to send password reset email');
     }
@@ -405,6 +404,7 @@ export class AuthService {
 
     // Send confirmation
     const email = user?.email || member?.primaryContactEmail;
+    console.log(email, "this is email")
     if (email) {
       try {
         await NotificationHelper.sendCustomNotification(
@@ -421,9 +421,11 @@ export class AuthService {
             recipientEmail: email,
           }
         );
+        console.log(`Password change confirmation sent to: ${email}`);
 
         logger.info(`Password change confirmation sent to: ${email}`);
       } catch (error) {
+        console.log(error)
         logger.error('Failed to send confirmation email:', error);
       }
     }
