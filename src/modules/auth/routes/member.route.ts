@@ -7,6 +7,10 @@ const createMemberRoutes = (dataSource: DataSource): Router => {
   const router = Router();
   const memberController = new MemberController(dataSource);
 
+  // EXPORT routes
+  router.get('/members-excel', memberController.exportMembersToExcel);
+  router.get('/members-excel/:id', memberController.exportMemberByIdToExcel);
+
   // GET routes
   router.get('/', memberController.getAllMembers);
   router.get('/search', authMiddleware, memberController.searchMembers);
