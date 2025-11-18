@@ -1,8 +1,8 @@
 // src/main.ts (Updated with enhanced Swagger setup and Secure CORS)
-import path from 'path';
+import compression from 'compression';
 import moduleAlias from 'module-alias';
 import 'module-alias/register';
-import compression from 'compression';
+import path from 'path';
 // import compression from 'compression';
 import cors from 'cors';
 import express from 'express';
@@ -39,7 +39,7 @@ if (isProduction) {
 
 import { createApiRouter } from '@/api/routes';
 import { getSwaggerInfo, swaggerSpec } from '@/api/swagger/schemas/swagger.config';
-import { config } from '@/config';
+import { config, connectRedis } from '@/config';
 import { AppDataSource, connectDatabase } from '@/config/database';
 import { errorHandler, notFoundHandler } from '@/shared/middleware/error.middleware';
 import { generalRateLimit } from '@/shared/middleware/rate-limit.middleware';

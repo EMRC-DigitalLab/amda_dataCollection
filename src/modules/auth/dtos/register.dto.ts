@@ -14,9 +14,6 @@ export class RegisterDto {
   email!: string;
 
   @IsString()
-  country!: string;
-
-  @IsString()
   phoneNumber!: string;
 
   @IsString()

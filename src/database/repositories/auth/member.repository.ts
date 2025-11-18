@@ -1,8 +1,8 @@
 // @ts-nocheck
-
 import { DataSource, ILike, Repository } from 'typeorm';
 import { IMemberRepository } from '../../../modules/auth/interfaces/member.interface';
 import { Member, MembershipStatus } from '../../entities/member.entity';
+import { User } from '../../entities/user.entity';
 
 export class MemberRepository implements IMemberRepository {
   private repository: Repository<Member>;
@@ -17,13 +17,20 @@ export class MemberRepository implements IMemberRepository {
     });
   }
 
+  
   async findById(id: string): Promise<Member | null> {
     return await this.repository.findOne({
       where: { id },
     });
   }
 
-  async updateLastLogin(memberId: string): Promise<void | null> {
+  async findByPrimaryContactEmail(email: string): Promise<Member | null> {
+    return await this.repository.findOne({
+      where: { primaryContactEmail: email },
+    });
+  }
+
+  async updateLastLogin(memberId: string): Promise<void | any> {
     return await this.repository.update({ id: memberId }, { lastLoginAt: new Date() });
   }
   async findByUserId(memberId: string): Promise<Member | null> {
@@ -157,41 +164,7 @@ export class MemberRepository implements IMemberRepository {
     };
   }
 
-  async findMembersWithFilters(filters: {
-    status?: MembershipStatus;
-    country?: string;
-    membershipType?: string;
-    search?: string;
-  }): Promise<Member[]> {
-    const queryBuilder = this.repository.createQueryBuilder('member');
-
-    if (filters.status) {
-      queryBuilder.andWhere('member.membershipStatus = :status', {
-        status: filters.status,
-      });
-    }
-
-    if (filters.country) {
-      queryBuilder.andWhere('member.country ILIKE :country', {
-        country: `%${filters.country}%`,
-      });
-    }
-
-    if (filters.membershipType) {
-      queryBuilder.andWhere('member.membershipType = :membershipType', {
-        membershipType: filters.membershipType,
-      });
-    }
-
-    if (filters.search) {
-      queryBuilder.andWhere(
-        '(member.companyName ILIKE :search OR member.primaryContactName ILIKE :search OR member.primaryContactEmail ILIKE :search)',
-        { search: `%${filters.search}%` }
-      );
-    }
-
-    return await queryBuilder.orderBy('member.createdAt', 'DESC').getMany();
-  }
+  
 
   async findByVerificationStatus(isVerified: boolean): Promise<Member[]> {
     return this.repository.find({
