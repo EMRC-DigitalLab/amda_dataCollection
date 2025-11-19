@@ -1,5 +1,5 @@
 // src/modules/notifications/channels/email.channel.ts
-import * as nodemailer from 'nodemailer';
+import nodemailer from 'nodemailer';
 import { config } from '@/config';
 import {
   INotificationChannel,
@@ -16,7 +16,7 @@ export class EmailChannel implements INotificationChannel {
     this.transporter = nodemailer.createTransport({
       host: config.email.host,
       port: config.email.port,
-      secure: config.email.port === 465,
+      secure: config.email.secure, // true for 465, false for other ports
       auth: {
         user: config.email.user,
         pass: config.email.password,
@@ -27,12 +27,12 @@ export class EmailChannel implements INotificationChannel {
   async send(notification: NotificationRequest): Promise<NotificationResult> {
     try {
       const mailOptions = {
-        from: `"AMDA DataCollection Tool" <${config.email.user}>`,
+        from: config.email.from || `"${config.email.fromName}" <${config.email.user}>`,
         to: notification.recipientEmail,
         subject: notification.subject,
         text: notification.content,
         html: notification.htmlContent || notification.content,
-        messageId: notification.id, // For tracking
+        messageId: notification.id,
       };
 
       const result = await this.transporter.sendMail(mailOptions);

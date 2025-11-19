@@ -323,26 +323,33 @@ export class AuthService {
    * Request password reset
    */
   async forgotPassword(forgotPasswordData: ForgotPasswordRequest): Promise<void> {
+    console.log('=== FORGOT PASSWORD CALLED ===');
+    console.log('Email:', forgotPasswordData.email);
     const { email } = forgotPasswordData;
 
     // Try user first
     const user = await this.userRepository.findOne({
       where: { email, status: UserStatus.ACTIVE },
     });
+    console.log('User found:', !!user);
 
     // Try member if not found
     let member: Member | null = null;
     if (!user) {
       member = await this.memberRepository.findByEmail(email);
+      console.log('Member found:', !!member);
     }
 
     // Don't reveal if email exists
     if (!user && !member) {
+      console.log('No user/member found - exiting silently');
       return;
     }
 
     // Generate reset token
+    console.log('Generating token...');
     const resetToken = crypto.randomBytes(32).toString('hex');
+    console.log('Token:', resetToken);
     const resetExpires = new Date(Date.now() + 15 * 60 * 1000);
 
     const entityId = user?.id || member?.id;
