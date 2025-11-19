@@ -108,27 +108,27 @@ export class Member {
   @Column({ type: 'varchar', length: 200, unique: true })
   registrationNumber!: string;
 
-  @Column({ type: 'varchar', length: 4 })
+  @Column({ type: 'varchar', length: 4, nullable: true })
   yearEstablished!: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   website!: string;
 
   // Primary Contact Information
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   primaryContactName!: string;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   primaryContactTitle!: string;
 
   @Column({ type: 'varchar', length: 255, unique: true })
   primaryContactEmail!: string;
 
-  @Column({ type: 'varchar', length: 200 })
+  @Column({ type: 'varchar', length: 200, nullable: true })
   primaryContactPhone!: string;
 
   // Company Address
-  @Column({ type: 'text' })
+  @Column({ type: 'text', nullable: true })
   headOfficeAddress!: string;
 
   @Column({ type: 'varchar', length: 200, nullable: true })

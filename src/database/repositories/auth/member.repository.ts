@@ -17,7 +17,6 @@ export class MemberRepository implements IMemberRepository {
     });
   }
 
-  
   async findById(id: string): Promise<Member | null> {
     return await this.repository.findOne({
       where: { id },
@@ -163,8 +162,6 @@ export class MemberRepository implements IMemberRepository {
       totalPages: Math.ceil(total / limit),
     };
   }
-
-  
 
   async findByVerificationStatus(isVerified: boolean): Promise<Member[]> {
     return this.repository.find({
