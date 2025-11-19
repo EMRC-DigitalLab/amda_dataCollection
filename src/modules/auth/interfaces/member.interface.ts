@@ -1,126 +1,112 @@
 import {
-  BusinessModel,
-  CompanyType,
+  BusinessInAfricaType,
+  ForProfitType,
   Member,
   MembershipStatus,
   MembershipType,
 } from '../../../database/entities/member.entity';
-import { User } from '../../../database/entities/user.entity';
+import { MinigridSite } from '../../../database/entities/minigrid-site.entity';
+import { CreateMemberDto } from '../dtos/create-member.dto';
 
 export interface IMember {
+  // Core Identifiers
   id?: string;
-  userId: string;
-  user?: User;
+  memberId?: string | null;
+
+  // Authentication & Verification
+  email?: string;
+  password?: string | null;
+  lastLoginAt?: Date | null;
+  emailVerifiedAt?: Date | null;
+  resetPasswordToken?: string | null;
+  resetPasswordExpires?: Date | null;
+  isFirstLogin?: boolean;
+  isVerified: boolean;
+  verifiedAt?: Date | null;
+  verifiedByAdminId?: string | null;
 
   // Company Information
   companyName: string;
-  companyType: CompanyType;
-  registrationNumber: string;
-  yearEstablished: string;
-  website?: string;
+  tradingAs?: string | null;
+  website?: string | null;
 
-  // Primary Contact Information
-  primaryContactName: string;
-  primaryContactTitle: string;
-  primaryContactEmail: string;
-  primaryContactPhone: string;
+  // Address (Head Office / Billing)
+  billingAddress?: string | null;
+  city?: string | null;
+  country?: string | null;
+  postalCode?: string | null;
 
-  // Company Address
-  headOfficeAddress: string;
-  city: string;
-  state: string;
-  country: string;
-  postalCode?: string;
+  // Primary Contact
+  contact1Name?: string | null;
+  contact1Title?: string | null;
+  contact1Email?: string | null;
+  contact1Phone?: string | null;
 
-  // AMDA Membership Details
+  // Secondary Contact
+  contact2Name?: string | null;
+  contact2Title?: string | null;
+  contact2Email?: string | null;
+  contact2Phone?: string | null;
+
+  // Authorized Signatory & Billing Contact
+  authorizedSignatory?: string | null;
+  billingContactName?: string | null;
+  billingContactTitle?: string | null;
+  billingContactEmail?: string | null;
+  billingContactPhone?: string | null;
+
+  // Business Classification
+  forProfit?: ForProfitType | null;
+  forProfitOther?: string | null;
+  businessInAfrica?: BusinessInAfricaType | null;
+  businessInAfricaOther?: string | null;
+  countriesOfBusiness?: string | null;
+  businessLanguages?: string[] | null;
+  businessLanguageOther?: string | null;
+  businessCategory?: string | null;
+  businessCategoryOther?: string | null;
+  businessDescription?: string | null;
+  servicesNeeded?: string | null;
+  annualTurnover?: string | null;
+  shareFinancials?: boolean | null;
+  criminalLitigation?: boolean | null;
+  civilLitigation?: boolean | null;
+  deniedMembership?: boolean | null;
+  acknowledgeProcess?: boolean | null;
+  dataSharing?: boolean | null;
+  signature?: string | null;
+
+  // Membership
   membershipType: MembershipType;
-  membershipStartDate: Date;
+  membershipStartDate: Date | null;
   membershipStatus: MembershipStatus;
-  annualDues: string;
-  countriesOfOperation: string;
 
-  // Business Information
-  businessModel: BusinessModel;
-  targetMarkets: string;
-  primaryTechnology: string;
-  minigridCount: string;
-  totalCapacityInstalled: string;
-  customerConnections: string;
+  // Relations
+  sites?: MinigridSite[];
 
-  // Additional Information
-  companyMission: string;
-  keyProjects: string;
-  partnerships: string;
-  certifications: string;
+  // Timestamps
+  createdAt: Date;
+  updatedAt: Date;
 
-  createdAt?: Date;
-  updatedAt?: Date;
+  // Virtual / Computed (not in DB, but useful in code)
+  primaryContactEmail?: string; // often mapped to contact1Email
+  registrationNumber?: string; // if you plan to add later
+
+  // Computed getters (you can keep them if you convert entity methods)
+  hasWebsite?: boolean;
+  isActiveMember?: boolean;
+  isPendingMember?: boolean;
+  isSuspended?: boolean;
+  isInactive?: boolean;
+  fullAddress?: string;
+  displayName?: string;
+  primaryEmail?: string;
+  isEmailVerified?: boolean;
+  isVerifiedMember?: boolean;
+  requiresPasswordChange?: boolean;
 }
 
-export interface CreateMemberDto {
-  userId: string;
-  companyName: string;
-  companyType: CompanyType;
-  registrationNumber: string;
-  yearEstablished: string;
-  website?: string;
-  primaryContactName: string;
-  primaryContactTitle: string;
-  primaryContactEmail: string;
-  primaryContactPhone: string;
-  headOfficeAddress: string;
-  city: string;
-  state: string;
-  country: string;
-  postalCode?: string;
-  membershipType: MembershipType;
-  membershipStartDate: string;
-  membershipStatus: MembershipStatus;
-  annualDues: string;
-  countriesOfOperation: string;
-  businessModel: BusinessModel;
-  targetMarkets: string;
-  primaryTechnology: string;
-  minigridCount: string;
-  totalCapacityInstalled: string;
-  customerConnections: string;
-  companyMission: string;
-  keyProjects: string;
-  partnerships: string;
-  certifications: string;
-}
-
-export interface UpdateMemberDto {
-  companyName?: string;
-  companyType?: CompanyType;
-  registrationNumber?: string;
-  yearEstablished?: string;
-  website?: string;
-  primaryContactName?: string;
-  primaryContactTitle?: string;
-  primaryContactEmail?: string;
-  primaryContactPhone?: string;
-  headOfficeAddress?: string;
-  city?: string;
-  state?: string;
-  country?: string;
-  postalCode?: string;
-  membershipType?: MembershipType;
-  membershipStartDate?: string;
-  membershipStatus?: MembershipStatus;
-  annualDues?: string;
-  countriesOfOperation?: string;
-  businessModel?: BusinessModel;
-  targetMarkets?: string;
-  primaryTechnology?: string;
-  minigridCount?: string;
-  totalCapacityInstalled?: string;
-  customerConnections?: string;
-  companyMission?: string;
-  keyProjects?: string;
-  partnerships?: string;
-  certifications?: string;
-}
+export interface UpdateMemberDto extends CreateMemberDto {}
 
 export interface IMemberRepository {
   findAll(): Promise<Member[]>;
@@ -165,13 +151,13 @@ export interface IMemberService {
   getMemberById(id: string): Promise<Member>;
   getMemberByUserId(userId: string): Promise<Member>;
   getMemberByEmail(email: string): Promise<Member>;
-  createMember(memberData: CreateMemberDto): Promise<Member>;
-  updateMember(id: string, memberData: UpdateMemberDto): Promise<Member>;
+  createMember(memberData: IMember): Promise<IMember>;
+  updateMember(id: string, memberData: IMember): Promise<IMember>;
   deleteMember(id: string): Promise<void>;
   getMembersByStatus(status: MembershipStatus): Promise<Member[]>;
   getMembersByCountry(country: string): Promise<Member[]>;
   searchMembers(query: string): Promise<Member[]>;
-  updateMemberStatus(id: string, status: MembershipStatus): Promise<Member>;
+  updateMemberStatus(id: string, status: MembershipStatus): Promise<Partial<IMember>>;
   getMembersWithFilters(filters: {
     status?: MembershipStatus;
     country?: string;

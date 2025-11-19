@@ -3,18 +3,21 @@ import { DataSource } from 'typeorm';
 import { MembershipStatus } from '../../../database/entities/member.entity';
 import { MemberRepository } from '../../../database/repositories/auth/member.repository';
 import { UserRepository } from '../../../database/repositories/auth/user.repository';
+import { FormRepository } from '../../../database/repositories/forms/form.repository';
 import { AppError } from '../../../shared/middleware/error.middleware';
 import { ResponseHelper } from '../../../shared/utils/response';
-import { CreateMemberDto, UpdateMemberDto } from '../interfaces/member.interface';
+import { IMember } from '../interfaces/member.interface';
 import { MemberService } from '../services/member.service';
 
 export class MemberController {
   private memberService: MemberService;
 
   constructor(private readonly dataSource: DataSource) {
+    // We are working on the member controller, therefore we'd need to access external repository, like the user repo, form, and member repo (inclusive)
     this.memberService = new MemberService(
       new MemberRepository(dataSource),
-      new UserRepository(dataSource)
+      new UserRepository(dataSource),
+      new FormRepository(dataSource)
     );
   }
 
@@ -75,7 +78,8 @@ export class MemberController {
 
   createMember = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const memberData: CreateMemberDto = req.body;
+      console.log(req.body, 'this is the member boday');
+      const memberData: IMember = req.body;
       const member = await this.memberService.createMember(memberData);
       res.status(201).json({
         success: true,
@@ -90,7 +94,7 @@ export class MemberController {
   updateMember = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const memberData: UpdateMemberDto = req.body;
+      const memberData: IMember = req.body;
       const member = await this.memberService.updateMember(id, memberData);
       res.status(200).json({
         success: true,
@@ -316,6 +320,79 @@ export class MemberController {
       });
     } catch (error: any) {
       ResponseHelper.error(res, error.message, 401);
+    }
+  };
+  exportMembersToExcel = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    console.log('reached herellll');
+    try {
+      const { status, country, membershipType, isVerified } = req.query;
+
+      const filters = {
+        status: status as MembershipStatus,
+        country: country as string,
+        membershipType: membershipType as string,
+        isVerified: isVerified ? isVerified === 'true' : undefined,
+      };
+
+      // Remove undefined values
+      Object.keys(filters).forEach(key => {
+        if (filters[key as keyof typeof filters] === undefined) {
+          delete filters[key as keyof typeof filters];
+        }
+      });
+
+      const excelBuffer = await this.memberService.exportMembersToExcel(filters);
+
+      // Set headers for Excel download
+      const filename = `AMDA_Members_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', excelBuffer.length);
+
+      res.send(excelBuffer);
+    } catch (error: any) {
+      ResponseHelper.error(res, error.message, error.statusCode || 500);
+    }
+  };
+
+  exportMemberByIdToExcel = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { id } = req.params;
+
+      // Generate the comprehensive Excel export
+      const excelBuffer = await this.memberService.exportSingleMemberToExcel(id);
+
+      // Get member info for filename
+      const member = await this.memberService.getMemberById(id);
+
+      // Create filename with company name and date
+      const sanitizedCompanyName = member.companyName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      const filename = `${sanitizedCompanyName}_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      // Set headers for Excel download
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', excelBuffer.length);
+
+      res.send(excelBuffer);
+    } catch (error: any) {
+      console.error('Error exporting member to Excel:', error);
+      ResponseHelper.error(
+        res,
+        error.message || 'Failed to export member data',
+        error.statusCode || 500
+      );
     }
   };
 }

@@ -537,9 +537,7 @@ export class AuthService {
     }
 
     // Find the member to verify
-    const member = await this.userRepository.findOne({
-      where: { id: memberId, role: UserRole.MEMBER },
-    });
+    const member = await this.memberRepository.findById(memberId);
 
     if (!member) {
       const error: any = new Error('Member not found');
@@ -556,8 +554,7 @@ export class AuthService {
     }
 
     try {
-      // Use repository method instead of direct database queries
-      const updatedMember = await this.userRepository.updateVerificationStatus(
+      const updatedMember = await this.memberRepository.updateVerificationStatus(
         memberId,
         verifyDto.isVerified,
         verifyDto.isVerified ? adminId : undefined
@@ -693,6 +690,8 @@ export class AuthService {
       filters.country = country;
     }
 
+    const membersFromMembersDb = await this.memberRepository.findAll(true);
+
     const { users: members, total } = await this.userRepository.searchUsers(
       searchTerm,
       page,
@@ -700,10 +699,12 @@ export class AuthService {
       filters
     );
 
+    const cumulativeMembers = [...members, ...membersFromMembersDb];
+
     return {
-      members,
+      members: cumulativeMembers,
       total,
-      hasMore: (page - 1) * limit + members.length < total,
+      hasMore: (page - 1) * limit + cumulativeMembers.length < total,
     };
   }
 

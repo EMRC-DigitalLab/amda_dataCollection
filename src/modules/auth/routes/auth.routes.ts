@@ -12,7 +12,6 @@ import { LoginDto } from '../dtos/login.dto';
 import { RefreshTokenDto } from '../dtos/refresh-token.dto';
 import { RegisterDto } from '../dtos/register.dto';
 import { ResetPasswordDto } from '../dtos/reset-password.dto';
-import { VerifyMemberDto } from '../dtos/verify-member.dto';
 
 export function createAuthRoutes(dataSource: DataSource): Router {
   const router = Router();
@@ -93,15 +92,6 @@ export function createAuthRoutes(dataSource: DataSource): Router {
     authMiddleware,
     adminMiddleware,
     authController.searchMembers
-  );
-
-  // Verify or unverify a specific member
-  router.patch(
-    '/admin/members/:memberId/verify',
-    authMiddleware,
-    adminMiddleware,
-    validationMiddleware(VerifyMemberDto),
-    authController.verifyMember
   );
 
   // Get member verification history

@@ -1,4 +1,4 @@
-//  @ts-nocheck
+// @ts-nocheck
 
 import * as bcrypt from 'bcryptjs';
 import {
@@ -11,6 +11,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  ValueTransformer,
 } from 'typeorm';
 import { MinigridSite } from './minigrid-site.entity';
 
@@ -28,33 +29,32 @@ export enum MembershipStatus {
   PENDING = 'PENDING',
 }
 
-export enum CompanyType {
-  PRIVATE_LIMITED = 'PRIVATE_LIMITED',
-  PUBLIC_LIMITED = 'PUBLIC_LIMITED',
-  PARTNERSHIP = 'PARTNERSHIP',
-  SOLE_PROPRIETORSHIP = 'SOLE_PROPRIETORSHIP',
-  LIMITED_LIABILITY = 'LIMITED_LIABILITY',
-  CORPORATION = 'CORPORATION',
-  // COOPERATIVE = 'COOPERATIVE',
-  NON_PROFIT = 'NON_PROFIT',
-  GOVERNMENT = 'GOVERNMENT',
-  NGO = 'NGO',
-
-  OTHER = 'OTHER',
+export enum ForProfitType {
+  YES = 'Yes',
+  NO = 'No',
+  OTHER = 'Other',
 }
 
-export enum BusinessModel {
-  UTILITY = 'UTILITY',
-  IPP = 'IPP',
-  EPC = 'EPC',
-  OEM = 'OEM',
-  FINANCE = 'FINANCE',
-  OTHER = 'OTHER',
+export enum BusinessInAfricaType {
+  YES = 'Yes',
+  NO = 'No',
+  OTHER = 'Other',
 }
+
+// Custom transformer for boolean fields that may come as "Yes"/"No" strings
+const booleanTransformer: ValueTransformer = {
+  to: (value: any): boolean => {
+    if (typeof value === 'string') {
+      const lowerValue = value.toLowerCase();
+      return lowerValue === 'yes' || lowerValue === 'true' || lowerValue === 'i agree';
+    }
+    return Boolean(value);
+  },
+  from: (value: any): boolean => Boolean(value),
+};
 
 @Entity('members')
-@Index(['primaryContactEmail'], { unique: true })
-@Index(['registrationNumber'], { unique: true })
+@Index(['email'], { unique: true })
 @Index(['companyName'])
 @Index(['membershipStatus'])
 @Index(['membershipType'])
@@ -67,6 +67,9 @@ export class Member {
   memberId!: string;
 
   // Authentication Fields
+  @Column({ type: 'varchar', length: 255, unique: true })
+  email!: string;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   password!: string;
 
@@ -94,60 +97,172 @@ export class Member {
   @Column({ type: 'uuid', nullable: true })
   verifiedByAdminId?: string;
 
-  // Company Information
+  // Company Information (Mapped to Frontend)
   @Column({ type: 'varchar', length: 255 })
   companyName!: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  tradingAs?: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  website?: string;
+
+  // Address Information (Billing/Head Office)
+  @Column({ type: 'text', nullable: true })
+  billingAddress?: string;
+
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  city?: string;
+
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  country?: string;
+
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  postalCode?: string;
+
+  // Primary Contact Information (contact1)
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  contact1Name?: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  contact1Title?: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  contact1Email?: string;
+
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  contact1Phone?: string;
+
+  // Secondary Contact Information (contact2)
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  contact2Name?: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  contact2Title?: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  contact2Email?: string;
+
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  contact2Phone?: string;
+
+  // Authorized Signatory
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  authorizedSignatory?: string;
+
+  // Billing Contact Information
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  billingContactName?: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  billingContactTitle?: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  billingContactEmail?: string;
+
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  billingContactPhone?: string;
+
+  // Business Type (forProfit)
   @Column({
     type: 'enum',
-    enum: CompanyType,
-    default: CompanyType.PRIVATE_LIMITED,
+    enum: ForProfitType,
+    default: ForProfitType.YES,
+    nullable: true,
   })
-  companyType!: CompanyType;
-
-  @Column({ type: 'varchar', length: 200, unique: true })
-  registrationNumber!: string;
-
-  @Column({ type: 'varchar', length: 4, nullable: true })
-  yearEstablished!: string;
+  forProfit?: ForProfitType;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  website!: string;
+  forProfitOther?: string;
 
-  // Primary Contact Information
+  // Business in Africa
+  @Column({
+    type: 'enum',
+    enum: BusinessInAfricaType,
+    default: BusinessInAfricaType.YES,
+    nullable: true,
+  })
+  businessInAfrica?: BusinessInAfricaType;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
-  primaryContactName!: string;
+  businessInAfricaOther?: string;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  primaryContactTitle!: string;
-
-  @Column({ type: 'varchar', length: 255, unique: true })
-  primaryContactEmail!: string;
-
-  @Column({ type: 'varchar', length: 200, nullable: true })
-  primaryContactPhone!: string;
-
-  // Company Address
   @Column({ type: 'text', nullable: true })
-  headOfficeAddress!: string;
+  countriesOfBusiness?: string;
 
-  @Column({ type: 'varchar', length: 200, nullable: true })
-  city!: string;
+  // Business Languages (Array stored as JSON)
+  @Column({ type: 'simple-json', nullable: true })
+  businessLanguages?: string[];
 
-  @Column({ type: 'varchar', length: 200, nullable: true })
-  state!: string;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  businessLanguageOther?: string;
 
-  @Column({ type: 'varchar', length: 200, nullable: true })
-  country!: string;
+  // Business Category
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  businessCategory?: string;
 
-  @Column({ type: 'varchar', length: 200, nullable: true })
-  postalCode!: string;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  businessCategoryOther?: string;
 
-  @Column({ type: 'varchar', nullable: true })
-  resetPasswordToken?: string;
+  @Column({ type: 'text', nullable: true })
+  businessDescription?: string;
 
-  @Column({ type: 'timestamp', nullable: true })
-  resetPasswordExpires?: Date;
+  @Column({ type: 'text', nullable: true })
+  servicesNeeded?: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  annualTurnover?: string;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+    nullable: true,
+    transformer: booleanTransformer,
+  })
+  shareFinancials?: boolean;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+    nullable: true,
+    transformer: booleanTransformer,
+  })
+  criminalLitigation?: boolean;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+    nullable: true,
+    transformer: booleanTransformer,
+  })
+  civilLitigation?: boolean;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+    nullable: true,
+    transformer: booleanTransformer,
+  })
+  deniedMembership?: boolean;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+    nullable: true,
+    transformer: booleanTransformer,
+  })
+  acknowledgeProcess?: boolean;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+    nullable: true,
+    transformer: booleanTransformer,
+  })
+  dataSharing?: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  signature?: string;
 
   // AMDA Membership Details
   @Column({
@@ -167,57 +282,21 @@ export class Member {
   })
   membershipStatus!: MembershipStatus;
 
-  @Column({ type: 'varchar', length: 200, nullable: true })
-  annualDues!: string;
-
-  @Column({ type: 'varchar', length: 200, nullable: true })
-  countriesOfOperation!: string;
-
-  // Business Information
-  @Column({
-    type: 'enum',
-    enum: BusinessModel,
-    default: BusinessModel.UTILITY,
-  })
-  businessModel!: BusinessModel;
-
-  @Column({ type: 'text', nullable: true })
-  targetMarkets!: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  primaryTechnology!: string;
-
-  @Column({ type: 'varchar', length: 200, nullable: true })
-  minigridCount!: string;
-
-  @Column({ type: 'varchar', length: 200, nullable: true })
-  totalCapacityInstalled!: string;
-
-  @Column({ type: 'varchar', length: 200, nullable: true })
-  customerConnections!: string;
-
   // FIXED RELATIONSHIP: One Member can have many MinigridSites
   @OneToMany(() => MinigridSite, site => site.member, { cascade: true })
   sites!: MinigridSite[];
-
-  // Additional Information
-  @Column({ type: 'text', nullable: true })
-  companyMission!: string;
-
-  @Column({ type: 'text', nullable: true })
-  keyProjects!: string;
-
-  @Column({ type: 'text', nullable: true })
-  partnerships!: string;
-
-  @Column({ type: 'text', nullable: true })
-  certifications!: string;
 
   @CreateDateColumn()
   createdAt!: Date;
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  primaryContactEmail?: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  registrationNumber?: string;
 
   // PASSWORD HANDLING
   @BeforeInsert()
@@ -233,10 +312,6 @@ export class Member {
   }
 
   // VIRTUAL PROPERTIES
-  get companyAge(): number {
-    return new Date().getFullYear() - parseInt(this.yearEstablished);
-  }
-
   get hasWebsite(): boolean {
     return Boolean(this.website);
   }
@@ -258,7 +333,7 @@ export class Member {
   }
 
   get fullAddress(): string {
-    const parts = [this.headOfficeAddress, this.city, this.state, this.country];
+    const parts = [this.billingAddress, this.city, this.country];
     if (this.postalCode) parts.push(this.postalCode);
     return parts.filter(Boolean).join(', ');
   }
@@ -268,7 +343,7 @@ export class Member {
   }
 
   get primaryEmail(): string {
-    return this.primaryContactEmail;
+    return this.email;
   }
 
   get isEmailVerified(): boolean {
@@ -334,13 +409,10 @@ export class Member {
   updateCompanyInfo(
     data: Partial<{
       companyName: string;
-      companyType: CompanyType;
-      registrationNumber: string;
-      yearEstablished: string;
+      tradingAs: string;
       website: string;
-      headOfficeAddress: string;
+      billingAddress: string;
       city: string;
-      state: string;
       country: string;
       postalCode: string;
     }>
@@ -350,10 +422,19 @@ export class Member {
 
   updatePrimaryContact(
     data: Partial<{
-      primaryContactName: string;
-      primaryContactTitle: string;
-      primaryContactEmail: string;
-      primaryContactPhone: string;
+      contact1Name: string;
+      contact1Title: string;
+      contact1Email: string;
+      contact1Phone: string;
+      contact2Name: string;
+      contact2Title: string;
+      contact2Email: string;
+      contact2Phone: string;
+      authorizedSignatory: string;
+      billingContactName: string;
+      billingContactTitle: string;
+      billingContactEmail: string;
+      billingContactPhone: string;
     }>
   ): void {
     Object.assign(this, data);
@@ -364,8 +445,6 @@ export class Member {
       membershipType: MembershipType;
       membershipStartDate: Date;
       membershipStatus: MembershipStatus;
-      annualDues: string;
-      countriesOfOperation: string;
     }>
   ): void {
     Object.assign(this, data);
@@ -373,16 +452,25 @@ export class Member {
 
   updateBusinessInfo(
     data: Partial<{
-      businessModel: BusinessModel;
-      targetMarkets: string;
-      primaryTechnology: string;
-      minigridCount: string;
-      totalCapacityInstalled: string;
-      customerConnections: string;
-      companyMission: string;
-      keyProjects: string;
-      partnerships: string;
-      certifications: string;
+      forProfit: ForProfitType;
+      forProfitOther: string;
+      businessInAfrica: BusinessInAfricaType;
+      businessInAfricaOther: string;
+      countriesOfBusiness: string;
+      businessLanguages: string[];
+      businessLanguageOther: string;
+      businessCategory: string;
+      businessCategoryOther: string;
+      businessDescription: string;
+      servicesNeeded: string;
+      annualTurnover: string;
+      shareFinancials: boolean;
+      criminalLitigation: boolean;
+      civilLitigation: boolean;
+      deniedMembership: boolean;
+      acknowledgeProcess: boolean;
+      dataSharing: boolean;
+      signature: string;
     }>
   ): void {
     Object.assign(this, data);
