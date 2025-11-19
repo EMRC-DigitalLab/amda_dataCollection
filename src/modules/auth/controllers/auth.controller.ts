@@ -331,7 +331,6 @@ export class AuthController {
    */
   getAllMembersWithVerificationStatus = asyncHandler(
     async (req: AuthenticatedRequest, res: Response) => {
-      console.log('reaches this page');
       try {
         const adminId = req.user?.id;
         if (!adminId) {

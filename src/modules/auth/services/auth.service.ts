@@ -103,7 +103,6 @@ export class AuthService {
         throw new Error('Invalid credentials');
       }
 
-
       loginUser = {
         ...member,
         role: 'member',
@@ -136,7 +135,6 @@ export class AuthService {
     const refreshToken = jwt.sign(refreshTokenPayload, config.jwt.refreshSecret, {
       expiresIn: config.jwt.refreshExpiresIn,
     });
-
 
     return {
       accessToken,
@@ -202,7 +200,6 @@ export class AuthService {
    */
   async registerAdmin(adminData: RegisterRequest): Promise<LoginResponse> {
     const { email, phoneNumber, password, firstName, lastName } = adminData;
-
 
     // Check if email already exists
     const emailExists = await this.userRepository.emailExists(email);
@@ -320,8 +317,6 @@ export class AuthService {
     });
     console.log('User found:', !!user);
 
-
-
     // Try member if not found
     let member: Member | null = null;
     if (!user) {
@@ -329,8 +324,7 @@ export class AuthService {
       console.log('Member found:', !!member);
     }
 
-    console.log(member, "this is member")
-
+    console.log(member, 'this is member');
 
     // Don't reveal if email exists
     if (!user && !member) {
@@ -411,7 +405,7 @@ export class AuthService {
 
     // Send confirmation
     const email = user?.email || member?.primaryContactEmail;
-    console.log(email, "this is email")
+    console.log(email, 'this is email');
     if (email) {
       try {
         await NotificationHelper.sendCustomNotification(
@@ -432,7 +426,7 @@ export class AuthService {
 
         logger.info(`Password change confirmation sent to: ${email}`);
       } catch (error) {
-        console.log(error)
+        console.log(error);
         logger.error('Failed to send confirmation email:', error);
       }
     }
@@ -543,9 +537,7 @@ export class AuthService {
     }
 
     // Find the member to verify
-    const member = await this.userRepository.findOne({
-      where: { id: memberId, role: UserRole.MEMBER },
-    });
+    const member = await this.memberRepository.findById(memberId);
 
     if (!member) {
       const error: any = new Error('Member not found');
@@ -562,8 +554,7 @@ export class AuthService {
     }
 
     try {
-      // Use repository method instead of direct database queries
-      const updatedMember = await this.userRepository.updateVerificationStatus(
+      const updatedMember = await this.memberRepository.updateVerificationStatus(
         memberId,
         verifyDto.isVerified,
         verifyDto.isVerified ? adminId : undefined
@@ -699,6 +690,8 @@ export class AuthService {
       filters.country = country;
     }
 
+    const membersFromMembersDb = await this.memberRepository.findAll(true);
+
     const { users: members, total } = await this.userRepository.searchUsers(
       searchTerm,
       page,
@@ -706,10 +699,12 @@ export class AuthService {
       filters
     );
 
+    const cumulativeMembers = [...members, ...membersFromMembersDb];
+
     return {
-      members,
+      members: cumulativeMembers,
       total,
-      hasMore: (page - 1) * limit + members.length < total,
+      hasMore: (page - 1) * limit + cumulativeMembers.length < total,
     };
   }
 

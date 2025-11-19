@@ -17,16 +17,15 @@ export class MemberRepository implements IMemberRepository {
     });
   }
 
-  
   async findById(id: string): Promise<Member | null> {
     return await this.repository.findOne({
       where: { id },
     });
   }
 
-  async findByPrimaryContactEmail(email: string): Promise<Member | null> {
+  async findByemail(email: string): Promise<Member | null> {
     return await this.repository.findOne({
-      where: { primaryContactEmail: email },
+      where: { email: email },
     });
   }
 
@@ -47,7 +46,7 @@ export class MemberRepository implements IMemberRepository {
 
   async findByEmail(email: string): Promise<Member | null> {
     return await this.repository.findOne({
-      where: { primaryContactEmail: email },
+      where: { email: email },
     });
   }
 
@@ -63,7 +62,7 @@ export class MemberRepository implements IMemberRepository {
     });
   }
 
-  async create(memberData: Partial<Member>): Promise<Member> {
+  async create(memberData: Partial<IMember>): Promise<Member> {
     const member = this.repository.create(memberData);
     return await this.repository.save(member);
   }
@@ -135,7 +134,7 @@ export class MemberRepository implements IMemberRepository {
       where: [
         { companyName: ILike(`%${query}%`) },
         { primaryContactName: ILike(`%${query}%`) },
-        { primaryContactEmail: ILike(`%${query}%`) },
+        { email: ILike(`%${query}%`) },
         { city: ILike(`%${query}%`) },
         { state: ILike(`%${query}%`) },
         { country: ILike(`%${query}%`) },
@@ -163,8 +162,6 @@ export class MemberRepository implements IMemberRepository {
       totalPages: Math.ceil(total / limit),
     };
   }
-
-  
 
   async findByVerificationStatus(isVerified: boolean): Promise<Member[]> {
     return this.repository.find({
@@ -205,11 +202,82 @@ export class MemberRepository implements IMemberRepository {
 
     if (filters.search) {
       queryBuilder.andWhere(
-        '(member.companyName ILIKE :search OR member.primaryContactName ILIKE :search OR member.primaryContactEmail ILIKE :search)',
+        '(member.companyName ILIKE :search OR member.primaryContactName ILIKE :search OR member.email ILIKE :search)',
         { search: `%${filters.search}%` }
       );
     }
 
     return queryBuilder.orderBy('member.createdAt', 'DESC').getMany();
+  }
+
+  async findMembersWithSites(filters: {
+    status?: MembershipStatus;
+    country?: string;
+    membershipType?: string;
+    isVerified?: boolean;
+  }): Promise<Member[]> {
+    const queryBuilder = this.repository
+      .createQueryBuilder('member')
+      .leftJoinAndSelect('member.sites', 'sites')
+      .orderBy('member.createdAt', 'DESC')
+      .addOrderBy('sites.createdAt', 'ASC');
+
+    // Apply filters if provided
+    if (filters.status) {
+      queryBuilder.andWhere('member.membershipStatus = :status', {
+        status: filters.status,
+      });
+    }
+
+    if (filters.country) {
+      queryBuilder.andWhere('member.country ILIKE :country', {
+        country: `%${filters.country}%`,
+      });
+    }
+
+    if (filters.membershipType) {
+      queryBuilder.andWhere('member.membershipType = :membershipType', {
+        membershipType: filters.membershipType,
+      });
+    }
+
+    if (filters.isVerified !== undefined) {
+      queryBuilder.andWhere('member.isVerified = :isVerified', {
+        isVerified: filters.isVerified,
+      });
+    }
+
+    return await queryBuilder.getMany();
+  }
+
+  async getExportStats(): Promise<{
+    totalMembers: number;
+    totalSites: number;
+    verifiedMembers: number;
+    activeMembers: number;
+  }> {
+    const totalMembers = await this.repository.count();
+
+    const verifiedMembers = await this.repository.count({
+      where: { isVerified: true },
+    });
+
+    const activeMembers = await this.repository.count({
+      where: { membershipStatus: MembershipStatus.ACTIVE },
+    });
+
+    // Count total sites across all members
+    const sitesCount = await this.repository
+      .createQueryBuilder('member')
+      .leftJoin('member.sites', 'sites')
+      .select('COUNT(sites.id)', 'count')
+      .getRawOne();
+
+    return {
+      totalMembers,
+      totalSites: parseInt(sitesCount?.count || '0'),
+      verifiedMembers,
+      activeMembers,
+    };
   }
 }
