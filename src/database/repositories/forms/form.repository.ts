@@ -1161,7 +1161,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     }
   }
 
-  async getFormSubmissions(
+ async getFormSubmissions(
     formId: string,
     filters?: Record<string, any>,
     pagination?: { page: number; limit: number },
@@ -1175,8 +1175,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
 
     let sql: string;
 
-    console.log(populate, formId);
-
     if (populate) {
       // SQL with JOINs to populate related data
       sql = `
@@ -1189,6 +1187,19 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
           f.description as form_description,
           f.status as form_status,
           f."admin_id" as form_admin_id,
+          f."formTypeId" as form_form_type_id,
+          -- Form Type data
+          ft.id as form_type_id,
+          ft.name as form_type_name,
+          ft.slug as form_type_slug,
+          ft.description as form_type_description,
+          ft.year as form_type_year,
+          ft.status as form_type_status,
+          ft.color as form_type_color,
+          ft.icon as form_type_icon,
+          ft."sortOrder" as form_type_sort_order,
+          ft."isPublic" as form_type_is_public,
+          ft."isDefault" as form_type_is_default,
           -- User data (submitted_by)
           u.id as submitted_by_id,
           u."companyName" as submitted_by_name,
@@ -1205,6 +1216,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
           ms."siteId" as site_id
         FROM "${tableName}" s
         LEFT JOIN forms f ON s.form_id = f.id
+        LEFT JOIN form_types ft ON f."formTypeId" = ft.id
         LEFT JOIN members u ON s.submitted_by = u.id
         LEFT JOIN users admin ON f."admin_id" = admin.id
         LEFT JOIN minigrid_sites ms ON s."minigrid_siteId" = ms.id
@@ -1225,7 +1237,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         const columnName = key;
 
         if (populate) {
-          // When populating, prefix with table aliasd
+          // When populating, prefix with table alias
           sql += ` AND s."${columnName}" = $${paramIndex}`;
         } else {
           sql += ` AND "${columnName}" = $${paramIndex}`;
@@ -1260,6 +1272,10 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         submitted_by: row.submitted_by,
         submitted_at: row.submitted_at,
         status: row.status,
+        admin_status: row.admin_status,
+        admin_comment: row.admin_comment,
+        reviewed_by: row.reviewed_by,
+        reviewed_at: row.reviewed_at,
         created_at: row.created_at,
         updated_at: row.updated_at,
 
@@ -1273,9 +1289,9 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
               title: row.form_title,
               slug: row.form_slug,
               description: row.form_description,
-              formType: row.form_type,
               status: row.form_status,
               adminId: row.form_admin_id,
+              formTypeId: row.form_form_type_id,
               admin: row.admin_user_id
                 ? {
                     id: row.admin_user_id,
@@ -1283,6 +1299,22 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
                     firstName: row.admin_first_name,
                     lastName: row.admin_last_name,
                     fullName: `${row.admin_first_name || ''} ${row.admin_last_name || ''}`.trim(),
+                  }
+                : null,
+              // Nested formType data
+              formType: row.form_type_id
+                ? {
+                    id: row.form_type_id,
+                    name: row.form_type_name,
+                    slug: row.form_type_slug,
+                    description: row.form_type_description,
+                    year: row.form_type_year,
+                    status: row.form_type_status,
+                    color: row.form_type_color,
+                    icon: row.form_type_icon,
+                    sortOrder: row.form_type_sort_order,
+                    isPublic: row.form_type_is_public,
+                    isDefault: row.form_type_is_default,
                   }
                 : null,
             }
