@@ -129,6 +129,7 @@ export interface IMemberRepository {
   findByCompanyName(companyName: string): Promise<Member | null>;
   findByMemberId(memberId: string): Promise<Member | null>;
   findByEmail(email: string): Promise<Member | null>;
+  findByPrimaryContactEmail(email: string): Promise<Member | null>;
   findByRegistrationNumber(registrationNumber: string): Promise<Member | null>;
   create(memberData: Partial<IMember>): Promise<Member>;
   update(id: string, memberData: Partial<IMember>): Promise<Member | null>;
@@ -136,10 +137,15 @@ export interface IMemberRepository {
   findByMembershipStatus(status: MembershipStatus): Promise<Member[]>;
   findByCountry(country: string): Promise<Member[]>;
   searchMembers(query: string): Promise<Member[]>;
-
+  updateLastLogin(memberId: string): Promise<void | any>;
+  findByVerificationStatus(isVerified: boolean): Promise<Member[]>;
+  verifyMember(memberId: string, adminId?: string): Promise<Member>;
+  unverifyMember(memberId: string): Promise<Member>;
   findWithPagination(
-    page: number,
-    limit: number
+    page?: number,
+    limit?: number,
+    sortBy?: string,
+    sortOrder?: 'ASC' | 'DESC'
   ): Promise<{
     members: Member[];
     total: number;
@@ -150,6 +156,7 @@ export interface IMemberRepository {
     country?: string;
     membershipType?: string;
     search?: string;
+    isVerified?: boolean;
   }): Promise<Member[]>;
 }
 
