@@ -34,7 +34,7 @@ export class MemberProcessor {
       }
 
       // Check by email
-      member = await this.memberRepository.findByEmail(memberData.primaryContactEmail);
+      member = await this.memberRepository.findByEmail(memberData.email);
 
       if (member) {
         logger.info(`Member found by email: ${member.companyName} (ID: ${member.id})`);
@@ -63,39 +63,29 @@ export class MemberProcessor {
    * Generate member data with simulated values for missing fields
    */
   private generateMemberData(companyName: string): MemberCreationData {
-    // Simulate email from company name
     const emailSlug = companyName
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '')
       .substring(0, 20);
 
-    const primaryContactEmail = `contact@${emailSlug}.com`;
-
-    // Simulate contact name from company name
-    const primaryContactName = `${companyName} Representative`;
-
-    // Simulate phone
-    const primaryContactPhone = `+1-${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 9000 + 1000)}`;
-
-    // Generate unique registration number
+    const email = `contact@${emailSlug}.com`;
     const registrationNumber = `REG-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-    // Extract country if possible (default to Tanzania)
     const country = this.extractCountryFromName(companyName) || 'Tanzania';
 
     return {
       companyName,
-      primaryContactEmail,
-      primaryContactName,
-      primaryContactPhone,
-      primaryContactTitle: DEFAULT_MEMBER_DATA.primaryContactTitle,
+      email,
       registrationNumber,
-      yearEstablished: DEFAULT_MEMBER_DATA.yearEstablished,
+      membershipType: DEFAULT_MEMBER_DATA.membershipType,
+      billingAddress: DEFAULT_MEMBER_DATA.billingAddress,
+      city: DEFAULT_MEMBER_DATA.city,
       country,
-      headOfficeAddress: DEFAULT_MEMBER_DATA.headOfficeAddress,
-      companyType: DEFAULT_MEMBER_DATA.companyType as any,
-      businessModel: DEFAULT_MEMBER_DATA.businessModel as any,
-      membershipType: DEFAULT_MEMBER_DATA.membershipType as any,
+      postalCode: DEFAULT_MEMBER_DATA.postalCode,
+      website: DEFAULT_MEMBER_DATA.website,
+      contact1Name: `${companyName} Representative`,
+      contact1Title: DEFAULT_MEMBER_DATA.contact1Title,
+      contact1Email: email,
+      contact1Phone: `+1-${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 9000 + 1000)}`,
     };
   }
 

@@ -72,8 +72,11 @@ export class FormTypeProcessor {
 
       // Check if slug exists (to avoid conflicts)
       const existingSlug = await this.formTypeRepository.findBySlug(slug);
-      if (existingSlug && existingSlug.year === year) {
-        // If slug exists for same year, append year to make unique
+      if (existingSlug) {
+        if (existingSlug.year === year) {
+          logger.info(`Form type already exists with this slug for year ${year}, using existing`);
+          return existingSlug;
+        }
         slug = `${slug}-${year}`;
         logger.warn(`Slug conflict detected, using: ${slug}`);
       }

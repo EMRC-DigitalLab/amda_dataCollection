@@ -27,43 +27,38 @@ export class SubmissionProcessor {
     logger.debug(`Processing submission for site: ${site.name}`);
 
     try {
-      // Check if submission already exists
       const existingSubmission = await this.formRepository.getSubmissionByMinigridSiteId(
         form.id,
         site.id
       );
 
+      // Clean data
+      const cleanedData = this.cleanSubmissionData(siteRow.data, form);
+
       if (existingSubmission) {
         logger.debug(`Submission already exists for site: ${site.name}, updating...`);
-
-        // Update existing submission
         const updatedSubmission = await this.formRepository.updateSubmission(
           form.id,
           existingSubmission.id,
           {
-            ...siteRow.data,
+            ...cleanedData,
             minigrid_siteId: site.id,
           }
         );
-
-        logger.debug(`Submission updated for site: ${site.name}`);
         return updatedSubmission;
       }
 
-      // Create new submission
       logger.debug(`Creating new submission for site: ${site.name}`);
-
       const submission = await this.formRepository.submitFormData(
         form.id,
         {
-          ...siteRow.data,
+          ...cleanedData,
           minigrid_siteId: site.id,
         },
         member.id
       );
 
       logger.success(`Submission created for site: ${site.name} (ID: ${submission.id})`);
-
       return submission;
     } catch (error: any) {
       logger.error(`Failed to process submission for site: ${site.name}`, {
@@ -76,6 +71,37 @@ export class SubmissionProcessor {
       });
       throw error;
     }
+  }
+
+  private cleanSubmissionData(data: Record<string, any>, form: Form): Record<string, any> {
+    const cleaned: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(data)) {
+      if (value === null || value === undefined || value === '') {
+        cleaned[key] = null;
+        continue;
+      }
+
+      // Find question type
+      let questionType = 'text';
+      for (const cat of form.categories) {
+        for (const q of cat.questions) {
+          if (q.slug === key) {
+            questionType = q.type;
+            break;
+          }
+        }
+      }
+
+      // Clean based on type
+      if (questionType === 'number' || questionType === 'currency') {
+        cleaned[key] = String(value).replace(/[^0-9.-]/g, ''); // Remove commas, letters, etc
+      } else {
+        cleaned[key] = value;
+      }
+    }
+
+    return cleaned;
   }
 
   /**

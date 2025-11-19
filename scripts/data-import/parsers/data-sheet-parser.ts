@@ -123,8 +123,9 @@ export function parseDataSheet(
  */
 function groupIntoCategories(columnMappings: ColumnMapping[]): CategoryData[] {
   const categoryMap = new Map<string, CategoryData>();
+  const usedSlugs = new Set<string>();
 
-  columnMappings.forEach((mapping, _index_) => {
+  columnMappings.forEach((mapping, _index) => {
     const categoryName = mapping.category;
 
     if (!categoryMap.has(categoryName)) {
@@ -138,9 +139,18 @@ function groupIntoCategories(columnMappings: ColumnMapping[]): CategoryData[] {
 
     const category = categoryMap.get(categoryName)!;
 
+    // Make slug unique
+    let slug = mapping.slug;
+    let counter = 1;
+    while (usedSlugs.has(slug)) {
+      slug = `${mapping.slug}${counter}`;
+      counter++;
+    }
+    usedSlugs.add(slug);
+
     const question: QuestionData = {
       kpi: mapping.kpi,
-      slug: mapping.slug,
+      slug: slug,
       description: mapping.description,
       type: mapping.type,
       units: mapping.units,

@@ -28,21 +28,15 @@ export const EXCEL_CONFIG = {
  * Default member data for simulation
  */
 export const DEFAULT_MEMBER_DATA = {
-  primaryContactTitle: 'Chief Executive Officer',
-  yearEstablished: '2015',
-  headOfficeAddress: '123 Main Street, Business District',
-  companyType: 'PRIVATE_LIMITED',
-  businessModel: 'UTILITY',
-  membershipType: 'FULL_MEMBER',
-  website: '',
+  membershipType: 'FULL',
+  billingAddress: '123 Main Street, Business District',
   city: '',
-  state: '',
+  country: 'Tanzania',
   postalCode: '',
-  countriesOfOperation: '',
-  primaryTechnology: 'Solar Hybrid',
-  minigridCount: '0',
-  totalCapacityInstalled: '0',
-  customerConnections: '0',
+  website: '',
+  contact1Title: 'Chief Executive Officer',
+  forProfit: 'Yes',
+  businessInAfrica: 'Yes',
 };
 
 /**

@@ -76,17 +76,18 @@ export interface SiteDataRow {
  */
 export interface MemberCreationData {
   companyName: string;
-  primaryContactEmail: string;
-  primaryContactName: string;
-  primaryContactPhone: string;
-  primaryContactTitle: string;
+  email: string;
   registrationNumber: string;
-  yearEstablished: string;
-  country: string;
-  headOfficeAddress: string;
-  companyType: string;
-  businessModel: string;
   membershipType: string;
+  billingAddress?: string;
+  city?: string;
+  country?: string;
+  postalCode?: string;
+  website?: string;
+  contact1Name?: string;
+  contact1Title?: string;
+  contact1Email?: string;
+  contact1Phone?: string;
 }
 
 /**
