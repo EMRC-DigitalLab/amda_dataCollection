@@ -434,7 +434,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     if (!form?.tableName) throw new Error('Form table not found');
 
     const tableName = form.tableName;
-    const sql = `SELECT * FROM "${tableName}" WHERE form_id = $1 AND minigrid_siteId = $2`;
+    const sql = `SELECT * FROM "${tableName}" WHERE form_id = $1 AND "minigrid_siteId" = $2`;
     const result = await this.dataSource.query(sql, [formId, siteId]);
 
     return result.length > 0 ? result[0] : null;
@@ -1161,7 +1161,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     }
   }
 
- async getFormSubmissions(
+  async getFormSubmissions(
     formId: string,
     filters?: Record<string, any>,
     pagination?: { page: number; limit: number },
@@ -1383,20 +1383,42 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     let sql = `CREATE TABLE "${tableName}" (\n`;
     sql += `  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`;
     sql += `  "form_id" UUID NOT NULL REFERENCES forms(id) ON DELETE CASCADE,\n`;
-    sql += `  "submitted_by" UUID REFERENCES members(id) ON DELETE SET NULL,\n`; // Members submit forms
+    sql += `  "submitted_by" UUID REFERENCES members(id) ON DELETE SET NULL,\n`;
     sql += `  "minigrid_siteId" UUID REFERENCES minigrid_sites(id) ON DELETE SET NULL,\n`;
     sql += `  "submitted_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n`;
     sql += `  "status" VARCHAR(20) DEFAULT 'SUBMITTED',\n`;
 
     sql += `  "admin_status" VARCHAR(20) DEFAULT 'PENDING' CHECK (admin_status IN ('PENDING', 'APPROVED', 'REJECTED')),\n`;
     sql += `  "admin_comment" TEXT NULL,\n`;
-    sql += `  "reviewed_by" UUID REFERENCES users(id) ON DELETE SET NULL,\n`; // Admins (users) review forms
+    sql += `  "reviewed_by" UUID REFERENCES users(id) ON DELETE SET NULL,\n`;
     sql += `  "reviewed_at" TIMESTAMP NULL,\n`;
+
+    // Reserved column names
+    const reservedColumns = [
+      'id',
+      'form_id',
+      'submitted_by',
+      'minigrid_siteId',
+      'submitted_at',
+      'status',
+      'admin_status',
+      'admin_comment',
+      'reviewed_by',
+      'reviewed_at',
+      'created_at',
+      'updated_at',
+    ];
 
     // Add columns for each question
     for (const category of form.categories) {
       for (const question of category.questions) {
         const columnName = question.slug;
+
+        // Skip reserved column names
+        if (reservedColumns.includes(columnName)) {
+          continue;
+        }
+
         const columnType = this.getPostgreSQLType(question.type);
         const nullable = question.required ? 'NOT NULL' : 'NULL';
 
