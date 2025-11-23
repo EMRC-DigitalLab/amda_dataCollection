@@ -1,5 +1,3 @@
-// src/shared/services/cache.service.ts
-
 import { redisClient } from '../../config';
 
 export interface CacheOptions {
@@ -18,6 +16,10 @@ export class CacheService {
   private readonly defaultTTL = 3600; // 1 hour
   private readonly defaultPrefix = 'app';
 
+  private static readonly CACHE_KEYS = {
+    DASHBOARD_OVERVIEW: (filters: string) => `dashboard:overview:${filters}`,
+    FORM_STATS: (formId: string) => `form:stats:${formId}`,
+  };
   private constructor() {}
 
   static getInstance(): CacheService {
@@ -316,6 +318,38 @@ export class CacheService {
     } catch (error) {
       console.error('Cache STATS error:', error);
       return null;
+    }
+  }
+
+  static async getCachedDashboard(filters: any, fetchFn: () => Promise<any>): Promise<any> {
+    const cacheKey = this.CACHE_KEYS.DASHBOARD_OVERVIEW(JSON.stringify(filters || {}));
+
+    try {
+      // Try to get from cache
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+
+      // Cache miss - fetch fresh data
+      const data = await fetchFn();
+
+      // Cache for 5 minutes (dashboard data changes frequently)
+      await redisClient.setEx(cacheKey, 300, JSON.stringify(data));
+
+      return data;
+    } catch (error) {
+      console.error('Cache error:', error);
+      // Fallback to direct query if Redis fails
+      return fetchFn();
+    }
+  }
+
+  static async invalidateDashboardCache(): Promise<void> {
+    const pattern = 'dashboard:overview:*';
+    const keys = await redisClient.keys(pattern);
+    if (keys.length > 0) {
+      await redisClient.del(keys);
     }
   }
 }

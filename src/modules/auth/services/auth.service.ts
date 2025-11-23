@@ -60,6 +60,8 @@ export class AuthService {
       member = await this.memberRepository.findByEmail(email);
     }
 
+    console.log(member, 'this is member');
+
     // If still no user/member found, throw error
     if (!user && !member) {
       throw new Error('Invalid credentials');

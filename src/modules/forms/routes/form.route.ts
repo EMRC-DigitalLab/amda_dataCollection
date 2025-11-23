@@ -5,9 +5,9 @@ import { adminMiddleware } from '@/shared/middleware/admin.middleware';
 import { authMiddleware } from '@/shared/middleware/auth.middleware';
 import { Router } from 'express';
 import { DataSource } from 'typeorm';
+import { FormRepository } from '../../../database/repositories/forms/form.repository';
 import { FormController } from '../controllers/form.controller';
 import { FormNotificationService } from '../services/form-notification.service';
-import { FormRepository } from '../../../database/repositories/forms/form.repository';
 import { FormService } from '../services/form.service';
 
 // // Global WebSocket service reference
@@ -20,11 +20,6 @@ export function createFormRoutes(dataSource: DataSource): Router {
 
   const formRepository = new FormRepository(dataSource);
   const webSocketService = (global as any).webSocketService;
-
-  // ADD THIS DEBUG
-  console.log('=== FORM ROUTES INIT ===');
-  console.log('WebSocket service available:', !!webSocketService);
-  console.log('========================');
 
   const formNotificationService = new FormNotificationService(webSocketService);
   const formService = new FormService(formRepository, formNotificationService);
@@ -180,6 +175,11 @@ export function createFormRoutes(dataSource: DataSource): Router {
   // Get user's own submissions
   router.get('/:id/my-submissions', authMiddleware, formController.getMySubmissions);
 
+  router.get(
+    '/member/submissions/overview',
+    authMiddleware,
+    formController.getMemberSubmissionsOverview
+  );
   // Update user's own submission (if allowed)
   router.put('/:id/submissions/:submissionId', authMiddleware, formController.updateMySubmission);
 
@@ -207,7 +207,6 @@ export function createFormRoutes(dataSource: DataSource): Router {
   router.get(
     '/:id/submissions-site/:siteId',
     authMiddleware,
-    adminMiddleware,
     formController.getSubmissionByMinigridSiteId
   );
 
@@ -257,7 +256,7 @@ export function createFormRoutes(dataSource: DataSource): Router {
     formController.getAllSubmissionsByFormType
   );
 
-  // Export all submissions from all forms as CSV/Excel
+  // Export all submissions from all forms as CSV/Excelr
   router.get(
     '/all/submissions/export',
     authMiddleware,
@@ -299,6 +298,68 @@ export function createFormRoutes(dataSource: DataSource): Router {
   // Get submission statistics
   router.get('/:id/stats', authMiddleware, adminMiddleware, formController.getSubmissionStats);
 
+  router.get(
+    '/admin/dashboard/overview',
+    // authMiddleware,
+    // adminMiddleware,
+    formController.getAdminDashboardOverview
+  );
+
+  router.get(
+    '/admin/dashboard/quick-stats',
+    authMiddleware,
+    adminMiddleware,
+    formController.getAdminQuickStats
+  );
+
+  router.get(
+    '/admin/dashboard/analytics/:metric',
+    authMiddleware,
+    adminMiddleware,
+    formController.getDetailedAnalytics
+  );
+
+  router.get(
+    '/admin/dashboard/alerts',
+    authMiddleware,
+    adminMiddleware,
+    formController.getAdminAlerts
+  );
+
+  router.get(
+    '/admin/dashboard/recommendations',
+    authMiddleware,
+    adminMiddleware,
+    formController.getAdminRecommendations
+  );
+
+  router.get(
+    '/admin/dashboard/export',
+    authMiddleware,
+    adminMiddleware,
+    formController.exportDashboardData
+  );
+
+  router.get(
+    '/admin/dashboard/live-updates',
+    authMiddleware,
+    adminMiddleware,
+    formController.getLiveDashboardUpdates
+  );
+
+  router.get(
+    '/admin/dashboard/form-types/:formTypeId',
+    authMiddleware,
+    adminMiddleware,
+    formController.getFormTypeBreakdown
+  );
+
+  router.get(
+    '/admin/dashboard/comparison',
+    authMiddleware,
+    adminMiddleware,
+    formController.getTimeComparison
+  );
   /* ============================================================================ */
   /* Form Template & Versioning Routes                                           */
   /* ============================================================================ */

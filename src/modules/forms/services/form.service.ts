@@ -346,12 +346,8 @@ export class FormService {
     }
   }
 
-  // ... rest of your existing methods remain the same ...
-
   async getUserSubmission(formId: string, minigrid_siteId?: string): Promise<any | null> {
     if (!minigrid_siteId) return null;
-
-    console.log(minigrid_siteId);
 
     const submissions = await this.repo.getFormSubmissions(
       formId,
@@ -432,6 +428,530 @@ export class FormService {
 
     // Update submission through repository
     return this.repo.updateSubmission(formId, submissionId, updatedSubmission);
+  }
+
+  async getMemberSubmissionsOverview(memberId: string): Promise<{
+    totalSubmissions: number;
+    submissionsByFormType: {
+      formType: {
+        id: string;
+        name: string;
+        slug: string;
+        color?: string;
+        icon?: string;
+      };
+      submissionCount: number;
+      minigridSites: {
+        siteId: string;
+        siteName: string;
+        forms: {
+          formId: string;
+          formTitle: string;
+          formSlug: string;
+          submissionId: string;
+          submittedAt: Date;
+          status: string;
+          formStructure: any;
+        }[];
+      }[];
+    }[];
+  }> {
+    // Get all published forms that the member has submitted to
+    const submissions = await this.repo.getMemberAllSubmissions(memberId);
+
+    // Group submissions by form type
+    const groupedByFormType = new Map();
+
+    for (const submission of submissions) {
+      const formType = submission.form?.formType;
+      if (!formType) continue;
+
+      const formTypeKey = formType.id;
+
+      if (!groupedByFormType.has(formTypeKey)) {
+        groupedByFormType.set(formTypeKey, {
+          formType: {
+            id: formType.id,
+            name: formType.name,
+            slug: formType.slug,
+            color: formType.color,
+            icon: formType.icon,
+          },
+          submissionCount: 0,
+          minigridSitesMap: new Map(),
+        });
+      }
+
+      const formTypeData = groupedByFormType.get(formTypeKey);
+      formTypeData.submissionCount++;
+
+      // Group by minigrid site within form type
+      const siteId = submission.minigridSite?.id || 'no-site';
+      const siteName = submission.minigridSite?.name || 'No Site';
+
+      if (!formTypeData.minigridSitesMap.has(siteId)) {
+        formTypeData.minigridSitesMap.set(siteId, {
+          siteId: submission.minigridSite?.siteId || null,
+          siteName: siteName,
+          forms: [],
+        });
+      }
+
+      console.log(submission.form, 'this is form submission');
+
+      // Add form submission to site
+      formTypeData.minigridSitesMap.get(siteId).forms.push({
+        ...submission,
+        // formStructure: this.buildRenderableStructure(submission.form),
+      });
+    }
+
+    // Convert maps to arrays
+    const submissionsByFormType = Array.from(groupedByFormType.values()).map(data => ({
+      formType: data.formType,
+      submissionCount: data.submissionCount,
+      minigridSites: Array.from(data.minigridSitesMap.values()),
+    }));
+
+    return {
+      totalSubmissions: submissions.length,
+      submissionsByFormType,
+    };
+  }
+
+  // Add this method to FormService class
+
+  /**
+   * Get comprehensive admin dashboard overview
+   * Provides complete insights into all forms, submissions, and system health
+   */
+  async getAdminDashboardOverview(filters?: {
+    dateFrom?: Date;
+    dateTo?: Date;
+    formType?: string;
+    adminId?: string;
+  }): Promise<{
+    summary: {
+      totalForms: number;
+      publishedForms: number;
+      draftForms: number;
+      archivedForms: number;
+      totalSubmissions: number;
+      pendingReviews: number;
+      approvedSubmissions: number;
+      rejectedSubmissions: number;
+      totalMembers: number;
+      activeMembersThisMonth: number;
+    };
+    formTypeBreakdown: Array<{
+      formTypeId: string;
+      formTypeName: string;
+      formTypeSlug: string;
+      totalForms: number;
+      publishedForms: number;
+      totalSubmissions: number;
+      pendingReviews: number;
+      recentActivity: Date | null;
+    }>;
+    recentActivity: {
+      recentSubmissions: Array<{
+        id: string;
+        formId: string;
+        formTitle: string;
+        formType: string;
+        submittedBy: string;
+        memberName: string;
+        submittedAt: Date;
+        status: string;
+        adminStatus: string;
+      }>;
+      recentlyPublishedForms: Array<{
+        id: string;
+        title: string;
+        formType: string;
+        publishedAt: Date;
+        submissionCount: number;
+      }>;
+      pendingReviews: Array<{
+        id: string;
+        formId: string;
+        formTitle: string;
+        formType: string;
+        submittedBy: string;
+        memberName: string;
+        submittedAt: Date;
+        waitingTime: number;
+      }>;
+    };
+    submissionTrends: {
+      daily: Array<{ date: string; count: number }>;
+      weekly: Array<{ week: string; count: number }>;
+      monthly: Array<{ month: string; count: number }>;
+    };
+    memberActivity: {
+      topSubmitters: Array<{
+        memberId: string;
+        memberName: string;
+        totalSubmissions: number;
+        formsCompleted: number;
+        lastSubmission: Date;
+      }>;
+      inactiveMembers: Array<{
+        memberId: string;
+        memberName: string;
+        lastActivity: Date | null;
+        daysInactive: number;
+      }>;
+    };
+    formPerformance: Array<{
+      formId: string;
+      formTitle: string;
+      formType: string;
+      status: string;
+      totalSubmissions: number;
+      completionRate: number;
+      averageTimeToSubmit: number;
+      lastSubmission: Date | null;
+      healthStatus: 'healthy' | 'warning' | 'critical';
+      issues: string[];
+    }>;
+    systemHealth: {
+      formsWithIssues: number;
+      orphanedSubmissions: number;
+      duplicateSubmissions: number;
+      missingTables: number;
+      schemaMismatches: number;
+    };
+    insights: {
+      alerts: Array<{
+        type: 'warning' | 'critical' | 'info';
+        title: string;
+        message: string;
+        actionRequired: boolean;
+        relatedFormId?: string;
+      }>;
+      recommendations: Array<{
+        title: string;
+        description: string;
+        priority: 'high' | 'medium' | 'low';
+        actionUrl?: string;
+      }>;
+    };
+  }> {
+    // Set default date range if not provided (last 90 days)
+    const defaultDateFrom = new Date();
+    defaultDateFrom.setDate(defaultDateFrom.getDate() - 90);
+
+    const dateFrom = filters?.dateFrom || defaultDateFrom;
+    const dateTo = filters?.dateTo || new Date();
+
+    // Get raw data from repository
+    const overviewData = await this.repo.getAdminDashboardOverview({
+      dateFrom,
+      dateTo,
+      formType: filters?.formType,
+      adminId: filters?.adminId,
+    });
+
+    // Generate insights based on the data
+    const insights = this.generateDashboardInsights(overviewData);
+
+    return {
+      ...overviewData,
+      insights,
+    };
+  }
+
+  /**
+   * Generate actionable insights from dashboard data
+   */
+  private generateDashboardInsights(data: any): {
+    alerts: Array<{
+      type: 'warning' | 'critical' | 'info';
+      title: string;
+      message: string;
+      actionRequired: boolean;
+      relatedFormId?: string;
+    }>;
+    recommendations: Array<{
+      title: string;
+      description: string;
+      priority: 'high' | 'medium' | 'low';
+      actionUrl?: string;
+    }>;
+  } {
+    const alerts: any[] = [];
+    const recommendations: any[] = [];
+
+    // CRITICAL ALERTS
+
+    // 1. High number of pending reviews
+    if (data.summary.pendingReviews > 50) {
+      alerts.push({
+        type: 'critical',
+        title: 'High Pending Review Backlog',
+        message: `${data.summary.pendingReviews} submissions are waiting for review. This may delay member operations.`,
+        actionRequired: true,
+      });
+
+      recommendations.push({
+        title: 'Review Pending Submissions',
+        description: 'Allocate time to review pending submissions to reduce backlog.',
+        priority: 'high',
+        actionUrl: '/admin/submissions?status=pending',
+      });
+    }
+
+    // 2. Forms with missing tables
+    if (data.systemHealth.missingTables > 0) {
+      alerts.push({
+        type: 'critical',
+        title: 'Forms Missing Submission Tables',
+        message: `${data.systemHealth.missingTables} published forms don't have submission tables created.`,
+        actionRequired: true,
+      });
+
+      recommendations.push({
+        title: 'Repair Form Tables',
+        description: 'Run table repair for forms missing submission tables.',
+        priority: 'high',
+        actionUrl: '/admin/forms/health',
+      });
+    }
+
+    // 3. Schema mismatches
+    if (data.systemHealth.schemaMismatches > 0) {
+      alerts.push({
+        type: 'critical',
+        title: 'Schema Mismatches Detected',
+        message: `${data.systemHealth.schemaMismatches} forms have schema mismatches between form structure and database table.`,
+        actionRequired: true,
+      });
+    }
+
+    // WARNING ALERTS
+
+    // 4. Long-waiting pending reviews
+    const longWaitingReviews = data.recentActivity.pendingReviews.filter(
+      (r: any) => r.waitingTime > 72 // More than 3 days
+    );
+
+    if (longWaitingReviews.length > 0) {
+      alerts.push({
+        type: 'warning',
+        title: 'Submissions Waiting Over 72 Hours',
+        message: `${longWaitingReviews.length} submissions have been pending review for over 3 days.`,
+        actionRequired: true,
+      });
+    }
+
+    // 5. Low member activity
+    const activityRate =
+      data.summary.totalMembers > 0
+        ? (data.summary.activeMembersThisMonth / data.summary.totalMembers) * 100
+        : 0;
+
+    if (activityRate < 30 && data.summary.totalMembers > 10) {
+      alerts.push({
+        type: 'warning',
+        title: 'Low Member Engagement',
+        message: `Only ${Math.round(activityRate)}% of members have been active this month.`,
+        actionRequired: false,
+      });
+
+      recommendations.push({
+        title: 'Increase Member Engagement',
+        description: 'Consider sending reminder emails or simplifying form submission process.',
+        priority: 'medium',
+      });
+    }
+
+    // 6. Forms with critical health status
+    const criticalForms = data.formPerformance.filter((f: any) => f.healthStatus === 'critical');
+
+    if (criticalForms.length > 0) {
+      criticalForms.forEach((form: any) => {
+        alerts.push({
+          type: 'critical',
+          title: `Form Health Critical: ${form.formTitle}`,
+          message: `Issues detected: ${form.issues.join(', ')}`,
+          actionRequired: true,
+          relatedFormId: form.formId,
+        });
+      });
+    }
+
+    // 7. Forms with no submissions
+    const formsWithoutSubmissions = data.formPerformance.filter(
+      (f: any) => f.totalSubmissions === 0 && f.status === 'PUBLISHED'
+    );
+
+    if (formsWithoutSubmissions.length > 0) {
+      alerts.push({
+        type: 'info',
+        title: 'Published Forms Without Submissions',
+        message: `${formsWithoutSubmissions.length} published forms haven't received any submissions yet.`,
+        actionRequired: false,
+      });
+
+      recommendations.push({
+        title: 'Promote New Forms',
+        description: 'Notify members about newly published forms to increase adoption.',
+        priority: 'low',
+      });
+    }
+
+    // RECOMMENDATIONS
+
+    // 8. Draft forms recommendation
+    if (data.summary.draftForms > data.summary.publishedForms) {
+      recommendations.push({
+        title: 'Review Draft Forms',
+        description: `You have ${data.summary.draftForms} draft forms. Consider publishing or archiving them.`,
+        priority: 'low',
+        actionUrl: '/admin/forms?status=draft',
+      });
+    }
+
+    // 9. Trending submissions
+    if (data.submissionTrends.weekly.length > 0) {
+      const recentWeeks = data.submissionTrends.weekly.slice(-2);
+      if (recentWeeks.length === 2) {
+        const growthRate =
+          ((recentWeeks[1].count - recentWeeks[0].count) / recentWeeks[0].count) * 100;
+
+        if (growthRate > 50) {
+          alerts.push({
+            type: 'info',
+            title: 'Submission Volume Increasing',
+            message: `Submissions increased by ${Math.round(growthRate)}% this week. Ensure adequate review capacity.`,
+            actionRequired: false,
+          });
+        } else if (growthRate < -30) {
+          alerts.push({
+            type: 'warning',
+            title: 'Submission Volume Declining',
+            message: `Submissions decreased by ${Math.round(Math.abs(growthRate))}% this week.`,
+            actionRequired: false,
+          });
+
+          recommendations.push({
+            title: 'Investigate Submission Decline',
+            description: 'Check if members are facing issues with form submission.',
+            priority: 'medium',
+          });
+        }
+      }
+    }
+
+    // 10. System health recommendations
+    if (data.systemHealth.formsWithIssues > 0) {
+      recommendations.push({
+        title: 'Schedule System Maintenance',
+        description: `${data.systemHealth.formsWithIssues} forms need attention. Run health checks and repairs.`,
+        priority: 'medium',
+        actionUrl: '/admin/system/health',
+      });
+    }
+
+    // Sort alerts by type priority
+    const alertPriority = { critical: 0, warning: 1, info: 2 };
+    alerts.sort((a, b) => alertPriority[a.type] - alertPriority[b.type]);
+
+    // Sort recommendations by priority
+    const recPriority = { high: 0, medium: 1, low: 2 };
+    recommendations.sort((a, b) => recPriority[a.priority] - recPriority[b.priority]);
+
+    return { alerts, recommendations };
+  }
+
+  /**
+   * Get quick stats for admin dashboard widgets
+   */
+  async getAdminQuickStats(): Promise<{
+    todaySubmissions: number;
+    weekSubmissions: number;
+    monthSubmissions: number;
+    pendingReviews: number;
+    avgReviewTime: number; // hours
+    activeMembers: number;
+    systemHealthScore: number; // 0-100
+  }> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - 7);
+
+    const monthStart = new Date();
+    monthStart.setMonth(monthStart.getMonth() - 1);
+
+    // Get all published forms
+    const [forms] = await this.repo.findAllForms({ status: FormStatus.PUBLISHED });
+    const formsWithTables = forms.filter(f => f.tableCreated && f.tableName);
+
+    let todaySubmissions = 0;
+    let weekSubmissions = 0;
+    let monthSubmissions = 0;
+    let pendingReviews = 0;
+    let totalReviewTime = 0;
+    let reviewedCount = 0;
+    const activeMembers = new Set<string>();
+
+    for (const form of formsWithTables) {
+      try {
+        const statsQuery = `
+        SELECT 
+          COUNT(*) FILTER (WHERE submitted_at >= $1) as today_count,
+          COUNT(*) FILTER (WHERE submitted_at >= $2) as week_count,
+          COUNT(*) FILTER (WHERE submitted_at >= $3) as month_count,
+          COUNT(*) FILTER (WHERE admin_status = 'PENDING') as pending_count,
+          AVG(EXTRACT(EPOCH FROM (reviewed_at - submitted_at)) / 3600) FILTER (WHERE reviewed_at IS NOT NULL) as avg_review_hours,
+          COUNT(DISTINCT submitted_by) FILTER (WHERE submitted_at >= $2) as active_members
+        FROM "${form.tableName}"
+      `;
+
+        const stats = await this.repo.dataSource.query(statsQuery, [today, weekStart, monthStart]);
+
+        if (stats[0]) {
+          todaySubmissions += parseInt(stats[0].today_count || 0);
+          weekSubmissions += parseInt(stats[0].week_count || 0);
+          monthSubmissions += parseInt(stats[0].month_count || 0);
+          pendingReviews += parseInt(stats[0].pending_count || 0);
+
+          if (stats[0].avg_review_hours) {
+            totalReviewTime += parseFloat(stats[0].avg_review_hours);
+            reviewedCount++;
+          }
+
+          // Get unique active members
+          const membersQuery = `
+          SELECT DISTINCT submitted_by 
+          FROM "${form.tableName}" 
+          WHERE submitted_at >= $1 AND submitted_by IS NOT NULL
+        `;
+          const members = await this.repo.dataSource.query(membersQuery, [weekStart]);
+          members.forEach((m: any) => activeMembers.add(m.submitted_by));
+        }
+      } catch (error) {
+        console.error(`Error fetching quick stats for form ${form.id}:`, error);
+      }
+    }
+
+    // Calculate system health score
+    const totalForms = forms.length;
+    const healthyForms = formsWithTables.length;
+    const healthScore = totalForms > 0 ? Math.round((healthyForms / totalForms) * 100) : 100;
+
+    return {
+      todaySubmissions,
+      weekSubmissions,
+      monthSubmissions,
+      pendingReviews,
+      avgReviewTime: reviewedCount > 0 ? Math.round(totalReviewTime / reviewedCount) : 0,
+      activeMembers: activeMembers.size,
+      systemHealthScore: healthScore,
+    };
   }
 
   // Helper methods remain the same...

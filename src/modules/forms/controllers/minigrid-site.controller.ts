@@ -108,7 +108,6 @@ export class MinigridSiteController {
   // Alternative method: Get current authenticated user's minigrid sites
   getMyMinigridSites = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      console.log(req.user, 'this is the user');
       // Assuming you have user info in req.user from auth middleware
 
       const userId = (req as any).user?.id;
@@ -118,7 +117,7 @@ export class MinigridSiteController {
       }
 
       const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 10;
+      const limit = parseInt(req.query.limit as string) || 1000000000000000;
 
       const result = await this.minigridSiteService.getMinigridSitesByUserId(userId, page, limit);
 

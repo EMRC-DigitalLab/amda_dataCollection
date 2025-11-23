@@ -16,8 +16,6 @@ export class FormTypeService {
   }
 
   async create(data: FormTypeCreateData): Promise<FormType> {
-    console.log(data, 'this is stye form tyoe');
-
     // Check for duplicate name/year combination
     const existing = await this.formTypeRepository.findByNameAndYear(data.name, data.year);
 

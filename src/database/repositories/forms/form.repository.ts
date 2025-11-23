@@ -2,6 +2,7 @@
 import { Injectable } from 'injection-js';
 import { DataSource, QueryRunner, Repository } from 'typeorm';
 
+import { redisClient } from '../../../config';
 import { IFormRepository } from '../../../modules/forms/interfaces/form.interface';
 import { CreateCategoryDto, CreateFormDto, UpdateFormDto } from '../../../shared/types/form.types';
 import { Category } from '../../entities/category.entity';
@@ -74,6 +75,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
+    console.log(changes, 'this is the uodate');
     try {
       // Update form basic info
       Object.assign(form, {
@@ -81,9 +83,20 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         slug: changes.slug ?? form.slug,
         description: changes.description ?? form.description,
         status: changes.status ?? form.status,
-        formTypeId: changes.formTypeId ?? form.formTypeId,
       });
 
+      if (changes.formTypeId !== undefined) {
+        if (changes.formTypeId === null) {
+          form.formType = null;
+          form.formTypeId = null;
+        } else {
+          // Option B: Just set the ID (works in most cases with allow-infer flag or newer TypeORM)
+          form.formTypeId = changes.formTypeId;
+
+          // Force TypeORM to recognize the change
+          form.formType = { id: changes.formTypeId } as FormType;
+        }
+      }
       await queryRunner.manager.save(Form, form);
 
       // Handle categories update if provided
@@ -265,6 +278,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
 
   // Alternative method using TypeORM's built-in groupBy (if preferred)
   async getPublishedFormTypesWithTypeORM(): Promise<{ formType: string; count: number }[]> {
+    console.log(formType, 'this is the form type');
     const result = await this.formRepository
       .createQueryBuilder('form')
       .select('form.formType', 'formType')
@@ -1159,9 +1173,48 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         }
       }
     }
+
+    return answers;
   }
 
- async getFormSubmissions(
+  async getMemberAllSubmissions(memberId: string): Promise<any[]> {
+    // Get all published forms
+    const [publishedForms] = await this.findAllForms({
+      status: FormStatus.PUBLISHED,
+    });
+
+    const allSubmissions: any[] = [];
+    // const tableName = form.tableName;
+    //     let sql = `SELECT * FROM "${tableName}" WHERE form_id = $1`;
+    //     const params = [formId];
+
+    // Query each form's submission table for this member's data
+    for (const form of publishedForms) {
+      if (!form.tableCreated || !form.tableName) continue;
+
+      try {
+        const submissions = await this.getFormSubmissions(
+          form.id,
+          { submitted_by: memberId },
+          undefined,
+          true
+        );
+
+        allSubmissions.push(...submissions);
+      } catch (error) {
+        console.error(`Error fetching submissions for form ${form.id}:`, error);
+        // Continue with other forms
+      }
+    }
+
+    // Sort by submission date (newest first)
+    allSubmissions.sort(
+      (a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
+    );
+
+    return allSubmissions;
+  }
+  async getFormSubmissions(
     formId: string,
     filters?: Record<string, any>,
     pagination?: { page: number; limit: number },
@@ -1174,66 +1227,67 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     const tableName = form.tableName;
 
     let sql: string;
+    const params: any[] = [formId];
 
     if (populate) {
-      // SQL with JOINs to populate related data
+      // Build the SELECT clause to include all question columns
+      const questionColumns = this.getQuestionColumns(form);
+
       sql = `
-        SELECT 
-          s.*,
-          -- Form data
-          f.id as form_data_id,
-          f.title as form_title,
-          f.slug as form_slug,
-          f.description as form_description,
-          f.status as form_status,
-          f."admin_id" as form_admin_id,
-          f."formTypeId" as form_form_type_id,
-          -- Form Type data
-          ft.id as form_type_id,
-          ft.name as form_type_name,
-          ft.slug as form_type_slug,
-          ft.description as form_type_description,
-          ft.year as form_type_year,
-          ft.status as form_type_status,
-          ft.color as form_type_color,
-          ft.icon as form_type_icon,
-          ft."sortOrder" as form_type_sort_order,
-          ft."isPublic" as form_type_is_public,
-          ft."isDefault" as form_type_is_default,
-          -- User data (submitted_by)
-          u.id as submitted_by_id,
-          u."companyName" as submitted_by_name,
-          u."primaryContactEmail" as submitted_by_contact_email,
-          u."memberId" as submitted_by_member_id,
-          -- Admin data (form creator)
-          admin.id as admin_user_id,
-          admin.email as admin_email,
-          admin."firstName" as admin_first_name,
-          admin."lastName" as admin_last_name,
-          -- Minigrid Site Information
-          ms.id as minigrid_site_id,
-          ms.name as minigrid_site_name,
-          ms."siteId" as site_id
-        FROM "${tableName}" s
-        LEFT JOIN forms f ON s.form_id = f.id
-        LEFT JOIN form_types ft ON f."formTypeId" = ft.id
-        LEFT JOIN members u ON s.submitted_by = u.id
-        LEFT JOIN users admin ON f."admin_id" = admin.id
-        LEFT JOIN minigrid_sites ms ON s."minigrid_siteId" = ms.id
-        WHERE s.form_id = $1
-      `;
+      SELECT 
+        s.*,
+        ${questionColumns}
+        -- Form data
+        f.id as form_data_id,
+        f.title as form_title,
+        f.slug as form_slug,
+        f.description as form_description,
+        f.status as form_status,
+        f."admin_id" as form_admin_id,
+        f."formTypeId" as form_form_type_id,
+        -- Form Type data
+        ft.id as form_type_id,
+        ft.name as form_type_name,
+        ft.slug as form_type_slug,
+        ft.description as form_type_description,
+        ft.year as form_type_year,
+        ft.status as form_type_status,
+        ft.color as form_type_color,
+        ft.icon as form_type_icon,
+        ft."sortOrder" as form_type_sort_order,
+        ft."isPublic" as form_type_is_public,
+        ft."isDefault" as form_type_is_default,
+        -- User data (submitted_by)
+        u.id as submitted_by_id,
+        u."companyName" as submitted_by_name,
+        u."primaryContactEmail" as submitted_by_contact_email,
+        u."memberId" as submitted_by_member_id,
+        -- Admin data (form creator)
+        admin.id as admin_user_id,
+        admin.email as admin_email,
+        admin."firstName" as admin_first_name,
+        admin."lastName" as admin_last_name,
+        -- Minigrid Site Information
+        ms.id as minigrid_site_id,
+        ms.name as minigrid_site_name,
+        ms."siteId" as site_id
+      FROM "${tableName}" s
+      LEFT JOIN forms f ON s.form_id = f.id
+      LEFT JOIN form_types ft ON f."formTypeId" = ft.id
+      LEFT JOIN members u ON s.submitted_by = u.id
+      LEFT JOIN users admin ON f."admin_id" = admin.id
+      LEFT JOIN minigrid_sites ms ON s."minigrid_siteId" = ms.id
+      WHERE s.form_id = $1
+    `;
     } else {
-      // Simple query without population
+      // Simple query without population - but include ALL columns
       sql = `SELECT * FROM "${tableName}" WHERE form_id = $1`;
     }
 
-    const params: any[] = [formId];
-
     // Add filters if provided
     if (filters) {
-      let paramIndex = 2;
+      let paramIndex = params.length + 1;
       for (const [key, value] of Object.entries(filters)) {
-        // Sanitize column name for security
         const columnName = key;
 
         if (populate) {
@@ -1278,6 +1332,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         reviewed_at: row.reviewed_at,
         created_at: row.created_at,
         updated_at: row.updated_at,
+        minigrid_siteId: row.minigrid_siteId,
 
         // Extract form question answers (dynamic columns)
         ...this.extractFormAnswers(row, form),
@@ -1341,7 +1396,748 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       }));
     }
 
-    return results;
+    // When not populating, still extract the answers properly
+    return results.map((row: any) => ({
+      ...row,
+      answers: this.extractFormAnswers(row, form),
+    }));
+  }
+
+  /**
+   * Fixed implementation using TypeORM instead of raw SQL
+   * This approach is cleaner and avoids column naming issues
+   */
+
+  async getAdminDashboardOverview(filters?: {
+    dateFrom?: Date;
+    dateTo?: Date;
+    formType?: string;
+    adminId?: string;
+  }): Promise<{
+    summary: {
+      totalForms: number;
+      publishedForms: number;
+      draftForms: number;
+      archivedForms: number;
+      totalSubmissions: number;
+      pendingReviews: number;
+      approvedSubmissions: number;
+      rejectedSubmissions: number;
+      totalMembers: number;
+      activeMembersThisMonth: number;
+    };
+    formTypeBreakdown: Array<{
+      formTypeId: string;
+      formTypeName: string;
+      formTypeSlug: string;
+      totalForms: number;
+      publishedForms: number;
+      totalSubmissions: number;
+      pendingReviews: number;
+      recentActivity: Date | null;
+    }>;
+    recentActivity: {
+      recentSubmissions: Array<any>;
+      recentlyPublishedForms: Array<any>;
+      pendingReviews: Array<any>;
+    };
+    submissionTrends: {
+      daily: Array<{ date: string; count: number }>;
+      weekly: Array<{ week: string; count: number }>;
+      monthly: Array<{ month: string; count: number }>;
+    };
+    memberActivity: {
+      topSubmitters: Array<any>;
+      inactiveMembers: Array<any>;
+    };
+    formPerformance: Array<any>;
+    systemHealth: {
+      formsWithIssues: number;
+      orphanedSubmissions: number;
+      duplicateSubmissions: number;
+      missingTables: number;
+      schemaMismatches: number;
+    };
+  }> {
+    // ============================================================================
+    // 1. TRY CACHE FIRST (5 minute TTL for dashboard data)
+    // ============================================================================
+    const cacheKey = `dashboard:overview:${JSON.stringify(filters || {})}`;
+
+    try {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        console.log('✅ Dashboard cache hit');
+        return JSON.parse(cached);
+      }
+    } catch (error) {
+      console.warn('⚠️ Redis cache read failed, continuing without cache:', error);
+    }
+
+    // ============================================================================
+    // 2. SETUP DATE FILTERS
+    // ============================================================================
+    const dateFrom = filters?.dateFrom || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const dateTo = filters?.dateTo || new Date();
+
+    // ============================================================================
+    // 3. PARALLEL QUERY EXECUTION - Phase 1: Base Data
+    // ============================================================================
+    const [allForms, allFormTypes] = await Promise.all([
+      // Query forms with minimal data (don't load relations yet)
+      this.createQueryBuilder('form')
+        .select([
+          'form.id',
+          'form.title',
+          'form.slug',
+          'form.status',
+          'form.tableCreated',
+          'form.tableName',
+          'form.formTypeId',
+          // 'form.publishedAt',
+          // 'form.totalViews',
+          // 'form.averageCompletionTime',
+          'form.createdAt',
+        ])
+        .leftJoin('form.formType', 'formType')
+        .addSelect(['formType.id', 'formType.name', 'formType.slug'])
+        .where(filters?.formType ? 'form.formTypeId = :formTypeId' : '1=1', {
+          formTypeId: filters?.formType,
+        })
+        .andWhere(filters?.adminId ? 'form.adminId = :adminId' : '1=1', {
+          adminId: filters?.adminId,
+        })
+        .getMany(),
+
+      // Get all form types
+      this.formTypeRepo.find({
+        select: ['id', 'name', 'slug'],
+      }),
+    ]);
+
+    // ============================================================================
+    // 4. CALCULATE FORM STATISTICS (In-Memory - Fast)
+    // ============================================================================
+    const publishedForms = allForms.filter(f => f.status === FormStatus.PUBLISHED);
+    const draftForms = allForms.filter(f => f.status === FormStatus.DRAFT);
+    const archivedForms = allForms.filter(f => f.status === FormStatus.ARCHIVED);
+    const formsWithTables = publishedForms.filter(f => f.tableCreated && f.tableName);
+
+    // ============================================================================
+    // 5. PARALLEL QUERY EXECUTION - Phase 2: Submission Data (CRITICAL OPTIMIZATION)
+    // ============================================================================
+    const submissionStatsPromises = formsWithTables.map(async form => {
+      try {
+        // Execute all queries for this form in parallel
+        const [stats, members, activeMembers] = await Promise.all([
+          // Main stats query - optimized with single pass
+          this.dataSource.query(
+            `
+          SELECT 
+            COUNT(*) as total,
+            COUNT(*) FILTER (WHERE admin_status = 'PENDING') as pending,
+            COUNT(*) FILTER (WHERE admin_status = 'APPROVED') as approved,
+            COUNT(*) FILTER (WHERE admin_status = 'REJECTED') as rejected,
+            MAX(submitted_at) as last_submission
+          FROM "${form.tableName}"
+          WHERE submitted_at BETWEEN $1 AND $2
+        `,
+            [dateFrom, dateTo]
+          ),
+
+          // Unique members in date range
+          this.dataSource.query(
+            `
+          SELECT DISTINCT submitted_by 
+          FROM "${form.tableName}"
+          WHERE submitted_by IS NOT NULL 
+            AND submitted_at BETWEEN $1 AND $2
+        `,
+            [dateFrom, dateTo]
+          ),
+
+          // Active members (last 30 days)
+          this.dataSource.query(`
+          SELECT DISTINCT submitted_by 
+          FROM "${form.tableName}"
+          WHERE submitted_by IS NOT NULL 
+            AND submitted_at >= CURRENT_DATE - INTERVAL '30 days'
+        `),
+        ]);
+
+        return {
+          form,
+          stats: stats[0],
+          members: members.map(m => m.submitted_by).filter(Boolean),
+          activeMembers: activeMembers.map(m => m.submitted_by).filter(Boolean),
+        };
+      } catch (error) {
+        console.error(`❌ Error querying form ${form.id} (${form.tableName}):`, error.message);
+        return null;
+      }
+    });
+
+    // Wait for all submission queries to complete
+    const submissionResults = (await Promise.all(submissionStatsPromises)).filter(Boolean);
+
+    // ============================================================================
+    // 6. AGGREGATE SUBMISSION STATISTICS
+    // ============================================================================
+    let totalSubmissions = 0;
+    let pendingReviews = 0;
+    let approvedSubmissions = 0;
+    let rejectedSubmissions = 0;
+    const uniqueMembers = new Set<string>();
+    const activeMembersThisMonth = new Set<string>();
+    const formTypeStats = new Map<
+      string,
+      {
+        formTypeId: string;
+        formTypeName: string;
+        formTypeSlug: string;
+        totalForms: number;
+        publishedForms: number;
+        totalSubmissions: number;
+        pendingReviews: number;
+        recentActivity: Date | null;
+      }
+    >();
+
+    // Process all submission results
+    for (const result of submissionResults) {
+      if (!result) continue;
+
+      const { form, stats, members, activeMembers } = result;
+
+      // Aggregate totals
+      const formSubmissions = parseInt(stats.total || '0');
+      const formPending = parseInt(stats.pending || '0');
+
+      totalSubmissions += formSubmissions;
+      pendingReviews += formPending;
+      approvedSubmissions += parseInt(stats.approved || '0');
+      rejectedSubmissions += parseInt(stats.rejected || '0');
+
+      // Track unique members
+      members.forEach(m => uniqueMembers.add(m));
+      activeMembers.forEach(m => activeMembersThisMonth.add(m));
+
+      // Aggregate by form type
+      const formTypeId = form.formTypeId;
+      if (formTypeId) {
+        const existing = formTypeStats.get(formTypeId) || {
+          formTypeId: formTypeId,
+          formTypeName: form.formType?.name || 'Unknown',
+          formTypeSlug: form.formType?.slug || 'unknown',
+          totalForms: 0,
+          publishedForms: 0,
+          totalSubmissions: 0,
+          pendingReviews: 0,
+          recentActivity: null as Date | null,
+        };
+
+        existing.totalSubmissions += formSubmissions;
+        existing.pendingReviews += formPending;
+        existing.totalForms += 1;
+        existing.publishedForms += 1;
+
+        if (stats.last_submission) {
+          const lastSubmission = new Date(stats.last_submission);
+          if (!existing.recentActivity || lastSubmission > existing.recentActivity) {
+            existing.recentActivity = lastSubmission;
+          }
+        }
+
+        formTypeStats.set(formTypeId, existing);
+      }
+    }
+
+    // ============================================================================
+    // 7. BUILD FORM TYPE BREAKDOWN
+    // ============================================================================
+    const formTypeResultsMap = new Map<string, any>();
+
+    // Get form counts per type (without submission data)
+    for (const form of allForms) {
+      if (!form.formTypeId) continue;
+
+      const existing = formTypeResultsMap.get(form.formTypeId) || {
+        formTypeId: form.formTypeId,
+        formTypeName: form.formType?.name || 'Unknown',
+        formTypeSlug: form.formType?.slug || 'unknown',
+        totalForms: 0,
+        publishedForms: 0,
+        recentActivity: null,
+      };
+
+      existing.totalForms += 1;
+      if (form.status === FormStatus.PUBLISHED) {
+        existing.publishedForms += 1;
+
+        if (form.publishedAt) {
+          const publishedDate = new Date(form.publishedAt);
+          if (!existing.recentActivity || publishedDate > existing.recentActivity) {
+            existing.recentActivity = publishedDate;
+          }
+        }
+      }
+
+      formTypeResultsMap.set(form.formTypeId, existing);
+    }
+
+    // Merge with submission stats - include ALL form types
+    const formTypeBreakdown = allFormTypes
+      .map(formType => {
+        const formData = formTypeResultsMap.get(formType.id);
+        const stats = formTypeStats.get(formType.id);
+
+        return {
+          formTypeId: formType.id,
+          formTypeName: formType.name,
+          formTypeSlug: formType.slug,
+          totalForms: formData?.totalForms || 0,
+          publishedForms: formData?.publishedForms || 0,
+          totalSubmissions: stats?.totalSubmissions || 0,
+          pendingReviews: stats?.pendingReviews || 0,
+          recentActivity: stats?.recentActivity || formData?.recentActivity || null,
+        };
+      })
+      .filter(ft => {
+        // If filters are applied, only show form types that match the filter
+        if (filters?.formType) {
+          return ft.formTypeId === filters.formType;
+        }
+        return true;
+      })
+      .sort((a, b) => b.totalForms - a.totalForms);
+
+    // ============================================================================
+    // 8. PARALLEL QUERY EXECUTION - Phase 3: Additional Metrics
+    // ============================================================================
+    const [
+      recentSubmissions,
+      recentlyPublishedForms,
+      pendingReviewsList,
+      submissionTrends,
+      memberActivity,
+      formPerformance,
+      systemHealth,
+    ] = await Promise.all([
+      this.getRecentSubmissionsAcrossAllForms(10, dateFrom, dateTo, formsWithTables),
+      this.getRecentlyPublishedForms(5, publishedForms),
+      this.getPendingReviewSubmissions(10, formsWithTables),
+      this.getSubmissionTrends(dateFrom, dateTo, formsWithTables),
+      this.getMemberActivityStats(dateFrom, dateTo, formsWithTables),
+      this.getFormPerformanceMetrics(filters, publishedForms),
+      this.getSystemHealthMetrics(publishedForms),
+    ]);
+
+    // ============================================================================
+    // 9. BUILD FINAL RESPONSE
+    // ============================================================================
+    const dashboardData = {
+      summary: {
+        totalForms: allForms.length,
+        publishedForms: publishedForms.length,
+        draftForms: draftForms.length,
+        archivedForms: archivedForms.length,
+        totalSubmissions,
+        pendingReviews,
+        approvedSubmissions,
+        rejectedSubmissions,
+        totalMembers: uniqueMembers.size,
+        activeMembersThisMonth: activeMembersThisMonth.size,
+      },
+      formTypeBreakdown,
+      recentActivity: {
+        recentSubmissions,
+        recentlyPublishedForms,
+        pendingReviews: pendingReviewsList,
+      },
+      submissionTrends,
+      memberActivity,
+      formPerformance,
+      systemHealth,
+    };
+
+    // ============================================================================
+    // 10. CACHE THE RESULT (5 minutes TTL)
+    // ============================================================================
+    try {
+      await redisClient.setEx(cacheKey, 300, JSON.stringify(dashboardData));
+      console.log('✅ Dashboard data cached successfully');
+    } catch (error) {
+      console.warn('⚠️ Failed to cache dashboard data:', error);
+    }
+
+    return dashboardData;
+  }
+  /**
+   * Helper: Get recent submissions across all forms
+   */
+  private async getRecentSubmissionsAcrossAllForms(
+    limit: number,
+    dateFrom: Date,
+    dateTo: Date,
+    formsWithTables: Form[]
+  ): Promise<any[]> {
+    // Query all forms in parallel
+    const submissionPromises = formsWithTables.map(async form => {
+      if (!form.tableName) return [];
+
+      try {
+        const query = `
+        SELECT 
+          s.id,
+          s.form_id,
+          s.submitted_by,
+          s.submitted_at,
+          s.status,
+          s.admin_status,
+          m."companyName" as member_name
+        FROM "${form.tableName}" s
+        LEFT JOIN members m ON s.submitted_by = m.id
+        WHERE s.submitted_at BETWEEN $1 AND $2
+        ORDER BY s.submitted_at DESC
+        LIMIT $3
+      `;
+
+        const submissions = await this.dataSource.query(query, [dateFrom, dateTo, limit]);
+
+        return submissions.map((sub: any) => ({
+          id: sub.id,
+          formId: form.id,
+          formTitle: form.title,
+          formType: form.formType?.name || 'Unknown',
+          submittedBy: sub.submitted_by,
+          memberName: sub.member_name || 'Unknown',
+          submittedAt: sub.submitted_at,
+          status: sub.status,
+          adminStatus: sub.admin_status,
+        }));
+      } catch (error) {
+        console.error(`Error fetching submissions for form ${form.id}:`, error);
+        return [];
+      }
+    });
+
+    const allSubmissions = (await Promise.all(submissionPromises)).flat();
+
+    return allSubmissions
+      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
+      .slice(0, limit);
+  }
+
+  /**
+   * Helper: Get recently published forms
+   */
+  private async getRecentlyPublishedForms(limit: number, publishedForms: Form[]): Promise<any[]> {
+    // // Sort by publishedAt in memory (faster than DB query)
+    // const sortedForms = publishedForms.sort((a, b) => new Date(b.publishedAt!).getTime() - new Date(a.publishedAt!).getTime())
+    //   .slice(0, limit);
+
+    // Get submission counts in parallel
+    const formDataPromises = publishedForms.map(async form => {
+      let submissionCount = 0;
+
+      if (form.tableCreated && form.tableName) {
+        try {
+          const countQuery = `SELECT COUNT(*) as count FROM "${form.tableName}"`;
+          const countResult = await this.dataSource.query(countQuery);
+          submissionCount = parseInt(countResult[0]?.count || '0');
+        } catch (error) {
+          console.error(`Error counting submissions for form ${form.id}:`, error);
+        }
+      }
+
+      return {
+        id: form.id,
+        title: form.title,
+        formType: form.formType?.name || 'Unknown',
+        // publishedAt: form.publishedAt,
+        submissionCount,
+      };
+    });
+
+    return Promise.all(formDataPromises);
+  }
+
+  /**
+   * Helper: Get pending review submissions
+   */
+  private async getPendingReviewSubmissions(
+    limit: number,
+    formsWithTables: Form[]
+  ): Promise<any[]> {
+    const pendingPromises = formsWithTables.map(async form => {
+      if (!form.tableName) return [];
+
+      try {
+        const query = `
+        SELECT 
+          s.id,
+          s.form_id,
+          s.submitted_by,
+          s.submitted_at,
+          m."companyName" as member_name,
+          EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - s.submitted_at)) / 3600 as waiting_hours
+        FROM "${form.tableName}" s
+        LEFT JOIN members m ON s.submitted_by = m.id
+        WHERE s.admin_status = 'PENDING'
+        ORDER BY s.submitted_at ASC
+        LIMIT $1
+      `;
+
+        const submissions = await this.dataSource.query(query, [limit]);
+
+        return submissions.map((sub: any) => ({
+          id: sub.id,
+          formId: form.id,
+          formTitle: form.title,
+          formType: form.formType?.name || 'Unknown',
+          submittedBy: sub.submitted_by,
+          memberName: sub.member_name || 'Unknown',
+          submittedAt: sub.submitted_at,
+          waitingTime: Math.round(parseFloat(sub.waiting_hours)),
+        }));
+      } catch (error) {
+        console.error(`Error fetching pending for form ${form.id}:`, error);
+        return [];
+      }
+    });
+
+    const allPending = (await Promise.all(pendingPromises)).flat();
+
+    return allPending
+      .sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime())
+      .slice(0, limit);
+  }
+
+  /**
+   * Helper: Get submission trends
+   */
+  private async getSubmissionTrends(
+    dateFrom: Date,
+    dateTo: Date,
+    formsWithTables: Form[]
+  ): Promise<{
+    daily: Array<{ date: string; count: number }>;
+    weekly: Array<{ week: string; count: number }>;
+    monthly: Array<{ month: string; count: number }>;
+  }> {
+    const dailyCounts: Record<string, number> = {};
+    const weeklyCounts: Record<string, number> = {};
+    const monthlyCounts: Record<string, number> = {};
+
+    // Query all forms in parallel
+    const trendPromises = formsWithTables.map(async form => {
+      if (!form.tableName) return { daily: {}, weekly: {}, monthly: {} };
+
+      try {
+        const query = `
+        SELECT 
+          DATE(submitted_at) as date,
+          TO_CHAR(submitted_at, 'IYYY-IW') as week,
+          TO_CHAR(submitted_at, 'YYYY-MM') as month,
+          COUNT(*) as count
+        FROM "${form.tableName}"
+        WHERE submitted_at BETWEEN $1 AND $2
+        GROUP BY DATE(submitted_at), TO_CHAR(submitted_at, 'IYYY-IW'), TO_CHAR(submitted_at, 'YYYY-MM')
+      `;
+
+        const results = await this.dataSource.query(query, [dateFrom, dateTo]);
+
+        const daily: Record<string, number> = {};
+        const weekly: Record<string, number> = {};
+        const monthly: Record<string, number> = {};
+
+        results.forEach((row: any) => {
+          const dateStr = row.date.toISOString().split('T')[0];
+          daily[dateStr] = (daily[dateStr] || 0) + parseInt(row.count);
+          weekly[row.week] = (weekly[row.week] || 0) + parseInt(row.count);
+          monthly[row.month] = (monthly[row.month] || 0) + parseInt(row.count);
+        });
+
+        return { daily, weekly, monthly };
+      } catch (error) {
+        console.error(`Error fetching trends for form ${form.id}:`, error);
+        return { daily: {}, weekly: {}, monthly: {} };
+      }
+    });
+
+    // Aggregate all results
+    const allTrends = await Promise.all(trendPromises);
+
+    allTrends.forEach(({ daily, weekly, monthly }) => {
+      Object.entries(daily).forEach(([date, count]) => {
+        dailyCounts[date] = (dailyCounts[date] || 0) + count;
+      });
+      Object.entries(weekly).forEach(([week, count]) => {
+        weeklyCounts[week] = (weeklyCounts[week] || 0) + count;
+      });
+      Object.entries(monthly).forEach(([month, count]) => {
+        monthlyCounts[month] = (monthlyCounts[month] || 0) + count;
+      });
+    });
+
+    return {
+      daily: Object.entries(dailyCounts)
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+      weekly: Object.entries(weeklyCounts)
+        .map(([week, count]) => ({ week, count }))
+        .sort((a, b) => a.week.localeCompare(b.week)),
+      monthly: Object.entries(monthlyCounts)
+        .map(([month, count]) => ({ month, count }))
+        .sort((a, b) => a.month.localeCompare(b.month)),
+    };
+  }
+
+  /**
+   * Helper: Get member activity statistics
+   */
+  private async getMemberActivityStats(
+    dateFrom: Date,
+    dateTo: Date,
+    formsWithTables: Form[]
+  ): Promise<{
+    topSubmitters: any[];
+    inactiveMembers: any[];
+  }> {
+    // Aggregate member submissions across all forms
+    const memberSubmissions = new Map<string, { count: number; lastSubmission: Date }>();
+
+    const memberPromises = formsWithTables.map(async form => {
+      if (!form.tableName) return [];
+
+      try {
+        const query = `
+        SELECT 
+          submitted_by,
+          COUNT(*) as count,
+          MAX(submitted_at) as last_submission
+        FROM "${form.tableName}"
+        WHERE submitted_by IS NOT NULL
+          AND submitted_at BETWEEN $1 AND $2
+        GROUP BY submitted_by
+      `;
+
+        return this.dataSource.query(query, [dateFrom, dateTo]);
+      } catch (error) {
+        console.error(`Error fetching member activity for form ${form.id}:`, error);
+        return [];
+      }
+    });
+
+    const allMemberData = (await Promise.all(memberPromises)).flat();
+
+    allMemberData.forEach((row: any) => {
+      const existing = memberSubmissions.get(row.submitted_by) || {
+        count: 0,
+        lastSubmission: new Date(0),
+      };
+
+      existing.count += parseInt(row.count);
+      const lastSub = new Date(row.last_submission);
+      if (lastSub > existing.lastSubmission) {
+        existing.lastSubmission = lastSub;
+      }
+
+      memberSubmissions.set(row.submitted_by, existing);
+    });
+
+    // Get top submitters
+    const topSubmitters = Array.from(memberSubmissions.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 10)
+      .map(([memberId, data]) => ({
+        memberId,
+        submissionCount: data.count,
+        lastSubmission: data.lastSubmission,
+      }));
+
+    return {
+      topSubmitters,
+      inactiveMembers: [], // Implement if needed
+    };
+  }
+
+  /**
+   * Helper: Get form performance metrics
+   */
+  private async getFormPerformanceMetrics(filters: any, publishedForms: Form[]): Promise<any[]> {
+    const performancePromises = publishedForms.map(async form => {
+      let totalSubmissions = 0;
+      let lastSubmission = null;
+
+      if (form.tableCreated && form.tableName) {
+        try {
+          const statsQuery = `
+          SELECT 
+            COUNT(*) as total,
+            MAX(submitted_at) as last_submission
+          FROM "${form.tableName}"
+        `;
+          const stats = await this.dataSource.query(statsQuery);
+          totalSubmissions = parseInt(stats[0]?.total || '0');
+          lastSubmission = stats[0]?.last_submission;
+        } catch (error) {
+          console.error(`Error fetching stats for form ${form.id}:`, error);
+        }
+      }
+
+      return {
+        formId: form.id,
+        formTitle: form.title,
+        formType: form.formType?.name || 'Unknown',
+        status: form.status,
+        totalSubmissions,
+        completionRate: form.totalViews > 0 ? (totalSubmissions / form.totalViews) * 100 : 0,
+        averageTimeToSubmit: form.averageCompletionTime || 0,
+        lastSubmission,
+      };
+    });
+
+    const performance = await Promise.all(performancePromises);
+
+    return performance.sort((a, b) => b.totalSubmissions - a.totalSubmissions);
+  }
+
+  /**
+   * Helper: Get system health metrics
+   */
+  private async getSystemHealthMetrics(publishedForms: Form[]): Promise<{
+    formsWithIssues: number;
+    orphanedSubmissions: number;
+    duplicateSubmissions: number;
+    missingTables: number;
+    schemaMismatches: number;
+  }> {
+    let missingTables = 0;
+
+    // Quick check: just count forms without tables
+    missingTables = publishedForms.filter(f => !f.tableCreated || !f.tableName).length;
+
+    return {
+      formsWithIssues: missingTables,
+      orphanedSubmissions: 0, // Implement if needed
+      duplicateSubmissions: 0, // Implement if needed
+      missingTables,
+      schemaMismatches: 0, // Implement if needed (expensive operation)
+    };
+  }
+
+  private getQuestionColumns(form: Form): string {
+    const columns: string[] = [];
+
+    for (const category of form.categories) {
+      for (const question of category.questions) {
+        const columnName = question.slug;
+        columns.push(`s."${columnName}" as "${columnName}"`);
+      }
+    }
+
+    return columns.length > 0 ? columns.join(',\n        ') + ',\n        ' : '';
   }
 
   /* -------------------------------------------------- */

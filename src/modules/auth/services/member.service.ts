@@ -671,7 +671,6 @@ export class MemberService implements IMemberService {
     }
   }
 
-  
   private createMinigridSitesSheet(workbook: ExcelJS.Workbook, sites: any[]): void {
     const sheet = workbook.addWorksheet('Minigrid Sites', {
       views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }],
@@ -756,503 +755,503 @@ export class MemberService implements IMemberService {
    * ==========================================================================
    *
    */
- private createFormSubmissionSheet(
-  workbook: ExcelJS.Workbook,
-  form: any,
-  submissions: any[]
-): void {
-  // Sanitize sheet name
-  let sheetName = `Form: ${form.title}`;
-  if (sheetName.length > 31) {
-    sheetName = sheetName.substring(0, 28) + '...';
-  }
-  sheetName = sheetName.replace(/[:\/?*\[\]]/g, '_');
+  private createFormSubmissionSheet(
+    workbook: ExcelJS.Workbook,
+    form: any,
+    submissions: any[]
+  ): void {
+    // Sanitize sheet name
+    let sheetName = `Form: ${form.title}`;
+    if (sheetName.length > 31) {
+      sheetName = sheetName.substring(0, 28) + '...';
+    }
+    sheetName = sheetName.replace(/[:\/?*\[\]]/g, '_');
 
-  const sheet = workbook.addWorksheet(sheetName, {
-    views: [{ state: 'frozen', xSplit: 0, ySplit: 7 }], // Freeze first 7 rows
-  });
-
-  // Set default font for the entire sheet
-  sheet.properties.defaultRowHeight = 20;
-  
-  // Apply font to all cells
-  sheet.eachRow({ includeEmpty: true }, (row) => {
-    row.font = { name: 'Calibri', size: 11 };
-  });
-
-  // Row 1: Form Title
-  sheet.mergeCells('A1:Z1');
-  sheet.getCell('A1').value = `Form: ${form.title}`;
-  sheet.getCell('A1').font = { 
-    name: 'Calibri', 
-    bold: true, 
-    size: 18, 
-    color: { argb: 'FFFFFFFF' } 
-  };
-  sheet.getCell('A1').fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF2E75B6' },
-  };
-  sheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
-  sheet.getRow(1).height = 35;
-
-  // Row 2: Form metadata
-  sheet.mergeCells('A2:Z2');
-  sheet.getCell('A2').value = `Form Type: ${form.formType?.name || 'N/A'} | Status: ${form.status} | Submissions: ${submissions.length}`;
-  sheet.getCell('A2').font = { 
-    name: 'Calibri', 
-    italic: true, 
-    size: 11, 
-    color: { argb: 'FF666666' } 
-  };
-  sheet.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
-  sheet.getRow(2).height = 25;
-
-  // Define color palette for categories
-  const categoryColors = [
-    'FFE6F0FF', // Light Blue
-    'FFE6F7ED', // Light Green
-    'FFFFF4E6', // Light Orange
-    'FFFFFDE6', // Light Yellow
-    'FFFAE6FF', // Light Purple
-    'FFFFE6E6', // Light Red
-    'FFE6F9FF', // Light Cyan
-    'FFF0E6FF', // Light Lavender
-    'FFE6FFFC', // Light Mint
-    'FFFFF0E6', // Light Peach
-  ];
-
-  const categoryBorderColors = [
-    'FF2E75B6', // Dark Blue
-    'FF70AD47', // Dark Green
-    'FFED7D31', // Dark Orange
-    'FFFFC000', // Dark Yellow
-    'FF7030A0', // Dark Purple
-    'FFC00000', // Dark Red
-    'FF00B0F0', // Dark Cyan
-    'FF8064A2', // Dark Lavender
-    'FF00B050', // Dark Mint
-    'FFFF6600', // Dark Peach
-  ];
-
-  // Build column structure
-  const columnStructure: Array<{
-    category: string;
-    kpi: string;
-    description: string;
-    unit: string;
-    questionType: string;
-    key: string;
-    categoryIndex: number;
-    categoryColor: string;
-    categoryBorderColor: string;
-  }> = [];
-
-  let currentCol = 1;
-  const categoryColSpans: { [category: string]: { 
-    start: number; 
-    end: number; 
-    color: string;
-    borderColor: string;
-  } } = {};
-
-  // First, add submission metadata columns
-  const metadataColumns = [
-    { header: 'Submission ID', key: 'id', width: 15 },
-    { header: 'Submitted At', key: 'submitted_at', width: 20 },
-    { header: 'Status', key: 'status', width: 12 },
-    { header: 'Minigrid Site', key: 'minigrid_siteId', width: 20 },
-  ];
-
-  metadataColumns.forEach(({ header, key, width }) => {
-    columnStructure.push({
-      category: 'Metadata',
-      kpi: header,
-      description: '',
-      unit: '',
-      questionType: 'metadata',
-      key,
-      categoryIndex: -1,
-      categoryColor: 'FFF2F2F2',
-      categoryBorderColor: 'FF7F7F7F'
+    const sheet = workbook.addWorksheet(sheetName, {
+      views: [{ state: 'frozen', xSplit: 0, ySplit: 7 }], // Freeze first 7 rows
     });
-    
-    sheet.getColumn(currentCol).width = width;
-    currentCol++;
-  });
 
-  // Process form categories and questions
-  form.categories.forEach((category: any, categoryIndex: number) => {
-    const categoryStartCol = currentCol;
-    const questions = category.questions || [];
-    const colorIndex = categoryIndex % categoryColors.length;
-    const categoryColor = categoryColors[colorIndex];
-    const categoryBorderColor = categoryBorderColors[colorIndex];
+    // Set default font for the entire sheet
+    sheet.properties.defaultRowHeight = 20;
 
-    console.log(questions)
-    questions.forEach((question: any) => {
+    // Apply font to all cells
+    sheet.eachRow({ includeEmpty: true }, row => {
+      row.font = { name: 'Calibri', size: 11 };
+    });
+
+    // Row 1: Form Title
+    sheet.mergeCells('A1:Z1');
+    sheet.getCell('A1').value = `Form: ${form.title}`;
+    sheet.getCell('A1').font = {
+      name: 'Calibri',
+      bold: true,
+      size: 18,
+      color: { argb: 'FFFFFFFF' },
+    };
+    sheet.getCell('A1').fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF2E75B6' },
+    };
+    sheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+    sheet.getRow(1).height = 35;
+
+    // Row 2: Form metadata
+    sheet.mergeCells('A2:Z2');
+    sheet.getCell('A2').value =
+      `Form Type: ${form.formType?.name || 'N/A'} | Status: ${form.status} | Submissions: ${submissions.length}`;
+    sheet.getCell('A2').font = {
+      name: 'Calibri',
+      italic: true,
+      size: 11,
+      color: { argb: 'FF666666' },
+    };
+    sheet.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
+    sheet.getRow(2).height = 25;
+
+    // Define color palette for categories
+    const categoryColors = [
+      'FFE6F0FF', // Light Blue
+      'FFE6F7ED', // Light Green
+      'FFFFF4E6', // Light Orange
+      'FFFFFDE6', // Light Yellow
+      'FFFAE6FF', // Light Purple
+      'FFFFE6E6', // Light Red
+      'FFE6F9FF', // Light Cyan
+      'FFF0E6FF', // Light Lavender
+      'FFE6FFFC', // Light Mint
+      'FFFFF0E6', // Light Peach
+    ];
+
+    const categoryBorderColors = [
+      'FF2E75B6', // Dark Blue
+      'FF70AD47', // Dark Green
+      'FFED7D31', // Dark Orange
+      'FFFFC000', // Dark Yellow
+      'FF7030A0', // Dark Purple
+      'FFC00000', // Dark Red
+      'FF00B0F0', // Dark Cyan
+      'FF8064A2', // Dark Lavender
+      'FF00B050', // Dark Mint
+      'FFFF6600', // Dark Peach
+    ];
+
+    // Build column structure
+    const columnStructure: Array<{
+      category: string;
+      kpi: string;
+      description: string;
+      unit: string;
+      questionType: string;
+      key: string;
+      categoryIndex: number;
+      categoryColor: string;
+      categoryBorderColor: string;
+    }> = [];
+
+    let currentCol = 1;
+    const categoryColSpans: {
+      [category: string]: {
+        start: number;
+        end: number;
+        color: string;
+        borderColor: string;
+      };
+    } = {};
+
+    // First, add submission metadata columns
+    const metadataColumns = [
+      { header: 'Submission ID', key: 'id', width: 15 },
+      { header: 'Submitted At', key: 'submitted_at', width: 20 },
+      { header: 'Status', key: 'status', width: 12 },
+      { header: 'Minigrid Site', key: 'minigrid_siteId', width: 20 },
+    ];
+
+    metadataColumns.forEach(({ header, key, width }) => {
       columnStructure.push({
-        category: category.name,
-        kpi: question.kpi || '',
-        description: question.options.placeholder || question.description || '',
-        unit: question.unit || '',
-        questionType: question.type,
-        key: question.slug,
-        categoryIndex,
-        categoryColor,
-        categoryBorderColor,
+        category: 'Metadata',
+        kpi: header,
+        description: '',
+        unit: '',
+        questionType: 'metadata',
+        key,
+        categoryIndex: -1,
+        categoryColor: 'FFF2F2F2',
+        categoryBorderColor: 'FF7F7F7F',
       });
 
-      const width = this.getColumnWidth(question.type);
       sheet.getColumn(currentCol).width = width;
       currentCol++;
     });
 
-    categoryColSpans[category.name] = {
-      start: categoryStartCol,
-      end: currentCol - 1,
-      color: categoryColor,
-      borderColor: categoryBorderColor
+    // Process form categories and questions
+    form.categories.forEach((category: any, categoryIndex: number) => {
+      const categoryStartCol = currentCol;
+      const questions = category.questions || [];
+      const colorIndex = categoryIndex % categoryColors.length;
+      const categoryColor = categoryColors[colorIndex];
+      const categoryBorderColor = categoryBorderColors[colorIndex];
+
+      console.log(questions);
+      questions.forEach((question: any) => {
+        columnStructure.push({
+          category: category.name,
+          kpi: question.kpi || '',
+          description: question.options.placeholder || question.description || '',
+          unit: question.unit || '',
+          questionType: question.type,
+          key: question.slug,
+          categoryIndex,
+          categoryColor,
+          categoryBorderColor,
+        });
+
+        const width = this.getColumnWidth(question.type);
+        sheet.getColumn(currentCol).width = width;
+        currentCol++;
+      });
+
+      categoryColSpans[category.name] = {
+        start: categoryStartCol,
+        end: currentCol - 1,
+        color: categoryColor,
+        borderColor: categoryBorderColor,
+      };
+    });
+
+    // Row 3: Category headers
+    const categoryRow = 3;
+
+    // Set metadata category
+    const metadataStartCol = 1;
+    const metadataEndCol = metadataColumns.length;
+    const metadataStartLetter = this.getColumnLetter(metadataStartCol);
+    const metadataEndLetter = this.getColumnLetter(metadataEndCol);
+
+    sheet.getCell(`${metadataStartLetter}${categoryRow}`).value = 'Metadata';
+    sheet.getCell(`${metadataStartLetter}${categoryRow}`).font = {
+      name: 'Calibri',
+      bold: true,
+      size: 12,
+      color: { argb: 'FF333333' },
     };
-  });
-
-  // Row 3: Category headers
-  const categoryRow = 3;
-  
-  // Set metadata category
-  const metadataStartCol = 1;
-  const metadataEndCol = metadataColumns.length;
-  const metadataStartLetter = this.getColumnLetter(metadataStartCol);
-  const metadataEndLetter = this.getColumnLetter(metadataEndCol);
-
-  sheet.getCell(`${metadataStartLetter}${categoryRow}`).value = 'Metadata';
-  sheet.getCell(`${metadataStartLetter}${categoryRow}`).font = { 
-    name: 'Calibri', 
-    bold: true, 
-    size: 12, 
-    color: { argb: 'FF333333' } 
-  };
-  sheet.getCell(`${metadataStartLetter}${categoryRow}`).fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FFF2F2F2' },
-  };
-  sheet.getCell(`${metadataStartLetter}${categoryRow}`).alignment = { 
-    horizontal: 'center', 
-    vertical: 'middle' 
-  };
-  sheet.mergeCells(`${metadataStartLetter}${categoryRow}:${metadataEndLetter}${categoryRow}`);
-
-  // Set form categories with colors
-  Object.entries(categoryColSpans).forEach(([categoryName, span]) => {
-    const startCol = this.getColumnLetter(span.start);
-    const endCol = this.getColumnLetter(span.end);
-
-    sheet.getCell(`${startCol}${categoryRow}`).value = categoryName;
-    sheet.getCell(`${startCol}${categoryRow}`).font = { 
-      name: 'Calibri', 
-      bold: true, 
-      size: 12, 
-      color: { argb: 'FF333333' } 
-    };
-    sheet.getCell(`${startCol}${categoryRow}`).fill = {
+    sheet.getCell(`${metadataStartLetter}${categoryRow}`).fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: span.color },
+      fgColor: { argb: 'FFF2F2F2' },
     };
-    sheet.getCell(`${startCol}${categoryRow}`).alignment = { 
-      horizontal: 'center', 
-      vertical: 'middle' 
-    };
-    
-    if (span.start !== span.end) {
-      sheet.mergeCells(`${startCol}${categoryRow}:${endCol}${categoryRow}`);
-    }
-  });
-
-  sheet.getRow(categoryRow).height = 30;
-
-  // Row 4: KPI headers
-  const kpiRow = 4;
-  let colIndex = 1;
-
-  columnStructure.forEach(col => {
-    const colLetter = this.getColumnLetter(colIndex);
-    
-    sheet.getCell(`${colLetter}${kpiRow}`).value = col.kpi;
-    sheet.getCell(`${colLetter}${kpiRow}`).font = { 
-      name: 'Calibri', 
-      bold: true, 
-      size: 11, 
-      color: { argb: 'FF333333' } 
-    };
-    sheet.getCell(`${colLetter}${kpiRow}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: col.categoryColor },
-    };
-    sheet.getCell(`${colLetter}${kpiRow}`).alignment = {
+    sheet.getCell(`${metadataStartLetter}${categoryRow}`).alignment = {
       horizontal: 'center',
       vertical: 'middle',
-      wrapText: true,
     };
+    sheet.mergeCells(`${metadataStartLetter}${categoryRow}:${metadataEndLetter}${categoryRow}`);
 
-    colIndex++;
-  });
+    // Set form categories with colors
+    Object.entries(categoryColSpans).forEach(([categoryName, span]) => {
+      const startCol = this.getColumnLetter(span.start);
+      const endCol = this.getColumnLetter(span.end);
 
-  sheet.getRow(kpiRow).height = 35;
+      sheet.getCell(`${startCol}${categoryRow}`).value = categoryName;
+      sheet.getCell(`${startCol}${categoryRow}`).font = {
+        name: 'Calibri',
+        bold: true,
+        size: 12,
+        color: { argb: 'FF333333' },
+      };
+      sheet.getCell(`${startCol}${categoryRow}`).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: span.color },
+      };
+      sheet.getCell(`${startCol}${categoryRow}`).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+      };
 
-  // Row 5: Description headers
-  const descriptionRow = 5;
-  colIndex = 1;
+      if (span.start !== span.end) {
+        sheet.mergeCells(`${startCol}${categoryRow}:${endCol}${categoryRow}`);
+      }
+    });
 
-  columnStructure.forEach(col => {
-    const colLetter = this.getColumnLetter(colIndex);
-    
-    sheet.getCell(`${colLetter}${descriptionRow}`).value = col.description;
-    sheet.getCell(`${colLetter}${descriptionRow}`).font = { 
-      name: 'Calibri', 
-      italic: true, 
-      size: 10, 
-      color: { argb: 'FF555555' } 
-    };
-    sheet.getCell(`${colLetter}${descriptionRow}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: col.categoryColor },
-    };
-    sheet.getCell(`${colLetter}${descriptionRow}`).alignment = {
-      horizontal: 'center',
-      vertical: 'middle',
-      wrapText: true,
-    };
+    sheet.getRow(categoryRow).height = 30;
 
-    colIndex++;
-  });
-
-  sheet.getRow(descriptionRow).height = 35;
-
-  // Row 6: Unit headers
-  const unitRow = 6;
-  colIndex = 1;
-
-  columnStructure.forEach(col => {
-    const colLetter = this.getColumnLetter(colIndex);
-    
-    const unitText = col.unit ? `Unit: ${col.unit}` : '';
-    sheet.getCell(`${colLetter}${unitRow}`).value = unitText;
-    sheet.getCell(`${colLetter}${unitRow}`).font = { 
-      name: 'Calibri', 
-      size: 9, 
-      color: { argb: 'FF777777' } 
-    };
-    sheet.getCell(`${colLetter}${unitRow}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: col.categoryColor },
-    };
-    sheet.getCell(`${colLetter}${unitRow}`).alignment = {
-      horizontal: 'center',
-      vertical: 'middle',
-      wrapText: true,
-    };
-
-    colIndex++;
-  });
-
-  sheet.getRow(unitRow).height = 25;
-
-  // Add submission data starting from row 7
-  let currentDataRow = 7;
-  submissions.forEach(submission => {
-    colIndex = 1;
+    // Row 4: KPI headers
+    const kpiRow = 4;
+    let colIndex = 1;
 
     columnStructure.forEach(col => {
       const colLetter = this.getColumnLetter(colIndex);
-      let value = submission[col.key];
 
-      // Format value based on type
-      value = this.formatCellValue(value, col.questionType);
-      sheet.getCell(`${colLetter}${currentDataRow}`).value = value;
-      
-      // Apply cell formatting
-      sheet.getCell(`${colLetter}${currentDataRow}`).font = { 
-        name: 'Calibri', 
-        size: 10 
+      sheet.getCell(`${colLetter}${kpiRow}`).value = col.kpi;
+      sheet.getCell(`${colLetter}${kpiRow}`).font = {
+        name: 'Calibri',
+        bold: true,
+        size: 11,
+        color: { argb: 'FF333333' },
       };
-      sheet.getCell(`${colLetter}${currentDataRow}`).alignment = {
-        vertical: 'top',
-        wrapText: col.questionType === 'textarea' || col.questionType === 'text',
+      sheet.getCell(`${colLetter}${kpiRow}`).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: col.categoryColor },
       };
-
-      // Add borders with category-specific colors
-      sheet.getCell(`${colLetter}${currentDataRow}`).border = {
-        top: { style: 'thin', color: { argb: col.categoryBorderColor } },
-        left: { style: 'thin', color: { argb: col.categoryBorderColor } },
-        bottom: { style: 'thin', color: { argb: col.categoryBorderColor } },
-        right: { style: 'thin', color: { argb: col.categoryBorderColor } },
+      sheet.getCell(`${colLetter}${kpiRow}`).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+        wrapText: true,
       };
 
       colIndex++;
     });
 
-    currentDataRow++;
-  });
+    sheet.getRow(kpiRow).height = 35;
 
-  // Add borders to all header rows with category-specific colors
-  for (let col = 1; col < colIndex; col++) {
-    const colLetter = this.getColumnLetter(col);
-    const colData = columnStructure[col - 1];
-    
-    // Apply borders to all header rows (3-6)
-    for (let row = 3; row <= 6; row++) {
-      sheet.getCell(`${colLetter}${row}`).border = {
-        top: { style: 'thin', color: { argb: colData.categoryBorderColor } },
-        left: { style: 'thin', color: { argb: colData.categoryBorderColor } },
-        bottom: { style: 'thin', color: { argb: colData.categoryBorderColor } },
-        right: { style: 'thin', color: { argb: colData.categoryBorderColor } },
+    // Row 5: Description headers
+    const descriptionRow = 5;
+    colIndex = 1;
+
+    columnStructure.forEach(col => {
+      const colLetter = this.getColumnLetter(colIndex);
+
+      sheet.getCell(`${colLetter}${descriptionRow}`).value = col.description;
+      sheet.getCell(`${colLetter}${descriptionRow}`).font = {
+        name: 'Calibri',
+        italic: true,
+        size: 10,
+        color: { argb: 'FF555555' },
       };
-    }
-  }
+      sheet.getCell(`${colLetter}${descriptionRow}`).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: col.categoryColor },
+      };
+      sheet.getCell(`${colLetter}${descriptionRow}`).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+        wrapText: true,
+      };
 
-  // Add thick borders between categories
-  Object.values(categoryColSpans).forEach(span => {
-    if (span.start > metadataColumns.length) {
-      const leftBorderCol = this.getColumnLetter(span.start);
-      
-      // Apply left border to all rows in this category
+      colIndex++;
+    });
+
+    sheet.getRow(descriptionRow).height = 35;
+
+    // Row 6: Unit headers
+    const unitRow = 6;
+    colIndex = 1;
+
+    columnStructure.forEach(col => {
+      const colLetter = this.getColumnLetter(colIndex);
+
+      const unitText = col.unit ? `Unit: ${col.unit}` : '';
+      sheet.getCell(`${colLetter}${unitRow}`).value = unitText;
+      sheet.getCell(`${colLetter}${unitRow}`).font = {
+        name: 'Calibri',
+        size: 9,
+        color: { argb: 'FF777777' },
+      };
+      sheet.getCell(`${colLetter}${unitRow}`).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: col.categoryColor },
+      };
+      sheet.getCell(`${colLetter}${unitRow}`).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+        wrapText: true,
+      };
+
+      colIndex++;
+    });
+
+    sheet.getRow(unitRow).height = 25;
+
+    // Add submission data starting from row 7
+    let currentDataRow = 7;
+    submissions.forEach(submission => {
+      colIndex = 1;
+
+      columnStructure.forEach(col => {
+        const colLetter = this.getColumnLetter(colIndex);
+        let value = submission[col.key];
+
+        // Format value based on type
+        value = this.formatCellValue(value, col.questionType);
+        sheet.getCell(`${colLetter}${currentDataRow}`).value = value;
+
+        // Apply cell formatting
+        sheet.getCell(`${colLetter}${currentDataRow}`).font = {
+          name: 'Calibri',
+          size: 10,
+        };
+        sheet.getCell(`${colLetter}${currentDataRow}`).alignment = {
+          vertical: 'top',
+          wrapText: col.questionType === 'textarea' || col.questionType === 'text',
+        };
+
+        // Add borders with category-specific colors
+        sheet.getCell(`${colLetter}${currentDataRow}`).border = {
+          top: { style: 'thin', color: { argb: col.categoryBorderColor } },
+          left: { style: 'thin', color: { argb: col.categoryBorderColor } },
+          bottom: { style: 'thin', color: { argb: col.categoryBorderColor } },
+          right: { style: 'thin', color: { argb: col.categoryBorderColor } },
+        };
+
+        colIndex++;
+      });
+
+      currentDataRow++;
+    });
+
+    // Add borders to all header rows with category-specific colors
+    for (let col = 1; col < colIndex; col++) {
+      const colLetter = this.getColumnLetter(col);
+      const colData = columnStructure[col - 1];
+
+      // Apply borders to all header rows (3-6)
       for (let row = 3; row <= 6; row++) {
-        const cell = sheet.getCell(`${leftBorderCol}${row}`);
-        const existingBorder = cell.border || {};
-        cell.border = {
-          ...existingBorder,
-          left: { style: 'medium', color: { argb: span.borderColor } }
+        sheet.getCell(`${colLetter}${row}`).border = {
+          top: { style: 'thin', color: { argb: colData.categoryBorderColor } },
+          left: { style: 'thin', color: { argb: colData.categoryBorderColor } },
+          bottom: { style: 'thin', color: { argb: colData.categoryBorderColor } },
+          right: { style: 'thin', color: { argb: colData.categoryBorderColor } },
         };
       }
     }
-  });
 
-  // Add summary at the bottom
-  currentDataRow++;
-  const summaryStartCol = this.getColumnLetter(1);
-  const summaryEndCol = this.getColumnLetter(colIndex - 1);
-  sheet.mergeCells(`${summaryStartCol}${currentDataRow}:${summaryEndCol}${currentDataRow}`);
-  sheet.getCell(`${summaryStartCol}${currentDataRow}`).value = `Total Submissions: ${submissions.length}`;
-  sheet.getCell(`${summaryStartCol}${currentDataRow}`).font = { 
-    name: 'Calibri', 
-    bold: true, 
-    italic: true, 
-    size: 11 
-  };
-  sheet.getCell(`${summaryStartCol}${currentDataRow}`).fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FFFFEB9C' },
-  };
-  sheet.getCell(`${summaryStartCol}${currentDataRow}`).alignment = { horizontal: 'center' };
-}
+    // Add thick borders between categories
+    Object.values(categoryColSpans).forEach(span => {
+      if (span.start > metadataColumns.length) {
+        const leftBorderCol = this.getColumnLetter(span.start);
 
-// Helper method to get Excel column letter from number
-private getColumnLetter(columnNumber: number): string {
-  let letter = '';
-  while (columnNumber > 0) {
-    const remainder = (columnNumber - 1) % 26;
-    letter = String.fromCharCode(65 + remainder) + letter;
-    columnNumber = Math.floor((columnNumber - 1) / 26);
-  }
-  return letter;
-}
-
-// Helper method to get appropriate column width based on question type
-private getColumnWidth(questionType: string): number {
-  const widthMap: Record<string, number> = {
-    'text': 25,
-    'textarea': 40,
-    'number': 15,
-    'currency': 15,
-    'date': 15,
-    'datetime': 18,
-    'boolean': 12,
-    'select': 20,
-    'multiselect': 30,
-    'email': 25,
-    'phone': 18,
-    'url': 30,
-    'file': 35,
-    'rating': 15,
-    'scale': 15,
-  };
-
-  return widthMap[questionType] || 20;
-}
-
-// Helper method to format cell values based on type
-private formatCellValue(value: any, type: string): any {
-  if (value === null || value === undefined) return '';
-
-  switch (type) {
-    case 'date':
-    case 'datetime':
-      if (value) {
-        try {
-          return new Date(value).toLocaleDateString();
-        } catch {
-          return value;
+        // Apply left border to all rows in this category
+        for (let row = 3; row <= 6; row++) {
+          const cell = sheet.getCell(`${leftBorderCol}${row}`);
+          const existingBorder = cell.border || {};
+          cell.border = {
+            ...existingBorder,
+            left: { style: 'medium', color: { argb: span.borderColor } },
+          };
         }
       }
-      return '';
-     
-    case 'boolean':
-    case 'yesno':
-      return value === true || value === 'true' || value === 'yes' || value === '1'
-        ? 'Yes'
-        : 'No';
-     
-    case 'multiselect':
-    case 'checkbox':
-      if (Array.isArray(value)) {
-        return value.join(', ');
-      }
-      return value;
-     
-    case 'currency':
-      if (typeof value === 'number') {
-        return `$${value.toFixed(2)}`;
-      }
-      return value;
-     
-    case 'number':
-      if (typeof value === 'number') {
-        return value;
-      }
-      return value;
-     
-    default:
-      return value;
-  }
-}
+    });
 
-// Helper method to add section headers (for Member Information sheet)
-private addSectionHeader(
-  sheet: ExcelJS.Worksheet,
-  row: number,
-  title: string
-): void {
-  sheet.mergeCells(`A${row}:B${row}`);
-  sheet.getCell(`A${row}`).value = title;
-  sheet.getCell(`A${row}`).font = { 
-    name: 'Calibri',
-    bold: true, 
-    size: 12, 
-    color: { argb: 'FFFFFFFF' } 
-  };
-  sheet.getCell(`A${row}`).fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF4472C4' },
-  };
-  sheet.getCell(`A${row}`).alignment = { horizontal: 'left', vertical: 'middle' };
-  sheet.getRow(row).height = 25;
-}
+    // Add summary at the bottom
+    currentDataRow++;
+    const summaryStartCol = this.getColumnLetter(1);
+    const summaryEndCol = this.getColumnLetter(colIndex - 1);
+    sheet.mergeCells(`${summaryStartCol}${currentDataRow}:${summaryEndCol}${currentDataRow}`);
+    sheet.getCell(`${summaryStartCol}${currentDataRow}`).value =
+      `Total Submissions: ${submissions.length}`;
+    sheet.getCell(`${summaryStartCol}${currentDataRow}`).font = {
+      name: 'Calibri',
+      bold: true,
+      italic: true,
+      size: 11,
+    };
+    sheet.getCell(`${summaryStartCol}${currentDataRow}`).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFFFEB9C' },
+    };
+    sheet.getCell(`${summaryStartCol}${currentDataRow}`).alignment = { horizontal: 'center' };
+  }
+
+  // Helper method to get Excel column letter from number
+  private getColumnLetter(columnNumber: number): string {
+    let letter = '';
+    while (columnNumber > 0) {
+      const remainder = (columnNumber - 1) % 26;
+      letter = String.fromCharCode(65 + remainder) + letter;
+      columnNumber = Math.floor((columnNumber - 1) / 26);
+    }
+    return letter;
+  }
+
+  // Helper method to get appropriate column width based on question type
+  private getColumnWidth(questionType: string): number {
+    const widthMap: Record<string, number> = {
+      text: 25,
+      textarea: 40,
+      number: 15,
+      currency: 15,
+      date: 15,
+      datetime: 18,
+      boolean: 12,
+      select: 20,
+      multiselect: 30,
+      email: 25,
+      phone: 18,
+      url: 30,
+      file: 35,
+      rating: 15,
+      scale: 15,
+    };
+
+    return widthMap[questionType] || 20;
+  }
+
+  // Helper method to format cell values based on type
+  private formatCellValue(value: any, type: string): any {
+    if (value === null || value === undefined) return '';
+
+    switch (type) {
+      case 'date':
+      case 'datetime':
+        if (value) {
+          try {
+            return new Date(value).toLocaleDateString();
+          } catch {
+            return value;
+          }
+        }
+        return '';
+
+      case 'boolean':
+      case 'yesno':
+        return value === true || value === 'true' || value === 'yes' || value === '1'
+          ? 'Yes'
+          : 'No';
+
+      case 'multiselect':
+      case 'checkbox':
+        if (Array.isArray(value)) {
+          return value.join(', ');
+        }
+        return value;
+
+      case 'currency':
+        if (typeof value === 'number') {
+          return `$${value.toFixed(2)}`;
+        }
+        return value;
+
+      case 'number':
+        if (typeof value === 'number') {
+          return value;
+        }
+        return value;
+
+      default:
+        return value;
+    }
+  }
+
+  // Helper method to add section headers (for Member Information sheet)
+  private addSectionHeader(sheet: ExcelJS.Worksheet, row: number, title: string): void {
+    sheet.mergeCells(`A${row}:B${row}`);
+    sheet.getCell(`A${row}`).value = title;
+    sheet.getCell(`A${row}`).font = {
+      name: 'Calibri',
+      bold: true,
+      size: 12,
+      color: { argb: 'FFFFFFFF' },
+    };
+    sheet.getCell(`A${row}`).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF4472C4' },
+    };
+    sheet.getCell(`A${row}`).alignment = { horizontal: 'left', vertical: 'middle' };
+    sheet.getRow(row).height = 25;
+  }
 }
