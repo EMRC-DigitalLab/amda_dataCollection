@@ -48,8 +48,11 @@ const envVarsSchema = joi
     // Email
     SMTP_HOST: joi.string().required(),
     SMTP_PORT: joi.number().required(),
+    SMTP_SECURE: joi.boolean().default(false), // ADD THIS
     SMTP_USER: joi.string().required(),
     SMTP_PASSWORD: joi.string().required(),
+    SMTP_FROM_NAME: joi.string().default('AMDA'), // ADD THIS
+    SMTP_FROM_EMAIL: joi.string().email().optional(), // ADD THIS
 
     // Payment
     PAYMENT_GATEWAY_PUBLIC_KEY: joi.string().required(),
@@ -116,8 +119,11 @@ export const config = {
   email: {
     host: envVars.SMTP_HOST,
     port: envVars.SMTP_PORT,
+    secure: envVars.SMTP_SECURE, // ADD THIS
     user: envVars.SMTP_USER,
     password: envVars.SMTP_PASSWORD,
+    fromName: envVars.SMTP_FROM_NAME, // ADD THIS
+    from: envVars.SMTP_FROM_EMAIL || envVars.SMTP_USER, // ADD THIS
   },
 
   payment: {

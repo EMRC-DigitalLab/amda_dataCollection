@@ -98,21 +98,21 @@ export class MinigridSite {
 
   @Column({
     type: 'varchar',
-    length: 20,
+    length: 100,
     default: '0',
   })
   installedCapacityKw!: string;
 
   @Column({
     type: 'varchar',
-    length: 20,
+    length: 100,
     default: '0',
   })
   peakLoadKw!: string;
 
   @Column({
     type: 'varchar',
-    length: 20,
+    length: 100,
     default: '0',
   })
   connectedCustomers!: string;
