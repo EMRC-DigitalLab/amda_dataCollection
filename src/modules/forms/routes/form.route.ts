@@ -336,7 +336,7 @@ export function createFormRoutes(dataSource: DataSource): Router {
   router.get(
     '/admin/dashboard/export',
     authMiddleware,
-    adminMiddleware,
+    // adminMiddleware,
     formController.exportDashboardData
   );
 

@@ -497,8 +497,6 @@ export class FormService {
         });
       }
 
-      console.log(submission.form, 'this is form submission');
-
       // Add form submission to site
       formTypeData.minigridSitesMap.get(siteId).forms.push({
         ...submission,

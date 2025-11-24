@@ -1173,9 +1173,48 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         }
       }
     }
+
+    return answers;
   }
 
- async getFormSubmissions(
+  async getMemberAllSubmissions(memberId: string): Promise<any[]> {
+    // Get all published forms
+    const [publishedForms] = await this.findAllForms({
+      status: FormStatus.PUBLISHED,
+    });
+
+    const allSubmissions: any[] = [];
+    // const tableName = form.tableName;
+    //     let sql = `SELECT * FROM "${tableName}" WHERE form_id = $1`;
+    //     const params = [formId];
+
+    // Query each form's submission table for this member's data
+    for (const form of publishedForms) {
+      if (!form.tableCreated || !form.tableName) continue;
+
+      try {
+        const submissions = await this.getFormSubmissions(
+          form.id,
+          { submitted_by: memberId },
+          undefined,
+          true
+        );
+
+        allSubmissions.push(...submissions);
+      } catch (error) {
+        console.error(`Error fetching submissions for form ${form.id}:`, error);
+        // Continue with other forms
+      }
+    }
+
+    // Sort by submission date (newest first)
+    allSubmissions.sort(
+      (a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
+    );
+
+    return allSubmissions;
+  }
+  async getFormSubmissions(
     formId: string,
     filters?: Record<string, any>,
     pagination?: { page: number; limit: number },
