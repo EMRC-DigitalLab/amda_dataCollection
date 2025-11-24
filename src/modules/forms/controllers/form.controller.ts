@@ -796,6 +796,310 @@ export class FormController {
     }
   };
 
+  // Add these methods to FormController class
+
+  /**
+   * Get comprehensive admin dashboard overview
+   * GET /api/forms/admin/dashboard/overview
+   */
+  getAdminDashboardOverview = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const { dateFrom, dateTo, formType, adminId } = req.query;
+
+      const filters: any = {};
+
+      if (dateFrom) {
+        filters.dateFrom = new Date(dateFrom as string);
+      }
+
+      if (dateTo) {
+        filters.dateTo = new Date(dateTo as string);
+      }
+
+      if (formType) {
+        filters.formType = formType as string;
+      }
+
+      // Allow filtering by specific admin, or default to current admin
+      if (adminId) {
+        filters.adminId = adminId as string;
+      } else if (req.user?.role !== 'SUPER_ADMIN') {
+        // If not super admin, only show their own forms
+        filters.adminId = req.user?.id;
+      }
+
+      const overview = await this.service.getAdminDashboardOverview(filters);
+
+      console.log(overview, 'this is the dashboard ovevriew');
+      res.json({
+        success: true,
+        data: overview,
+        message: 'Admin dashboard overview retrieved successfully',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+
+  /**
+   * Get quick stats for admin dashboard widgets
+   * GET /api/forms/admin/dashboard/quick-stats
+   */
+  getAdminQuickStats = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const stats = await this.service.getAdminQuickStats();
+
+      res.json({
+        success: true,
+        data: stats,
+        message: 'Quick stats retrieved successfully',
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+
+  /**
+   * Get detailed analytics for a specific metric
+   * GET /api/forms/admin/dashboard/analytics/:metric
+   */
+  getDetailedAnalytics = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { metric } = req.params;
+      const { dateFrom, dateTo, formType } = req.query;
+
+      const filters: any = {
+        dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
+        dateTo: dateTo ? new Date(dateTo as string) : undefined,
+        formType: formType as string,
+      };
+
+      let analytics;
+
+      switch (metric) {
+        case 'submissions':
+          analytics = await this.service.getSubmissionAnalytics(filters);
+          break;
+
+        case 'members':
+          analytics = await this.service.getMemberAnalytics(filters);
+          break;
+
+        case 'forms':
+          analytics = await this.service.getFormAnalytics(filters);
+          break;
+
+        case 'reviews':
+          analytics = await this.service.getReviewAnalytics(filters);
+          break;
+
+        default:
+          return ResponseHelper.error(res, 'Invalid metric type', 400);
+      }
+
+      res.json({
+        success: true,
+        data: analytics,
+        message: `${metric} analytics retrieved successfully`,
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+
+  /**
+   * Get alerts and notifications for admin
+   * GET /api/forms/admin/dashboard/alerts
+   */
+  getAdminAlerts = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { priority, type } = req.query;
+
+      // Get overview which includes insights
+      const overview = await this.service.getAdminDashboardOverview({});
+
+      let alerts = overview.insights.alerts;
+
+      // Filter by type if provided
+      if (type && ['critical', 'warning', 'info'].includes(type as string)) {
+        alerts = alerts.filter(alert => alert.type === type);
+      }
+
+      // Filter by action required
+      if (priority === 'actionRequired') {
+        alerts = alerts.filter(alert => alert.actionRequired);
+      }
+
+      res.json({
+        success: true,
+        data: {
+          alerts,
+          totalAlerts: alerts.length,
+          criticalCount: alerts.filter(a => a.type === 'critical').length,
+          warningCount: alerts.filter(a => a.type === 'warning').length,
+          infoCount: alerts.filter(a => a.type === 'info').length,
+        },
+        message: 'Admin alerts retrieved successfully',
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+
+  /**
+   * Get recommendations for admin
+   * GET /api/forms/admin/dashboard/recommendations
+   */
+  getAdminRecommendations = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const { priority } = req.query;
+
+      // Get overview which includes insights
+      const overview = await this.service.getAdminDashboardOverview({});
+
+      let recommendations = overview.insights.recommendations;
+
+      // Filter by priority if provided
+      if (priority && ['high', 'medium', 'low'].includes(priority as string)) {
+        recommendations = recommendations.filter(rec => rec.priority === priority);
+      }
+
+      res.json({
+        success: true,
+        data: {
+          recommendations,
+          totalRecommendations: recommendations.length,
+          highPriority: recommendations.filter(r => r.priority === 'high').length,
+          mediumPriority: recommendations.filter(r => r.priority === 'medium').length,
+          lowPriority: recommendations.filter(r => r.priority === 'low').length,
+        },
+        message: 'Admin recommendations retrieved successfully',
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+
+  /**
+   * Export dashboard data as Excel
+   * GET /api/forms/admin/dashboard/export
+   */
+  exportDashboardData = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { dateFrom, dateTo, formType } = req.query;
+
+      const filters: any = {
+        dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
+        dateTo: dateTo ? new Date(dateTo as string) : undefined,
+        formType: formType as string,
+      };
+
+      const overview = await this.service.getAdminDashboardOverview(filters);
+
+      // Create Excel workbook with multiple sheets
+      const excelBuffer = await this.service.exportDashboardToExcel(overview);
+
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="admin_dashboard_${new Date().toISOString().split('T')[0]}.xlsx"`
+      );
+      res.send(excelBuffer);
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+
+  /**
+   * Get real-time dashboard updates (for WebSocket/polling)
+   * GET /api/forms/admin/dashboard/live-updates
+   */
+  getLiveDashboardUpdates = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      // Get only the most recent changes (last 5 minutes)
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
+      const updates = {
+        newSubmissions: await this.service.getRecentSubmissionsCount(fiveMinutesAgo),
+        newReviews: await this.service.getRecentReviewsCount(fiveMinutesAgo),
+        newMembers: await this.service.getNewMembersCount(fiveMinutesAgo),
+        systemChanges: await this.service.getRecentSystemChanges(fiveMinutesAgo),
+        timestamp: new Date().toISOString(),
+      };
+
+      res.json({
+        success: true,
+        data: updates,
+        message: 'Live dashboard updates retrieved successfully',
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+
+  /**
+   * Get specific form type breakdown
+   * GET /api/forms/admin/dashboard/form-types/:formTypeId
+   */
+  getFormTypeBreakdown = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { formTypeId } = req.params;
+      const { dateFrom, dateTo } = req.query;
+
+      const filters: any = {
+        formType: formTypeId,
+        dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
+        dateTo: dateTo ? new Date(dateTo as string) : undefined,
+      };
+
+      const breakdown = await this.service.getFormTypeDetailedBreakdown(filters);
+
+      res.json({
+        success: true,
+        data: breakdown,
+        message: 'Form type breakdown retrieved successfully',
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+
+  /**
+   * Get comparison between time periods
+   * GET /api/forms/admin/dashboard/comparison
+   */
+  getTimeComparison = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { period = 'month' } = req.query; // 'week', 'month', 'quarter', 'year'
+
+      const comparison = await this.service.getTimePeriodComparison(period as string);
+
+      res.json({
+        success: true,
+        data: comparison,
+        message: 'Time period comparison retrieved successfully',
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+
   /* ============================================================================ */
   /* Form Templates & Versioning                                                 */
   /* ============================================================================ */
@@ -983,6 +1287,29 @@ export class FormController {
         success: true,
         data: repairResult,
         message: 'Form table repair completed',
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+  getMemberSubmissionsOverview = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const memberId = req.user?.id;
+
+      if (!memberId) {
+        return ResponseHelper.error(res, 'Member ID is required', 401);
+      }
+
+      const overview = await this.service.getMemberSubmissionsOverview(memberId);
+
+      res.json({
+        success: true,
+        data: overview,
+        message: 'Member submissions overview retrieved successfully',
       });
     } catch (err) {
       ResponseHelper.error(res, err.message, 400);

@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { DataSource, ILike, Repository } from 'typeorm';
 import { IMemberRepository } from '../../../modules/auth/interfaces/member.interface';
+import { CacheService } from '../../../shared/utils/cache';
 import { Member, MembershipStatus } from '../../entities/member.entity';
 import { User } from '../../entities/user.entity';
 
@@ -92,6 +93,8 @@ export class MemberRepository implements IMemberRepository {
   }
 
   async verifyMember(memberId: string, adminId?: string): Promise<User> {
+    // await CacheService.invalidateDashboardCache();
+    await CacheService.invalidateDashboardCache();
     return this.repository.updateVerificationStatus(memberId, true, adminId);
   }
 
@@ -126,6 +129,8 @@ export class MemberRepository implements IMemberRepository {
    * Unverify a member - REFACTORED
    */
   async unverifyMember(memberId: string): Promise<User> {
+    await CacheService.invalidateDashboardCache();
+
     return this.repository.updateVerificationStatus(memberId, false);
   }
 
