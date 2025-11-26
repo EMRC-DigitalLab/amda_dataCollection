@@ -92,6 +92,23 @@ export class FormService {
     return this.repo.findAllForms(pagination);
   }
 
+  async getFormSubmissionRequirements(
+    formId: string,
+    memberId: string
+  ): Promise<FormSubmissionRequirements> {
+    const form = await this.repo.findFormById(formId);
+
+    if (!form) {
+      throw new Error('Form not found');
+    }
+
+    if (form.status !== FormStatus.PUBLISHED) {
+      throw new Error('Form is not published');
+    }
+
+    return this.repo.getFormSubmissionRequirements(formId, memberId);
+  }
+
   /* ============================================================================ */
   /* Form Publishing & Status Management WITH NOTIFICATIONS                       */
   /* ============================================================================ */

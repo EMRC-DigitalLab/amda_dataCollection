@@ -176,13 +176,31 @@ export function createFormRoutes(dataSource: DataSource): Router {
   router.get('/:id/my-submissions', authMiddleware, formController.getMySubmissions);
 
   router.get(
+    '/:id/submissions/:submissionId/edit',
+    authMiddleware,
+    formController.getSubmissionForEdit
+  );
+
+  router.get(
     '/member/submissions/overview',
+    authMiddleware,
+    formController.getMemberSubmissionsOverview
+  );
+
+  // THis is to get the submission overview for form entries
+  router.get(
+    '/member/submissions-overview',
     authMiddleware,
     formController.getMemberSubmissionsOverview
   );
   // Update user's own submission (if allowed)
   router.put('/:id/submissions/:submissionId', authMiddleware, formController.updateMySubmission);
 
+  router.get(
+    '/:id/submission-requirements',
+    authMiddleware,
+    formController.getSubmissionRequirements
+  );
   // Delete user's own submission
   router.delete(
     '/:id/submissions/:submissionId',

@@ -8,7 +8,6 @@ import {
   CreateCategoryDto,
   CreateFormDto,
   FormQueryDto,
-  FormSubmissionDto,
   SubmissionQueryDto,
   UpdateFormDto,
 } from '../../../shared/types/form.types';
@@ -348,68 +347,174 @@ export class FormController {
     }
   };
 
-  submitForm = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    console.log(req.params.id, req.user.id, req.body.data);
+  async submitForm(req: Request, res: Response): Promise<void> {
     try {
-      // Check if user has already submitted to this form
-      const existingSubmission = await this.service.getUserSubmission(
-        req.params.id,
-        req.body.data.minigrid_siteId
-      );
+      const { id: formId } = req.params;
+      const memberId = req.user?.id;
+      const submissionData = req.body;
 
-      const body = {
-        ...req.body.data,
-      };
-
-      const dto: FormSubmissionDto = {
-        formId: req.params.id,
-        submittedBy: req.user.id,
-        data: req.body.data,
-      };
-
-      let submission;
-      let message;
-
-      if (existingSubmission) {
-        // Update existing submission dinstead of creating new one
-        submission = await this.service.updateSubmission(
-          req.params.id,
-          existingSubmission.id,
-          dto.data,
-          req.user?.id
-        );
-        message = 'Form submission updated successfully';
-      } else {
-        // Create new submission
-        submission = await this.service.submitFormData(dto);
-        message = 'Form submitted successfully';
+      if (!memberId) {
+        return res.status(401).json({ error: 'Authentication required' });
       }
 
-      res.status(existingSubmission ? 200 : 201).json({
-        success: true,
-        data: submission,
-        message,
-        isUpdate: !!existingSubmission,
-      });
-    } catch (err) {
-      ResponseHelper.error(res, err.message, 400);
-    }
-  };
+      // Validate eligibility
+      const eligibility = await this.formRepository.canMemberSubmitForm(formId, memberId);
 
-  canUserSubmit = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    try {
-      const canSubmit = await this.service.canUserSubmit(req.params.id, req.user?.id);
-      res.json({
+      if (!eligibility.canSubmit) {
+        return res.status(400).json({
+          error: eligibility.reason || 'Cannot submit form',
+          metadata: eligibility.metadata,
+        });
+      }
+
+      // Additional validation for country-level forms
+      if (eligibility.scope === FormScope.COUNTRY_LEVEL) {
+        if (!submissionData.country) {
+          return res.status(400).json({
+            error: 'Country selection is required',
+            metadata: eligibility.metadata,
+          });
+        }
+
+        // Check if this country is available
+        const availableCountries = eligibility.metadata?.availableCountries || [];
+        if (!availableCountries.includes(submissionData.country)) {
+          return res.status(400).json({
+            error: `Cannot submit for ${submissionData.country}. Either you don't operate there or you've already submitted.`,
+            availableCountries,
+          });
+        }
+      }
+
+      // Submit the form
+      const submission = await this.formRepository.submitFormData(formId, submissionData, memberId);
+
+      res.status(201).json({
         success: true,
-        data: { canSubmit },
-        message: canSubmit
-          ? 'User can submit to this form'
-          : 'User has already submitted to this form',
+        message: 'Form submitted successfully',
+        submission,
+        scope: eligibility.scope,
       });
-    } catch (err) {
-      ResponseHelper.error(res, err.message, 400);
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      res.status(400).json({ error: error.message });
     }
-  };
+  }
+  async canUserSubmit(
+    formId: string,
+    memberId: string,
+    scopeData?: { siteId?: string; country?: string }
+  ): Promise<{
+    canSubmit: boolean;
+    reason?: string;
+    existingSubmissionId?: string;
+  }> {
+    const form = await this.findFormById(formId);
+
+    if (!form) {
+      return { canSubmit: false, reason: 'Form not found' };
+    }
+
+    if (form.status !== FormStatus.PUBLISHED) {
+      return { canSubmit: false, reason: 'Form is not published' };
+    }
+
+    if (!form.tableCreated || !form.tableName) {
+      return { canSubmit: false, reason: 'Form is not ready for submissions' };
+    }
+
+    const scope = form.submissionScope;
+
+    // SITE_LEVEL check
+    if (scope === FormSubmissionScope.SITE_LEVEL) {
+      if (!scopeData?.siteId) {
+        return { canSubmit: false, reason: 'Site ID is required' };
+      }
+
+      // Verify site belongs to member
+      const site = await this.dataSource.query(
+        `SELECT EXISTS(SELECT 1 FROM minigrid_sites WHERE id = $1 AND "memberUuid" = $2) as exists`,
+        [scopeData.siteId, memberId]
+      );
+
+      if (!site[0].exists) {
+        return { canSubmit: false, reason: 'Site not found or does not belong to you' };
+      }
+
+      if (form.allowOnlyOneSubmissionPerScope) {
+        const existing = await this.dataSource.query(
+          `SELECT id FROM "${form.tableName}" 
+         WHERE form_id = $1 AND minigrid_siteId = $2 
+         LIMIT 1`,
+          [formId, scopeData.siteId]
+        );
+
+        if (existing.length > 0) {
+          return {
+            canSubmit: false,
+            reason: 'You have already submitted this form for this site',
+            existingSubmissionId: existing[0].id,
+          };
+        }
+      }
+    }
+
+    // COUNTRY_LEVEL check
+    else if (scope === FormSubmissionScope.COUNTRY_LEVEL) {
+      if (!scopeData?.country) {
+        return { canSubmit: false, reason: 'Country is required' };
+      }
+
+      // Verify member operates in this country
+      const hasSites = await this.dataSource.query(
+        `SELECT EXISTS(SELECT 1 FROM minigrid_sites WHERE "memberUuid" = $1 AND country = $2) as exists`,
+        [memberId, scopeData.country]
+      );
+
+      if (!hasSites[0].exists) {
+        return { canSubmit: false, reason: 'You do not have any sites in this country' };
+      }
+
+      if (form.allowOnlyOneSubmissionPerScope) {
+        const existing = await this.dataSource.query(
+          `SELECT id FROM "${form.tableName}" 
+         WHERE form_id = $1 AND submitted_by = $2 AND country = $3 
+         LIMIT 1`,
+          [formId, memberId, scopeData.country]
+        );
+
+        if (existing.length > 0) {
+          return {
+            canSubmit: false,
+            reason: 'You have already submitted this form for this country',
+            existingSubmissionId: existing[0].id,
+          };
+        }
+      }
+    }
+
+    // MEMBER_LEVEL check
+    else if (scope === FormSubmissionScope.MEMBER_LEVEL) {
+      if (form.allowOnlyOneSubmissionPerScope) {
+        const existing = await this.dataSource.query(
+          `SELECT id FROM "${form.tableName}" 
+         WHERE form_id = $1 AND submitted_by = $2 
+         LIMIT 1`,
+          [formId, memberId]
+        );
+
+        if (existing.length > 0) {
+          return {
+            canSubmit: false,
+            reason: 'You have already submitted this form',
+            existingSubmissionId: existing[0].id,
+          };
+        }
+      }
+    }
+
+    return { canSubmit: true };
+  }
 
   getPublishedFormTypes = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -437,24 +542,27 @@ export class FormController {
       ResponseHelper.error(res, err.message, 400);
     }
   };
-  getMySubmissions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  async getMySubmissions(req: Request, res: Response): Promise<void> {
     try {
-      const { page = 1, limit = 10 } = req.query;
-      const submissions = await this.service.getFormSubmissions(
-        req.params.id,
-        { submitted_by: req.user?.id },
-        { page: Number(page), limit: Number(limit) }
-      );
+      const { id: formId } = req.params;
+      const memberId = req.user?.id;
+
+      if (!memberId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const submissions = await this.formRepository.getMemberFormSubmissions(formId, memberId);
 
       res.json({
         success: true,
-        data: submissions,
-        message: 'Submissions retrieved successfully',
+        count: submissions.length,
+        submissions,
       });
-    } catch (err) {
-      ResponseHelper.error(res, err.message, 400);
+    } catch (error) {
+      console.error('Error fetching submissions:', error);
+      res.status(500).json({ error: error.message });
     }
-  };
+  }
 
   updateMySubmission = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
@@ -489,6 +597,82 @@ export class FormController {
       ResponseHelper.error(res, err.message, 400);
     }
   };
+
+  async getSubmissionForEdit(req: Request, res: Response): Promise<void> {
+    try {
+      const { id: formId, submissionId } = req.params;
+      const memberId = req.user?.id;
+
+      if (!memberId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const submission = await this.formRepository.getSubmissionForEdit(
+        formId,
+        submissionId,
+        memberId
+      );
+
+      if (!submission) {
+        return res.status(404).json({
+          error: 'Submission not found or you do not have permission to edit it',
+        });
+      }
+
+      res.json({
+        success: true,
+        submission,
+      });
+    } catch (error) {
+      console.error('Error fetching submission:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  getSubmissionRequirements = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id: formId } = req.params;
+      const memberId = req.user?.id;
+
+      if (!memberId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authentication required',
+        });
+      }
+
+      const requirements = await this.service.getFormSubmissionRequirements(formId, memberId);
+
+      return res.status(200).json({
+        success: true,
+        data: requirements,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  async getMemberFormOverview(req: Request, res: Response, next: NextFunction) {
+    try {
+      const memberId = req.user?.id;
+
+      if (!memberId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authentication required',
+        });
+      }
+
+      const overview = await this.service.getMemberSubmissionOverview(memberId);
+
+      return res.status(200).json({
+        success: true,
+        data: overview,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 
   /* ============================================================================ */
   /* Admin Submission Management                                                  */

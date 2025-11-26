@@ -1,7 +1,12 @@
+import { FormSubmissionScope } from '../../database/entities/form.entity';
+
 export class CreateFormDto {
   title!: string;
   slug!: string;
   questions?: CreateQuestionDto[];
+  submissionScope?: FormSubmissionScope;
+  allowOnlyOneSubmissionPerScope?: boolean;
+  requireAllScopesSubmission?: boolean;
 }
 export class UpdateFormDto {
   id!: string;
