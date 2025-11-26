@@ -1,9 +1,7 @@
 import { Router } from 'express';
 import { DataSource } from 'typeorm';
 import { authMiddleware } from '../../../shared/middleware/auth.middleware';
-import { validationMiddleware } from '../../../shared/middleware/validation.middleware';
 import { MinigridSiteController } from '../controllers/minigrid-site.controller';
-import { UpdateMinigridSiteDto } from '../dtos/minigrid-site.dto';
 
 export function createMinigridRoutes(dataSource: DataSource): Router {
   const router = Router();
@@ -46,7 +44,6 @@ export function createMinigridRoutes(dataSource: DataSource): Router {
   router.put(
     '/:id',
     authMiddleware,
-    validationMiddleware(UpdateMinigridSiteDto),
     minigridSiteController.updateMinigridSite
   );
 

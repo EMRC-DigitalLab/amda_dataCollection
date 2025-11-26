@@ -21,6 +21,12 @@ export enum FormStatus {
   ARCHIVED = 'ARCHIVED', // Form is no longer active
 }
 
+export enum FormSubmissionScope {
+  SITE_LEVEL = 'SITE_LEVEL',
+  COUNTRY_LEVEL = 'COUNTRY_LEVEL',
+  MEMBER_LEVEL = 'MEMBER_LEVEL',
+}
+
 @Entity({ name: 'forms' })
 export class Form extends BaseEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -82,6 +88,28 @@ export class Form extends BaseEntity {
   })
   adminId!: string;
 
+  @Column({
+    type: 'enum',
+    enum: FormSubmissionScope,
+    default: FormSubmissionScope.SITE_LEVEL,
+    comment: 'Defines the scope of form submissions',
+  })
+  submissionScope!: FormSubmissionScope;
+
+  @Column({
+    type: 'boolean',
+    default: true,
+    comment: 'If true, member can only submit once per scope (site/country/member)',
+  })
+  allowOnlyOneSubmissionPerScope!: boolean;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+    comment: 'If true, member must submit for ALL their countries/sites (completeness enforcement)',
+  })
+  requireAllScopesSubmission!: boolean;
+
   @Column({ type: 'uuid', nullable: true })
   parentId?: string;
 
@@ -131,7 +159,6 @@ export class Form extends BaseEntity {
   averageCompletionTime: any;
   lastSubmissionAt: any;
   isTemplate: any;
-  allowMultipleSubmissions: any;
   maxSubmissions: number | undefined;
   archivedAt: Date | undefined;
   publishedAt: Date | undefined;

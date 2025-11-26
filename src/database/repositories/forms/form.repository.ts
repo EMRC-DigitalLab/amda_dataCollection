@@ -7,7 +7,7 @@ import { IFormRepository } from '../../../modules/forms/interfaces/form.interfac
 import { CreateCategoryDto, CreateFormDto, UpdateFormDto } from '../../../shared/types/form.types';
 import { Category } from '../../entities/category.entity';
 import { FormType, FormTypeStatus } from '../../entities/form-type.entity';
-import { Form, FormStatus } from '../../entities/form.entity';
+import { Form, FormStatus, FormSubmissionScope } from '../../entities/form.entity';
 import { Question } from '../../entities/question.entity';
 
 @Injectable()
@@ -75,7 +75,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
-    console.log(changes, 'this is the uodate');
     try {
       // Update form basic info
       Object.assign(form, {
@@ -83,6 +82,12 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         slug: changes.slug ?? form.slug,
         description: changes.description ?? form.description,
         status: changes.status ?? form.status,
+        // NEW: Update submission scope fields
+        submissionScope: changes.submissionScope ?? form.submissionScope,
+        allowOnlyOneSubmissionPerScope:
+          changes.allowOnlyOneSubmissionPerScope ?? form.allowOnlyOneSubmissionPerScope,
+        requireAllScopesSubmission:
+          changes.requireAllScopesSubmission ?? form.requireAllScopesSubmission,
       });
 
       if (changes.formTypeId !== undefined) {
@@ -90,13 +95,11 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
           form.formType = null;
           form.formTypeId = null;
         } else {
-          // Option B: Just set the ID (works in most cases with allow-infer flag or newer TypeORM)
           form.formTypeId = changes.formTypeId;
-
-          // Force TypeORM to recognize the change
           form.formType = { id: changes.formTypeId } as FormType;
         }
       }
+
       await queryRunner.manager.save(Form, form);
 
       // Handle categories update if provided
@@ -220,6 +223,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     return await this.formTypeRepo
       .createQueryBuilder('formType')
       .leftJoinAndSelect('formType.forms', 'form')
+      .addSelect(['form.submissionScope', 'form.allowOnlyOneSubmissionPerScope']) // Add these
       .where('formType.status = :status', { status: FormTypeStatus.ACTIVE })
       .andWhere('form.status = :formStatus', { formStatus: FormStatus.PUBLISHED })
       .getMany();
@@ -276,9 +280,208 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     return queryBuilder.getMany();
   }
 
+  private async columnExists(tableName: string, columnName: string): Promise<boolean> {
+    const result = await this.dataSource.query(
+      `SELECT EXISTS (
+      SELECT FROM information_schema.columns 
+      WHERE table_name = $1 AND column_name = $2
+    ) as exists`,
+      [tableName, columnName]
+    );
+    return result[0].exists;
+  }
+
+  async getFormSubmissionRequirements(
+    formId: string,
+    memberId: string
+  ): Promise<FormSubmissionRequirements> {
+    const form = await this.findFormById(formId);
+
+    if (!form) {
+      throw new Error('Form not found');
+    }
+
+    const scope = form.submissionScope || FormSubmissionScope.SITE_LEVEL;
+    const requiredSubmissions: SubmissionRequirement[] = [];
+
+    // ---------------------------------------------------------------------------
+    // SITE_LEVEL: One submission per site (all member's sites)
+    // ---------------------------------------------------------------------------
+    if (scope === FormSubmissionScope.SITE_LEVEL) {
+      const sites = await this.dataSource.query(
+        `SELECT id, "siteId", name, country 
+       FROM minigrid_sites 
+       WHERE "memberUuid" = $1 
+       ORDER BY country, name`,
+        [memberId]
+      );
+
+      if (form.tableCreated && form.tableName) {
+        // Check if minigrid_siteId column exists (old tables might not have it)
+        const hasSiteIdColumn = await this.columnExists(form.tableName, 'minigrid_siteId');
+
+        if (!hasSiteIdColumn) {
+          // Table needs repair - return sites as not submitted
+          console.warn(`Table ${form.tableName} is missing minigrid_siteId column. Repair needed.`);
+
+          for (const site of sites) {
+            requiredSubmissions.push({
+              type: 'site',
+              identifier: site.id,
+              name: `${site.name} (${site.country})`,
+              submitted: false,
+            });
+          }
+        } else {
+          // Table has the site FK column – safe to query it
+          const submissions = await this.dataSource.query(
+            `SELECT "minigrid_siteId" AS site_id, id 
+           FROM "${form.tableName}" 
+           WHERE submitted_by = $1`,
+            [memberId]
+          );
+
+          const submissionMap = new Map<string, string>(
+            submissions.map((s: any) => [s.site_id, s.id])
+          );
+
+          for (const site of sites) {
+            requiredSubmissions.push({
+              type: 'site',
+              identifier: site.id,
+              name: `${site.name} (${site.country})`,
+              submitted: submissionMap.has(site.id),
+              submissionId: submissionMap.get(site.id),
+            });
+          }
+        }
+      } else {
+        // Form not published yet or table not created – nothing submitted
+        for (const site of sites) {
+          requiredSubmissions.push({
+            type: 'site',
+            identifier: site.id,
+            name: `${site.name} (${site.country})`,
+            submitted: false,
+          });
+        }
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // COUNTRY_LEVEL: One submission per country where member operates
+    // ---------------------------------------------------------------------------
+    else if (scope === FormSubmissionScope.COUNTRY_LEVEL) {
+      // Get all countries where the member has sites
+      const countries = await this.dataSource.query(
+        `SELECT DISTINCT country 
+       FROM minigrid_sites 
+       WHERE "memberUuid" = $1 
+       ORDER BY country`,
+        [memberId]
+      );
+
+      if (form.tableCreated && form.tableName) {
+        // Check if "country" column exists on the submission table
+        const hasCountryColumn = await this.columnExists(form.tableName, 'country');
+
+        if (!hasCountryColumn) {
+          // Table needs repair - we can't rely on per-country submissions yet
+          console.warn(`Table ${form.tableName} is missing country column. Repair needed.`);
+
+          for (const { country } of countries) {
+            requiredSubmissions.push({
+              type: 'country',
+              identifier: country,
+              name: country,
+              submitted: false,
+            });
+          }
+        } else {
+          // Safe to select "country" from the submission table
+          const submissions = await this.dataSource.query(
+            `SELECT country, id 
+           FROM "${form.tableName}" 
+           WHERE submitted_by = $1`,
+            [memberId]
+          );
+
+          const submissionMap = new Map<string, string>(
+            submissions.map((s: any) => [s.country, s.id])
+          );
+
+          for (const { country } of countries) {
+            requiredSubmissions.push({
+              type: 'country',
+              identifier: country,
+              name: country,
+              submitted: submissionMap.has(country),
+              submissionId: submissionMap.get(country),
+            });
+          }
+        }
+      } else {
+        // Form not published yet – nothing submitted
+        for (const { country } of countries) {
+          requiredSubmissions.push({
+            type: 'country',
+            identifier: country,
+            name: country,
+            submitted: false,
+          });
+        }
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // MEMBER_LEVEL: One submission per member/organization
+    // ---------------------------------------------------------------------------
+    else if (scope === FormSubmissionScope.MEMBER_LEVEL) {
+      let submitted = false;
+      let submissionId: string | undefined;
+
+      if (form.tableCreated && form.tableName) {
+        const submission = await this.dataSource.query(
+          `SELECT id 
+         FROM "${form.tableName}" 
+         WHERE submitted_by = $1 
+         LIMIT 1`,
+          [memberId]
+        );
+
+        if (submission.length > 0) {
+          submitted = true;
+          submissionId = submission[0].id;
+        }
+      }
+
+      requiredSubmissions.push({
+        type: 'member',
+        identifier: memberId,
+        name: 'Organization Information',
+        submitted,
+        submissionId,
+      });
+    }
+
+    // ---------------------------------------------------------------------------
+    // Completion calculation
+    // ---------------------------------------------------------------------------
+    const total = requiredSubmissions.length;
+    const completed = requiredSubmissions.filter(r => r.submitted).length;
+    const completionPercentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    return {
+      scope,
+      allowMultiple: !form.allowOnlyOneSubmissionPerScope,
+      requiredSubmissions,
+      completionPercentage,
+      formTitle: form.title, // remove this if your FormSubmissionRequirements type doesn't include it
+    };
+  }
+
   // Alternative method using TypeORM's built-in groupBy (if preferred)
   async getPublishedFormTypesWithTypeORM(): Promise<{ formType: string; count: number }[]> {
-    console.log(formType, 'this is the form type');
     const result = await this.formRepository
       .createQueryBuilder('form')
       .select('form.formType', 'formType')
@@ -1114,23 +1317,73 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     if (!form) throw new Error('Form not found');
     if (form.status !== FormStatus.PUBLISHED) throw new Error('Form is not published');
     if (!form.tableCreated || !form.tableName) throw new Error('Form table not created');
+    if (!submittedBy) throw new Error('Authentication required');
 
+    const submissionScope = form.submissionScope;
     const tableName = form.tableName;
+
+    // Scope-specific validation
+    const validationResult = await this.validateSubmissionScope(form, submittedBy, submissionData);
+
+    if (!validationResult.valid) {
+      throw new Error(validationResult.error);
+    }
+
     const queryRunner = this.dataSource.createQueryRunner();
 
     try {
       await queryRunner.connect();
 
-      // Prepare insertion data
       const insertData: Record<string, any> = {
         form_id: formId,
         submitted_by: submittedBy,
         submitted_at: new Date(),
         status: 'SUBMITTED',
-        minigrid_siteId: submissionData?.minigrid_siteId,
+        admin_status: 'PENDING',
       };
 
-      // Map form data to table columns
+      // Set scope-specific fields
+      if (submissionScope === FormSubmissionScope.SITE_LEVEL) {
+        insertData.minigrid_siteId = submissionData.minigrid_siteId;
+
+        // Derive country from site
+        const site = await queryRunner.query(
+          `SELECT country FROM minigrid_sites WHERE id = $1 AND "memberUuid" = $2`,
+          [submissionData.minigrid_siteId, submittedBy]
+        );
+
+        if (!site || site.length === 0) {
+          throw new Error('Invalid minigrid site or site does not belong to you');
+        }
+
+        insertData.country = site[0].country;
+      } else if (submissionScope === FormSubmissionScope.COUNTRY_LEVEL) {
+        if (!submissionData.country) {
+          throw new Error('Country is required for country-level submissions');
+        }
+
+        // Verify member operates in this country
+        const hasSitesInCountry = await queryRunner.query(
+          `SELECT EXISTS(
+          SELECT 1 FROM minigrid_sites 
+          WHERE "memberUuid" = $1 AND country = $2
+        ) as exists`,
+          [submittedBy, submissionData.country]
+        );
+
+        if (!hasSitesInCountry[0].exists) {
+          throw new Error('You do not have any sites in this country');
+        }
+
+        insertData.country = submissionData.country;
+        insertData.minigrid_siteId = submissionData.minigrid_siteId || null; // Optional reference
+      } else if (submissionScope === FormSubmissionScope.MEMBER_LEVEL) {
+        // Member-level: no required foreign keys
+        insertData.country = submissionData.country || null;
+        insertData.minigrid_siteId = submissionData.minigrid_siteId || null;
+      }
+
+      // Map form questions to table columns
       for (const category of form.categories) {
         for (const question of category.questions) {
           const columnName = question.slug;
@@ -1138,24 +1391,120 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
 
           if (value !== undefined) {
             insertData[columnName] = value;
+          } else if (question.required) {
+            throw new Error(`Required field missing: ${question.label || columnName}`);
           }
         }
       }
 
-      // Build and execute INSERT
       const columns = Object.keys(insertData)
         .map(col => `"${col}"`)
         .join(', ');
       const values = Object.values(insertData);
       const placeholders = values.map((_, index) => `$${index + 1}`).join(', ');
 
-      const insertSQL = `INSERT INTO "${tableName}" (${columns}) VALUES (${placeholders}) RETURNING id`;
+      const insertSQL = `
+      INSERT INTO "${tableName}" (${columns}) 
+      VALUES (${placeholders}) 
+      RETURNING id
+    `;
+
       const result = await queryRunner.query(insertSQL, values);
 
-      return { id: result[0].id, ...insertData };
+      return {
+        id: result[0].id,
+        ...insertData,
+        message: 'Form submitted successfully',
+      };
+    } catch (error: any) {
+      // Handle unique constraint violations
+      if (error.code === '23505') {
+        // PostgreSQL unique violation
+        if (submissionScope === FormSubmissionScope.SITE_LEVEL) {
+          throw new Error('You have already submitted this form for this site');
+        } else if (submissionScope === FormSubmissionScope.COUNTRY_LEVEL) {
+          throw new Error('You have already submitted this form for this country');
+        } else if (submissionScope === FormSubmissionScope.MEMBER_LEVEL) {
+          throw new Error('You have already submitted this form');
+        }
+      }
+      throw error;
     } finally {
       await queryRunner.release();
     }
+  }
+
+  // Validation helper
+  private async validateSubmissionScope(
+    form: Form,
+    memberId: string,
+    submissionData: Record<string, any>
+  ): Promise<{ valid: boolean; error?: string }> {
+    const scope = form.submissionScope;
+
+    // SITE_LEVEL validation
+    if (scope === FormSubmissionScope.SITE_LEVEL) {
+      if (!submissionData.minigrid_siteId) {
+        return { valid: false, error: 'Minigrid site is required for this form' };
+      }
+
+      // Check if already submitted for this site
+      if (form.allowOnlyOneSubmissionPerScope) {
+        const existing = await this.dataSource.query(
+          `SELECT EXISTS(
+          SELECT 1 FROM "${form.tableName}" 
+          WHERE form_id = $1 AND minigrid_siteId = $2
+        ) as exists`,
+          [form.id, submissionData.minigrid_siteId]
+        );
+
+        if (existing[0].exists) {
+          return { valid: false, error: 'A submission already exists for this site' };
+        }
+      }
+    }
+
+    // COUNTRY_LEVEL validation
+    else if (scope === FormSubmissionScope.COUNTRY_LEVEL) {
+      if (!submissionData.country) {
+        return { valid: false, error: 'Country is required for this form' };
+      }
+
+      // Check if already submitted for this country
+      if (form.allowOnlyOneSubmissionPerScope) {
+        const existing = await this.dataSource.query(
+          `SELECT EXISTS(
+          SELECT 1 FROM "${form.tableName}" 
+          WHERE form_id = $1 AND submitted_by = $2 AND country = $3
+        ) as exists`,
+          [form.id, memberId, submissionData.country]
+        );
+
+        if (existing[0].exists) {
+          return { valid: false, error: 'You have already submitted this form for this country' };
+        }
+      }
+    }
+
+    // MEMBER_LEVEL validation
+    else if (scope === FormSubmissionScope.MEMBER_LEVEL) {
+      // Check if already submitted
+      if (form.allowOnlyOneSubmissionPerScope) {
+        const existing = await this.dataSource.query(
+          `SELECT EXISTS(
+          SELECT 1 FROM "${form.tableName}" 
+          WHERE form_id = $1 AND submitted_by = $2
+        ) as exists`,
+          [form.id, memberId]
+        );
+
+        if (existing[0].exists) {
+          return { valid: false, error: 'You have already submitted this form' };
+        }
+      }
+    }
+
+    return { valid: true };
   }
 
   /**
@@ -1401,6 +1750,40 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       ...row,
       answers: this.extractFormAnswers(row, form),
     }));
+  }
+
+  /**
+   * Get member's submission status across all forms
+   */
+  async getMemberSubmissionOverview(memberId: string): Promise<any> {
+    const [publishedForms] = await this.findAllForms({
+      status: FormStatus.PUBLISHED,
+    });
+
+    const overview = [];
+
+    for (const form of publishedForms) {
+      if (!form.tableCreated || !form.tableName) continue;
+
+      try {
+        const requirements = await this.getFormSubmissionRequirements(form.id, memberId);
+
+        overview.push({
+          formId: form.id,
+          formTitle: form.title,
+          formType: form.formType?.name || 'Unknown',
+          submissionScope: form.submissionScope,
+          completionPercentage: requirements.completionPercentage,
+          requiredSubmissions: requirements.requiredSubmissions.length,
+          completedSubmissions: requirements.requiredSubmissions.filter(r => r.submitted).length,
+          pendingSubmissions: requirements.requiredSubmissions.filter(r => !r.submitted).length,
+        });
+      } catch (error) {
+        console.error(`Error fetching requirements for form ${form.id}:`, error);
+      }
+    }
+
+    return overview;
   }
 
   /**
@@ -2173,17 +2556,33 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     }
   }
 
+  // form.repository.ts - Updated createFormSubmissionTable method
+
   private async createFormSubmissionTable(queryRunner: QueryRunner, form: Form): Promise<void> {
     const tableName = form.tableName!;
+    const submissionScope = form.submissionScope;
 
     let sql = `CREATE TABLE "${tableName}" (\n`;
     sql += `  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`;
     sql += `  "form_id" UUID NOT NULL REFERENCES forms(id) ON DELETE CASCADE,\n`;
-    sql += `  "submitted_by" UUID REFERENCES members(id) ON DELETE SET NULL,\n`;
-    sql += `  "minigrid_siteId" UUID REFERENCES minigrid_sites(id) ON DELETE SET NULL,\n`;
+    sql += `  "submitted_by" UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,\n`;
+
+    // Add columns based on submission scope
+    if (submissionScope === FormSubmissionScope.SITE_LEVEL) {
+      sql += `  "minigrid_siteId" UUID NOT NULL REFERENCES minigrid_sites(id) ON DELETE CASCADE,\n`;
+      sql += `  "country" VARCHAR(100) NULL,\n`;
+    } else if (submissionScope === FormSubmissionScope.COUNTRY_LEVEL) {
+      sql += `  "country" VARCHAR(100) NOT NULL,\n`;
+      sql += `  "minigrid_siteId" UUID NULL REFERENCES minigrid_sites(id) ON DELETE SET NULL,\n`;
+    } else if (submissionScope === FormSubmissionScope.MEMBER_LEVEL) {
+      sql += `  "country" VARCHAR(100) NULL,\n`;
+      sql += `  "minigrid_siteId" UUID NULL REFERENCES minigrid_sites(id) ON DELETE SET NULL,\n`;
+    }
+
     sql += `  "submitted_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n`;
     sql += `  "status" VARCHAR(20) DEFAULT 'SUBMITTED',\n`;
 
+    // Admin review fields
     sql += `  "admin_status" VARCHAR(20) DEFAULT 'PENDING' CHECK (admin_status IN ('PENDING', 'APPROVED', 'REJECTED')),\n`;
     sql += `  "admin_comment" TEXT NULL,\n`;
     sql += `  "reviewed_by" UUID REFERENCES users(id) ON DELETE SET NULL,\n`;
@@ -2195,6 +2594,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       'form_id',
       'submitted_by',
       'minigrid_siteId',
+      'country',
       'submitted_at',
       'status',
       'admin_status',
@@ -2209,22 +2609,29 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     for (const category of form.categories) {
       for (const question of category.questions) {
         const columnName = question.slug;
-
-        // Skip reserved column names
-        if (reservedColumns.includes(columnName)) {
-          continue;
-        }
+        if (reservedColumns.includes(columnName)) continue;
 
         const columnType = this.getPostgreSQLType(question.type);
         const nullable = question.required ? 'NOT NULL' : 'NULL';
-
         sql += `  "${columnName}" ${columnType} ${nullable},\n`;
       }
     }
 
     sql += `  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n`;
     sql += `  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n`;
-    sql += `);`;
+
+    // Add unique constraint based on scope
+    if (form.allowOnlyOneSubmissionPerScope) {
+      if (submissionScope === FormSubmissionScope.SITE_LEVEL) {
+        sql += `,\n  CONSTRAINT "uq_${tableName}_per_site" UNIQUE ("form_id", "minigrid_siteId")`;
+      } else if (submissionScope === FormSubmissionScope.COUNTRY_LEVEL) {
+        sql += `,\n  CONSTRAINT "uq_${tableName}_per_country" UNIQUE ("form_id", "submitted_by", "country")`;
+      } else if (submissionScope === FormSubmissionScope.MEMBER_LEVEL) {
+        sql += `,\n  CONSTRAINT "uq_${tableName}_per_member" UNIQUE ("form_id", "submitted_by")`;
+      }
+    }
+
+    sql += `\n);`;
 
     await queryRunner.query(sql);
 
@@ -2233,12 +2640,23 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     const indexes = [
       `CREATE INDEX "idx_${indexPrefix}_form_id" ON "${tableName}"("form_id");`,
       `CREATE INDEX "idx_${indexPrefix}_submitted_by" ON "${tableName}"("submitted_by");`,
-      `CREATE INDEX "idx_${indexPrefix}_minigrid_siteId" ON "${tableName}"("minigrid_siteId");`,
       `CREATE INDEX "idx_${indexPrefix}_submitted_at" ON "${tableName}"("submitted_at");`,
       `CREATE INDEX "idx_${indexPrefix}_status" ON "${tableName}"("status");`,
       `CREATE INDEX "idx_${indexPrefix}_admin_status" ON "${tableName}"("admin_status");`,
-      `CREATE INDEX "idx_${indexPrefix}_reviewed_by" ON "${tableName}"("reviewed_by");`,
     ];
+
+    if (submissionScope === FormSubmissionScope.SITE_LEVEL) {
+      indexes.push(
+        `CREATE INDEX "idx_${indexPrefix}_minigrid_siteId" ON "${tableName}"("minigrid_siteId");`
+      );
+    }
+
+    if (
+      submissionScope === FormSubmissionScope.COUNTRY_LEVEL ||
+      submissionScope === FormSubmissionScope.SITE_LEVEL
+    ) {
+      indexes.push(`CREATE INDEX "idx_${indexPrefix}_country" ON "${tableName}"("country");`);
+    }
 
     for (const indexSQL of indexes) {
       await queryRunner.query(indexSQL);

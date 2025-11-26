@@ -28,6 +28,19 @@ export interface IFormRepository {
     formType?: string;
     adminId?: string;
   }): Promise<[Form[], number]>;
+  getFormSubmissionRequirements: (
+    formId: string,
+    memberId: string
+  ) => Promise<{
+    canSubmit: boolean;
+    reasons: string[];
+  }>;
+  getMemberSubmissionOverview: (memberId: string) => Promise<{
+    totalForms: number;
+    formsSubmitted: number;
+    formsPending: number;
+    formsNotStarted: number;
+  }>;
 
   /* ============================================================================ */
   /* Category Management                                                          */
