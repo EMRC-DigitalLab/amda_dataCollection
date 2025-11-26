@@ -41,11 +41,7 @@ export function createMinigridRoutes(dataSource: DataSource): Router {
   router.get('/:id', authMiddleware, minigridSiteController.getMinigridSiteById);
 
   // Update minigrid site
-  router.put(
-    '/:id',
-    authMiddleware,
-    minigridSiteController.updateMinigridSite
-  );
+  router.put('/:id', authMiddleware, minigridSiteController.updateMinigridSite);
 
   // Delete minigrid site
   router.delete('/:id', authMiddleware, minigridSiteController.deleteMinigridSite);

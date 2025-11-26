@@ -63,12 +63,9 @@ export class MemberProcessor {
    * Generate member data with simulated values for missing fields
    */
   private generateMemberData(companyName: string): MemberCreationData {
-    const emailSlug = companyName
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '')
-      .substring(0, 20);
-
-    const email = `contact@${emailSlug}.com`;
+    // Generate email in format: dev-a@amda.com, dev-b@amda.com, etc.
+    const abbreviation = this.generateCompanyAbbreviation(companyName);
+    const email = `${abbreviation}@amda.com`;
     const registrationNumber = `REG-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const country = this.extractCountryFromName(companyName) || 'Tanzania';
 
@@ -87,6 +84,31 @@ export class MemberProcessor {
       contact1Email: email,
       contact1Phone: `+1-${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 9000 + 1000)}`,
     };
+  }
+
+  /**
+   * Generate company abbreviation for email (dev-a, dev-b, etc.)
+   */
+  private generateCompanyAbbreviation(companyName: string): string {
+    // Extract first word and first letter of second word if exists
+    const words = companyName
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .split(/\s+/);
+
+    if (words.length >= 2) {
+      // e.g., "Dev A" -> "dev-a"
+      return `${words[0]}-${words[1].charAt(0)}`;
+    } else if (words.length === 1) {
+      // e.g., "DevCompany" -> "dev"
+      return words[0].substring(0, 10);
+    }
+
+    // Fallback
+    return companyName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .substring(0, 10);
   }
 
   /**

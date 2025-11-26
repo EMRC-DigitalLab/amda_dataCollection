@@ -53,7 +53,7 @@ export class FormTypeProcessor {
   /**
    * Process individual form type
    */
-  private async processFormType(
+  public async processFormType(
     name: string,
     description: string,
     slug: string,

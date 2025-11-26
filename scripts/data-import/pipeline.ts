@@ -6,6 +6,7 @@ import { MemberProcessor } from './processors/member-processor';
 import { FormTypeProcessor } from './processors/form-type-processor';
 import { FormProcessor } from './processors/form-processor';
 import { SiteProcessor } from './processors/site-processor';
+import { generateSlug } from './utils/slug-generator';
 import { SubmissionProcessor } from './processors/submission-processor';
 import { PipelineConfig, PipelineProgress } from './types';
 import { logger } from './utils/logger';
@@ -48,6 +49,24 @@ export class DataImportPipeline {
       const formTypeProcessor = new FormTypeProcessor(this.dataSource);
       const formTypeMap = await formTypeProcessor.processFormTypes(excelData.instructions, year);
       this.progress.formTypesCreated = formTypeMap.size;
+
+      // If no form types found from Instructions, create them from sheet names
+      if (formTypeMap.size === 0) {
+        logger.warn('No form types found in Instructions sheet, creating from data sheets...');
+
+        for (const dataSheet of excelData.dataSheets) {
+          const formType = await formTypeProcessor.processFormType(
+            dataSheet.formTypeName,
+            `Data collection for ${dataSheet.formTypeName}`,
+            generateSlug(dataSheet.formTypeName),
+            year
+          );
+          formTypeMap.set(dataSheet.formTypeName, formType);
+        }
+
+        this.progress.formTypesCreated = formTypeMap.size;
+        logger.success(`Created ${formTypeMap.size} form types from sheet names`);
+      }
 
       // STEP 4: Process Each Data Sheet
       const formProcessor = new FormProcessor(this.dataSource, this.adminId);

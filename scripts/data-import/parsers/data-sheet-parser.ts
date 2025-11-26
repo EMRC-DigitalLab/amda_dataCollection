@@ -154,7 +154,7 @@ function groupIntoCategories(columnMappings: ColumnMapping[]): CategoryData[] {
       description: mapping.description,
       type: mapping.type,
       units: mapping.units,
-      required: inferRequired(mapping.kpi, mapping.description),
+      required: inferRequired(mapping.kpi, mapping.description), // Always true now
       sortOrder: category.questions.length + 1,
       columnIndex: mapping.columnIndex,
       options: inferQuestionOptions(mapping.type, mapping.units, mapping.description),

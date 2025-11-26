@@ -27,13 +27,28 @@ export class SubmissionProcessor {
     logger.debug(`Processing submission for site: ${site.name}`);
 
     try {
+      // Check if submission already exists
       const existingSubmission = await this.formRepository.getSubmissionByMinigridSiteId(
         form.id,
         site.id
       );
 
-      // Clean data
+      // Clean and validate data
       const cleanedData = this.cleanSubmissionData(siteRow.data, form);
+
+      // Validate before submission
+      const validation = this.validateSubmissionData(cleanedData, form, site);
+      if (!validation.isValid) {
+        logger.warn(`Validation warnings for site: ${site.name}`, validation.warnings);
+      }
+
+      // Log what we're about to send
+      logger.debug(`Submission data for ${site.name}:`, {
+        siteId: site.id,
+        formId: form.id,
+        dataKeys: Object.keys(cleanedData),
+        sampleData: this.getSampleData(cleanedData),
+      });
 
       if (existingSubmission) {
         logger.debug(`Submission already exists for site: ${site.name}, updating...`);
@@ -45,6 +60,7 @@ export class SubmissionProcessor {
             minigrid_siteId: site.id,
           }
         );
+        logger.success(`Submission updated for site: ${site.name}`);
         return updatedSubmission;
       }
 
@@ -73,6 +89,9 @@ export class SubmissionProcessor {
     }
   }
 
+  /**
+   * Clean submission data - remove invalid characters, format correctly
+   */
   private cleanSubmissionData(data: Record<string, any>, form: Form): Record<string, any> {
     const cleaned: Record<string, any> = {};
 
@@ -95,8 +114,18 @@ export class SubmissionProcessor {
 
       // Clean based on type
       if (questionType === 'number' || questionType === 'currency') {
-        cleaned[key] = String(value).replace(/[^0-9.-]/g, ''); // Remove commas, letters, etc
+        // Remove commas, letters, spaces, etc - keep only numbers, dots, and minus
+        const cleanedValue = String(value).replace(/[^0-9.-]/g, '');
+        cleaned[key] = cleanedValue || null;
+      } else if (questionType === 'date') {
+        // Handle date formats
+        cleaned[key] = this.cleanDateValue(value);
+      } else if (questionType === 'boolean') {
+        // Convert to boolean
+        const strValue = String(value).toLowerCase();
+        cleaned[key] = strValue === 'yes' || strValue === 'true' || strValue === '1';
       } else {
+        // Keep as-is for text, textarea, select, etc
         cleaned[key] = value;
       }
     }
@@ -105,73 +134,95 @@ export class SubmissionProcessor {
   }
 
   /**
-   * Batch process submissions for multiple sites
+   * Clean date value
    */
-  async batchProcessSubmissions(
+  private cleanDateValue(value: any): string | null {
+    if (!value) return null;
+
+    // If already a Date object
+    if (value instanceof Date) {
+      return value.toISOString().split('T')[0];
+    }
+
+    // If string, try to parse
+    const str = String(value).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      return str;
+    }
+
+    // Try to parse other formats
+    try {
+      const date = new Date(str);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0];
+      }
+    } catch (e) {
+      // Invalid date
+    }
+
+    return null;
+  }
+
+  /**
+   * Validate submission data before sending to database
+   */
+  private validateSubmissionData(
+    data: Record<string, any>,
     form: Form,
-    sites: MinigridSite[],
-    member: Member,
-    siteRows: SiteDataRow[]
-  ): Promise<{
-    created: number;
-    updated: number;
-    failed: number;
-    errors: Array<{ site: string; error: string }>;
-  }> {
-    logger.info(`Batch processing ${siteRows.length} submissions...`);
+    _site: MinigridSite
+  ): { isValid: boolean; warnings: string[] } {
+    const warnings: string[] = [];
 
-    const results = {
-      created: 0,
-      updated: 0,
-      failed: 0,
-      errors: [] as Array<{ site: string; error: string }>,
-    };
+    for (const category of form.categories) {
+      for (const question of category.questions) {
+        const value = data[question.slug];
 
-    for (let i = 0; i < siteRows.length; i++) {
-      const siteRow = siteRows[i];
-      const site = sites[i];
-
-      try {
-        const existingSubmission = await this.formRepository.getSubmissionByMinigridSiteId(
-          form.id,
-          site.id
-        );
-
-        if (existingSubmission) {
-          await this.formRepository.updateSubmission(form.id, existingSubmission.id, {
-            ...siteRow.data,
-            minigrid_siteId: site.id,
-          });
-          results.updated++;
-        } else {
-          await this.formRepository.submitFormData(
-            form.id,
-            {
-              ...siteRow.data,
-              minigrid_siteId: site.id,
-            },
-            member.id
-          );
-          results.created++;
+        // Check required fields
+        if (question.required && (value === null || value === undefined || value === '')) {
+          warnings.push(`Missing required field: ${question.kpi}`);
         }
-      } catch (error: any) {
-        results.failed++;
-        results.errors.push({
-          site: site.name,
-          error: error.message,
-        });
-        logger.warn(`Failed to process submission for site: ${site.name}`, {
-          error: error.message,
-        });
+
+        // Type validation
+        if (value !== null && value !== undefined && value !== '') {
+          switch (question.type) {
+            case 'number':
+            case 'currency':
+              if (isNaN(Number(value))) {
+                warnings.push(`Invalid number for ${question.kpi}: ${value}`);
+              }
+              break;
+            case 'email':
+              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value))) {
+                warnings.push(`Invalid email for ${question.kpi}: ${value}`);
+              }
+              break;
+            case 'boolean':
+              if (typeof value !== 'boolean') {
+                warnings.push(`Invalid boolean for ${question.kpi}: ${value}`);
+              }
+              break;
+          }
+        }
       }
     }
 
-    logger.info('Batch processing complete', {
-      created: results.created,
-      updated: results.updated,
-      failed: results.failed,
-    });
+    return {
+      isValid: warnings.length === 0,
+      warnings,
+    };
+  }
 
-    return results;
+  /**
+   * Get sample of data for logging (first 3 fields)
+   */
+  private getSampleData(data: Record<string, any>): Record<string, any> {
+    const sample: Record<string, any> = {};
+    let count = 0;
+    for (const [key, value] of Object.entries(data)) {
+      if (count >= 3) break;
+      sample[key] = value;
+      count++;
+    }
+    return sample;
   }
 }
