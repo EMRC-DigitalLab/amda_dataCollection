@@ -417,7 +417,6 @@ export function createFormRoutes(dataSource: DataSource): Router {
   router.post(
     '/:id/submissions/bulk-delete',
     authMiddleware,
-    adminMiddleware,
     formController.bulkDeleteSubmissions
   );
 

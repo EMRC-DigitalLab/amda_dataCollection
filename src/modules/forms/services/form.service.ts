@@ -1364,7 +1364,6 @@ export class FormService {
   async getUserSubmission(formId: string, minigrid_siteId?: string): Promise<any | null> {
     if (!minigrid_siteId) return null;
 
-    console.log(minigrid_siteId);
 
     const submissions = await this.repo.getFormSubmissions(
       formId,
@@ -1421,10 +1420,9 @@ export class FormService {
       { page: 1, limit: 1 }
     );
 
-    console.log(formId, siteId, submissions, 'this is the paramasnsnns');
 
     if (submissions.length === 0) {
-      throw new Error('Submission not found');
+      throw new Error('No submissions have been made by this member yet.');
     }
 
     return submissions[0];

@@ -37,7 +37,6 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
     });
   }
 
-  // New method: Find minigrid sites by userId
   async findByUserId(
     userId: string,
     options?: FindManyOptions<MinigridSite>
@@ -49,19 +48,16 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
     });
   }
 
-  // New method: Find minigrid sites by status
   async findByStatus(
     status: string,
     options?: FindManyOptions<MinigridSite>
   ): Promise<MinigridSite[]> {
     return await this.repository.find({
-      where: { status: status as any }, // Cast to handle enum type
-      // relations: ['forms', 'user'],
+      where: { status: status as any },
       ...options,
     });
   }
 
-  // New method: Find minigrid sites by userId and status
   async findByUserIdAndStatus(
     userId: string,
     status: string,
@@ -72,52 +68,43 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
         memberId: userId,
         status: status as any,
       },
-      // relations: ['forms', 'user'],
       ...options,
     });
   }
 
-  // New method: Find minigrid sites by region
   async findByRegion(
     region: string,
     options?: FindManyOptions<MinigridSite>
   ): Promise<MinigridSite[]> {
     return await this.repository.find({
       where: { region },
-      // relations: ['forms', 'user'],
       ...options,
     });
   }
 
-  // New method: Find minigrid sites by country
   async findByCountry(
     country: string,
     options?: FindManyOptions<MinigridSite>
   ): Promise<MinigridSite[]> {
     return await this.repository.find({
       where: { country },
-      // relations: ['forms', 'user'],
       ...options,
     });
   }
 
-  // New method: Find operational minigrid sites
   async findOperational(options?: FindManyOptions<MinigridSite>): Promise<MinigridSite[]> {
     return await this.repository.find({
       where: { status: 'Operational' },
-      // relations: ['forms', 'user'],
       ...options,
     });
   }
 
-  // New method: Find minigrid sites by generation type
   async findByGenerationType(
     generationType: string,
     options?: FindManyOptions<MinigridSite>
   ): Promise<MinigridSite[]> {
     return await this.repository.find({
       where: { generationType },
-      // relations: ['forms', 'user'],
       ...options,
     });
   }
@@ -136,21 +123,18 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
     return await this.repository.count(options);
   }
 
-  // New method: Count minigrid sites by userId
   async countByUserId(userId: string): Promise<number> {
     return await this.repository.count({
       where: { memberId: userId },
     });
   }
 
-  // New method: Count minigrid sites by status
   async countByStatus(status: string): Promise<number> {
     return await this.repository.count({
       where: { status: status as any },
     });
   }
 
-  // New method: Count minigrid sites by userId and status
   async countByUserIdAndStatus(userId: string, status: string): Promise<number> {
     return await this.repository.count({
       where: {
@@ -160,28 +144,24 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
     });
   }
 
-  // New method: Count minigrid sites by region
   async countByRegion(region: string): Promise<number> {
     return await this.repository.count({
       where: { region },
     });
   }
 
-  // New method: Count minigrid sites by country
   async countByCountry(country: string): Promise<number> {
     return await this.repository.count({
       where: { country },
     });
   }
 
-  // New method: Count operational minigrid sites
   async countOperational(): Promise<number> {
     return await this.repository.count({
       where: { status: 'Operational' },
     });
   }
 
-  // New method: Get minigrid sites with high capacity (above threshold)
   async findHighCapacitySites(
     capacityThreshold: number = 100,
     options?: FindManyOptions<MinigridSite>
@@ -202,7 +182,6 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
       .getMany();
   }
 
-  // New method: Get minigrid sites with many customers (above threshold)
   async findHighCustomerSites(
     customerThreshold: number = 50,
     options?: FindManyOptions<MinigridSite>
@@ -223,7 +202,6 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
       .getMany();
   }
 
-  // New method: Search minigrid sites by name or location
   async searchSites(
     searchTerm: string,
     options?: FindManyOptions<MinigridSite>
@@ -245,7 +223,6 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
       .getMany();
   }
 
-  // New method: Get recently created minigrid sites
   async findRecentSites(
     days: number = 30,
     options?: FindManyOptions<MinigridSite>
@@ -265,7 +242,6 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
     });
   }
 
-  // New method: Bulk update minigrid sites
   async bulkUpdate(ids: string[], data: Partial<MinigridSite>): Promise<boolean> {
     const result = await this.repository
       .createQueryBuilder()
@@ -277,10 +253,35 @@ export class MinigridSiteRepository implements IMinigridSiteRepository {
     return result.affected !== 0;
   }
 
-  // async findActive(): Promise<MinigridSite[]> {
-  //   return await this.repository.find({
-  //     where: { isActive: true },
-  //     relations: ['forms'],
-  //   });
-  // }
+  async bulkDelete(ids: string[]): Promise<{ success: boolean; deletedCount: number }> {
+    const result = await this.repository
+      .createQueryBuilder()
+      .delete()
+      .from(MinigridSite)
+      .where('id IN (:...ids)', { ids })
+      .execute();
+
+    return {
+      success: result.affected !== 0,
+      deletedCount: result.affected || 0,
+    };
+  }
+
+  async bulkDeleteByUserId(
+    userId: string,
+    ids: string[]
+  ): Promise<{ success: boolean; deletedCount: number }> {
+    const result = await this.repository
+      .createQueryBuilder()
+      .delete()
+      .from(MinigridSite)
+      .where('id IN (:...ids)', { ids })
+      .andWhere('memberUuid = :userId', { userId })
+      .execute();
+
+    return {
+      success: result.affected !== 0,
+      deletedCount: result.affected || 0,
+    };
+  }
 }
