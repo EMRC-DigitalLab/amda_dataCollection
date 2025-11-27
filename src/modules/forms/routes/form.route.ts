@@ -414,11 +414,7 @@ export function createFormRoutes(dataSource: DataSource): Router {
   /* ============================================================================ */
 
   // Bulk delete submissions
-  router.post(
-    '/:id/submissions/bulk-delete',
-    authMiddleware,
-    formController.bulkDeleteSubmissions
-  );
+  router.post('/:id/submissions/bulk-delete', authMiddleware, formController.bulkDeleteSubmissions);
 
   // Bulk update submission status
   router.post(

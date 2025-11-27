@@ -234,9 +234,7 @@ export class MinigridSiteService implements IMinigridSiteService {
       ids.map(id => this.minigridSiteRepository.findById(id))
     );
 
-    const validIds = existingSites
-      .filter(site => site !== null)
-      .map(site => site!.id);
+    const validIds = existingSites.filter(site => site !== null).map(site => site!.id);
 
     if (validIds.length === 0) {
       throw new AppError('None of the provided site IDs exist', 404);
@@ -262,15 +260,12 @@ export class MinigridSiteService implements IMinigridSiteService {
     const userSites = await this.minigridSiteRepository.findByUserId(userId);
     const userSiteIds = userSites.map(site => site.id);
 
-    console.log(userSiteIds, ids, "these are the sites id coming");
+    console.log(userSiteIds, ids, 'these are the sites id coming');
 
     const validIds = ids.filter(id => userSiteIds.includes(id));
 
     if (validIds.length === 0) {
-      throw new AppError(
-        'None of the provided sites belong to this user or do not exist',
-        403
-      );
+      throw new AppError('None of the provided sites belong to this user or do not exist', 403);
     }
 
     const result = await this.minigridSiteRepository.bulkDeleteByUserId(userId, validIds);
