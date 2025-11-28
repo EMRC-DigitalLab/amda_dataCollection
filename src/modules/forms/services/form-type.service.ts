@@ -223,4 +223,197 @@ export class FormTypeService {
   async reorderFormTypes(orderedIds: string[]): Promise<void> {
     await this.formTypeRepository.reorderFormTypes(orderedIds);
   }
+
+/**
+ * Clone/Replicate a form type with all its forms to a new year
+ */
+async replicateFormType(
+  sourceFormTypeId: string,
+  targetYear: number,
+  options?: {
+    prefix?: string;
+    includeDrafts?: boolean;
+    preservePublishedStatus?: boolean;
+  }
+): Promise<FormType> {
+  // Validate source form type exists
+  const sourceFormType = await this.findById(sourceFormTypeId);
+  if (!sourceFormType) {
+    throw new Error(`Source form type with ID ${sourceFormTypeId} not found`);
+  }
+
+  // Validate target year
+  const currentYear = new Date().getFullYear();
+  if (targetYear < currentYear - 10 || targetYear > currentYear + 10) {
+    throw new Error(
+      `Invalid target year ${targetYear}. Must be within 10 years of current year.`
+    );
+  }
+
+  // Validate target year is different
+  if (targetYear === sourceFormType.year) {
+    throw new Error(
+      `Target year ${targetYear} is the same as the source year. Please choose a different year.`
+    );
+  }
+
+  // Check if target year already has this form type
+  const existingFormType = await this.formTypeRepository.findByNameAndYear(
+    sourceFormType.name,
+    targetYear
+  );
+
+  if (existingFormType) {
+    throw new Error(
+      `Form type "${sourceFormType.name}" already exists for year ${targetYear}. ` +
+      `Please delete the existing form type first or choose a different year.`
+    );
+  }
+
+  // Generate expected slug and check if it exists
+  const baseSlug = sourceFormType.slug.replace(/-\d{4}$/, '');
+  const expectedSlug = `${baseSlug}-${targetYear}`;
+  const existingSlug = await this.formTypeRepository.findBySlug(expectedSlug);
+
+  if (existingSlug) {
+    throw new Error(
+      `A form type with slug "${expectedSlug}" already exists. ` +
+      `This may indicate a naming conflict. Please resolve this before replicating.`
+    );
+  }
+
+  console.log(`Starting replication process for form type: ${sourceFormType.name} (${sourceFormType.year}) → ${targetYear}`);
+
+  try {
+    const result = await this.formTypeRepository.cloneFormTypeWithForms(
+      sourceFormTypeId,
+      targetYear,
+      options
+    );
+
+    console.log(`Replication completed successfully. New form type ID: ${result.id}`);
+    
+    return result;
+  } catch (error) {
+    console.error(`Replication failed:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Replicate a form type to multiple years at once
+ */
+async replicateFormTypeToMultipleYears(
+  sourceFormTypeId: string,
+  targetYears: number[],
+  options?: {
+    prefix?: string;
+    includeDrafts?: boolean;
+    preservePublishedStatus?: boolean;
+  }
+): Promise<{
+  successful: FormType[];
+  failed: Array<{ year: number; error: string }>;
+}> {
+  // Validate source form type exists
+  const sourceFormType = await this.findById(sourceFormTypeId);
+  if (!sourceFormType) {
+    throw new Error(`Source form type with ID ${sourceFormTypeId} not found`);
+  }
+
+  // Validate years
+  const currentYear = new Date().getFullYear();
+  const validYears = targetYears.filter(
+    year => year >= currentYear - 10 && year <= currentYear + 10
+  );
+
+  if (validYears.length === 0) {
+    throw new Error('No valid target years provided');
+  }
+
+  const successful: FormType[] = [];
+  const failed: Array<{ year: number; error: string }> = [];
+
+  for (const year of validYears) {
+    try {
+      const replicatedFormType = await this.replicateFormType(
+        sourceFormTypeId,
+        year,
+        options
+      );
+      successful.push(replicatedFormType);
+    } catch (error:any) {
+      failed.push({
+        year,
+        error: error.message,
+      });
+    }
+  }
+
+  return { successful, failed };
+}
+
+/**
+ * Get replication preview - shows what would be replicated
+ */
+async getReplicationPreview(sourceFormTypeId: string): Promise<{
+  formType: {
+    id: string;
+    name: string;
+    year: number;
+    description: string;
+  };
+  formsCount: number;
+  publishedFormsCount: number;
+  draftFormsCount: number;
+  totalQuestionsCount: number;
+  forms: Array<{
+    id: string;
+    title: string;
+    status: string;
+    categoriesCount: number;
+    questionsCount: number;
+  }>;
+}> {
+  const formType = await this.formTypeRepository.findById(sourceFormTypeId);
+  console.log(formType, "this is formtypeid")
+  
+  if (!formType) {
+    throw new Error(`Form type with ID ${sourceFormTypeId} not found`);
+  }
+
+  const forms = formType.forms || [];
+  const publishedForms = forms.filter(f => f.status === 'PUBLISHED');
+  const draftForms = forms.filter(f => f.status === 'DRAFT');
+
+  const formsDetails = forms.map(form => ({
+    id: form.id,
+    title: form.title,
+    status: form.status,
+    categoriesCount: form.categories?.length || 0,
+    questionsCount: form.categories?.reduce(
+      (sum, cat) => sum + (cat.questions?.length || 0),
+      0
+    ) || 0,
+  }));
+
+  const totalQuestionsCount = formsDetails.reduce(
+    (sum, form) => sum + form.questionsCount,
+    0
+  );
+
+  return {
+    formType: {
+      id: formType.id,
+      name: formType.name,
+      year: formType.year,
+      description: formType.description || '',
+    },
+    formsCount: forms.length,
+    publishedFormsCount: publishedForms.length,
+    draftFormsCount: draftForms.length,
+    totalQuestionsCount,
+    forms: formsDetails,
+  };
+}
 }

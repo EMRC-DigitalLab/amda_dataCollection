@@ -1,0 +1,372 @@
+components:
+  schemas:
+    ExportType:
+      type: string
+      enum:
+        - FORM_TYPE_CURRENT
+        - FORM_TYPE_YEARLY
+        - ALL_FORM_TYPES_ALL_YEARS
+        - MEMBER_SUBMISSIONS_ALL
+        - MEMBER_SUBMISSIONS_YEARLY
+        - SITE_SUBMISSIONS_ALL
+        - SITE_SUBMISSIONS_YEARLY
+        - CUSTOM_FILTERED
+      description: Type of export to perform
+
+    ExportFormat:
+      type: string
+      enum:
+        - csv
+        - xlsx
+        - json
+        - pdf
+      description: Output format for the export
+
+    DateRange:
+      type: object
+      properties:
+        start:
+          type: string
+          format: date-time
+          description: Start date for the range filter
+        end:
+          type: string
+          format: date-time
+          description: End date for the range filter
+      required:
+        - start
+        - end
+
+    ExportRequest:
+      type: object
+      properties:
+        exportType:
+          $ref: '#/components/schemas/ExportType'
+        format:
+          $ref: '#/components/schemas/ExportFormat'
+        formTypeId:
+          type: string
+          format: uuid
+          description: UUID of the form type to filter by
+        year:
+          type: integer
+          minimum: 2000
+          maximum: 9999
+          description: Year to filter submissions by
+        memberId:
+          type: string
+          format: uuid
+          description: UUID of the member to filter by
+        siteId:
+          type: string
+          format: uuid
+          description: UUID of the site to filter by
+        submissionStatus:
+          type: string
+          description: Status of submissions to filter by
+        dateRange:
+          $ref: '#/components/schemas/DateRange'
+      required:
+        - exportType
+        - format
+      example:
+        exportType: "FORM_TYPE_YEARLY"
+        format: "csv"
+        formTypeId: "123e4567-e89b-12d3-a456-426614174000"
+        year: 2024
+
+    BulkExportRequest:
+      type: object
+      properties:
+        format:
+          $ref: '#/components/schemas/ExportFormat'
+        year:
+          type: integer
+          minimum: 2000
+          maximum: 9999
+          description: Year to filter submissions by
+        formTypeIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: List of form type UUIDs to export
+        memberIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: List of member UUIDs to export
+        siteIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: List of site UUIDs to export
+      required:
+        - format
+      example:
+        format: "xlsx"
+        year: 2024
+        formTypeIds: ["123e4567-e89b-12d3-a456-426614174000"]
+        memberIds: ["123e4567-e89b-12d3-a456-426614174001"]
+
+    ExportFilters:
+      type: object
+      properties:
+        formTypeId:
+          type: string
+          format: uuid
+        year:
+          type: integer
+        memberId:
+          type: string
+          format: uuid
+        siteId:
+          type: string
+          format: uuid
+        submissionStatus:
+          type: string
+        dateRange:
+          $ref: '#/components/schemas/DateRange'
+
+    ExportResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Whether the export was successful
+        fileName:
+          type: string
+          description: Name of the generated export file
+        filePath:
+          type: string
+          description: Full path to the export file
+        format:
+          $ref: '#/components/schemas/ExportFormat'
+        recordCount:
+          type: integer
+          description: Number of records exported
+        fileSize:
+          type: integer
+          description: Size of the export file in bytes
+        exportedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the export was completed
+        exportedBy:
+          type: string
+          description: ID of the user who initiated the export
+        filters:
+          $ref: '#/components/schemas/ExportFilters'
+      example:
+        success: true
+        fileName: "export-form-type-yearly-2024-01-15T10-30-00-000Z.csv"
+        filePath: "/app/exports/export-form-type-yearly-2024-01-15T10-30-00-000Z.csv"
+        format: "csv"
+        recordCount: 1250
+        fileSize: 524288
+        exportedAt: "2024-01-15T10:30:00.000Z"
+        exportedBy: "user123"
+        filters:
+          formTypeId: "123e4567-e89b-12d3-a456-426614174000"
+          year: 2024
+
+    ExportSummary:
+      type: object
+      properties:
+        totalRecords:
+          type: integer
+          description: Total number of records that would be exported
+        exportType:
+          $ref: '#/components/schemas/ExportType'
+        filters:
+          $ref: '#/components/schemas/ExportFilters'
+        formTypes:
+          type: array
+          items:
+            type: string
+          description: Names of form types included in the export
+        memberCount:
+          type: integer
+          description: Number of unique members in the export
+        siteCount:
+          type: integer
+          description: Number of unique sites in the export
+        dateRange:
+          type: object
+          properties:
+            earliest:
+              type: string
+              format: date-time
+              description: Earliest submission date in the dataset
+            latest:
+              type: string
+              format: date-time
+              description: Latest submission date in the dataset
+      example:
+        totalRecords: 1250
+        exportType: "FORM_TYPE_YEARLY"
+        filters:
+          formTypeId: "123e4567-e89b-12d3-a456-426614174000"
+          year: 2024
+        formTypes: ["Finance Report", "Project Assessment"]
+        memberCount: 45
+        siteCount: 123
+        dateRange:
+          earliest: "2024-01-01T00:00:00.000Z"
+          latest: "2024-12-31T23:59:59.999Z"
+
+    ExportPreviewRequest:
+      type: object
+      properties:
+        exportType:
+          $ref: '#/components/schemas/ExportType'
+        formTypeId:
+          type: string
+          format: uuid
+        year:
+          type: integer
+        memberId:
+          type: string
+          format: uuid
+        siteId:
+          type: string
+          format: uuid
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+          description: Maximum number of records to preview
+      required:
+        - exportType
+
+    ExportHistory:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        exportType:
+          $ref: '#/components/schemas/ExportType'
+        format:
+          $ref: '#/components/schemas/ExportFormat'
+        fileName:
+          type: string
+        fileSize:
+          type: integer
+        recordCount:
+          type: integer
+        status:
+          type: string
+          enum: [completed, failed, in_progress]
+        exportedAt:
+          type: string
+          format: date-time
+        exportedBy:
+          type: string
+        filters:
+          $ref: '#/components/schemas/ExportFilters'
+        downloadCount:
+          type: integer
+          default: 0
+        lastDownloadedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ExportFile:
+      type: object
+      properties:
+        fileName:
+          type: string
+          description: Name of the export file
+        size:
+          type: number
+          description: File size in bytes
+        created:
+          type: string
+          format: date-time
+          description: File creation timestamp
+      example:
+        fileName: "export-form-type-yearly-2024-01-15T10-30-00-000Z.csv"
+        size: 524288
+        created: "2024-01-15T10:30:00.000Z"
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          description: Error message
+        error:
+          type: string
+          description: Detailed error information (only in development mode)
+        errors:
+          type: array
+          items:
+            type: string
+          description: Array of validation errors
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid input parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: "Validation failed"
+            errors: ["Export type is required", "Format must be one of: csv, xlsx, json, pdf"]
+
+    Unauthorized:
+      description: Unauthorized - invalid or missing authentication token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: "Authentication required"
+
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: "Insufficient permissions to access this resource"
+
+    NotFound:
+      description: Not found - resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: "Resource not found"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: "Internal server error occurred"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login endpoint
