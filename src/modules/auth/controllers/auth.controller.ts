@@ -25,7 +25,7 @@ export class AuthController {
       const result = await this.authService.login(req.body);
       ResponseHelper.success(res, result, 'Login successful');
     } catch (error: any) {
-      ResponseHelper.error(res, error.message, 401);
+      ResponseHelper.error(res, error.message, 404);
     }
   });
 
@@ -34,13 +34,13 @@ export class AuthController {
       // THis is an hardcsoded adminId, since we no ,longer create a member from the admin dashboard
       const adminId = '40d13800-6ba2-4bea-9298-d53334e600cf';
       if (!adminId) {
-        return ResponseHelper.error(res, 'Admin authentication required', 401);
+        return ResponseHelper.error(res, 'Admin authentication required', 404);
       }
 
       const result = await this.authService.createMember(req.body, adminId);
       ResponseHelper.success(res, result, 'Member created successfully', 201);
     } catch (error: any) {
-      ResponseHelper.error(res, error.message, 400);
+      ResponseHelper.error(res, error.message, 404);
     }
   });
 
@@ -49,7 +49,7 @@ export class AuthController {
       const result = await this.authService.registerAdmin(req.body);
       ResponseHelper.success(res, result, 'Admin registered successfully', 201);
     } catch (error: any) {
-      ResponseHelper.error(res, error.message, 400);
+      ResponseHelper.error(res, error.message, 404);
     }
   });
 
@@ -57,7 +57,7 @@ export class AuthController {
     try {
       const userId = req.user?.id;
       if (!userId) {
-        return ResponseHelper.error(res, 'Authentication required', 401);
+        return ResponseHelper.error(res, 'Authentication required', 404);
       }
 
       await this.authService.changePassword(userId, req.body);
@@ -72,7 +72,7 @@ export class AuthController {
       const result = await this.authService.refreshToken(req.body);
       ResponseHelper.success(res, result, 'Token refreshed successfully');
     } catch (error: any) {
-      ResponseHelper.error(res, error.message, 401);
+      ResponseHelper.error(res, error.message, 404);
     }
   });
 
@@ -80,13 +80,13 @@ export class AuthController {
     try {
       const userId = req.user?.id;
       if (!userId) {
-        return ResponseHelper.error(res, 'Authentication required', 401);
+        return ResponseHelper.error(res, 'Authentication required', 404);
       }
 
       await this.authService.logout(userId);
       ResponseHelper.success(res, null, 'Logged out successfully');
     } catch (error: any) {
-      ResponseHelper.error(res, error.message, 400);
+      ResponseHelper.error(res, error.message, 404);
     }
   });
 

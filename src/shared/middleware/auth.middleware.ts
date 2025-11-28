@@ -41,13 +41,10 @@ export const authMiddleware = async (
     const token = authHeader.substring(7);
 
     let decoded: any;
-    console.log(token, 'this is the token');
 
     try {
       decoded = jwt.verify(token, config.jwt.secret);
-      console.log(decoded, 'this is decoded');
     } catch (error) {
-      console.log(error, 'this is the error');
       if (error instanceof jwt.TokenExpiredError) {
         ResponseHelper.unauthorized(res, ERROR_MESSAGES.TOKEN_EXPIRED);
         return;
