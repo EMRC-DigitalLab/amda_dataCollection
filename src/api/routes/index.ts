@@ -29,7 +29,7 @@ export function createApiRouter(): Router {
     { path: '/form-types', factory: createFormTypeRoutes },
     { path: '/notifications', factory: createNotificationRoutes },
     { path: '/certificates', factory: createCertificateRoutes },
-    {path:'/exports', factory:createExportRoutes}
+    { path: '/exports', factory: createExportRoutes },
   ];
 
   for (const { path, factory } of modules) {

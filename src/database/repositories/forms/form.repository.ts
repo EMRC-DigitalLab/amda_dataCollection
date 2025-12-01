@@ -295,7 +295,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     formId: string,
     memberId: string
   ): Promise<FormSubmissionRequirements> {
-
     const form = await this.findFormById(formId);
 
     if (!form) {
@@ -1327,6 +1326,40 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     const validationResult = await this.validateSubmissionScope(form, submittedBy, submissionData);
 
     if (!validationResult.valid) {
+      // ← NEW: If validation fails due to existing submission, UPDATE instead of throwing error
+      if (validationResult.existingSubmissionId && form.allowOnlyOneSubmissionPerScope) {
+        console.log('📝 Existing submission found, updating instead of creating new one');
+
+        // Prepare update data with only form question fields
+        const updateData: Record<string, any> = {};
+
+        for (const category of form.categories) {
+          for (const question of category.questions) {
+            const columnName = question.slug;
+            const value = submissionData[question.slug];
+
+            if (value !== undefined) {
+              updateData[columnName] = value;
+            } else if (question.required) {
+              throw new Error(`Required field missing: ${question.label || columnName}`);
+            }
+          }
+        }
+
+        // Update the existing submission
+        const updatedSubmission = await this.updateSubmission(
+          formId,
+          validationResult.existingSubmissionId,
+          updateData
+        );
+
+        return {
+          ...updatedSubmission,
+          message: 'Form updated successfully',
+          isUpdate: true,
+        };
+      }
+
       throw new Error(validationResult.error);
     }
 
@@ -1356,8 +1389,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         if (!site || site.length === 0) {
           throw new Error('Invalid minigrid site or site does not belong to you');
         }
-
-        // insertData.country = site[0].country;
       } else if (submissionScope === FormSubmissionScope.COUNTRY_LEVEL) {
         if (!submissionData.country) {
           throw new Error('Country is required for country-level submissions');
@@ -1366,9 +1397,9 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         // Verify member operates in this country
         const hasSitesInCountry = await queryRunner.query(
           `SELECT EXISTS(
-          SELECT 1 FROM minigrid_sites 
-          WHERE "memberUuid" = $1 AND country = $2
-        ) as exists`,
+        SELECT 1 FROM minigrid_sites 
+        WHERE "memberUuid" = $1 AND country = $2
+      ) as exists`,
           [submittedBy, submissionData.country]
         );
 
@@ -1377,9 +1408,8 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         }
 
         insertData.country = submissionData.country;
-        insertData.minigrid_siteId = submissionData.minigrid_siteId || null; // Optional reference
+        insertData.minigrid_siteId = submissionData.minigrid_siteId || null;
       } else if (submissionScope === FormSubmissionScope.MEMBER_LEVEL) {
-        // Member-level: no required foreign keys
         insertData.country = submissionData.country || null;
         insertData.minigrid_siteId = submissionData.minigrid_siteId || null;
       }
@@ -1405,10 +1435,10 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       const placeholders = values.map((_, index) => `$${index + 1}`).join(', ');
 
       const insertSQL = `
-      INSERT INTO "${tableName}" (${columns}) 
-      VALUES (${placeholders}) 
-      RETURNING id
-    `;
+    INSERT INTO "${tableName}" (${columns}) 
+    VALUES (${placeholders}) 
+    RETURNING id
+  `;
 
       const result = await queryRunner.query(insertSQL, values);
 
@@ -1416,17 +1446,82 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         id: result[0].id,
         ...insertData,
         message: 'Form submitted successfully',
+        isUpdate: false,
       };
     } catch (error: any) {
-      // Handle unique constraint violations
+      // ← NEW: Enhanced error handling for race conditions
       if (error.code === '23505') {
-        // PostgreSQL unique violation
+        // PostgreSQL unique violation - race condition caught
+        console.log(
+          '⚠️ Unique constraint violation caught - attempting to update existing submission'
+        );
+
+        let existingSubmission = null;
+
+        try {
+          // Find the existing submission based on scope
+          if (submissionScope === FormSubmissionScope.SITE_LEVEL) {
+            existingSubmission = await queryRunner.query(
+              `SELECT id FROM "${tableName}" 
+             WHERE form_id = $1 AND "minigrid_siteId" = $2`,
+              [formId, submissionData.minigrid_siteId]
+            );
+          } else if (submissionScope === FormSubmissionScope.COUNTRY_LEVEL) {
+            existingSubmission = await queryRunner.query(
+              `SELECT id FROM "${tableName}" 
+             WHERE form_id = $1 AND submitted_by = $2 AND country = $3`,
+              [formId, submittedBy, submissionData.country]
+            );
+          } else if (submissionScope === FormSubmissionScope.MEMBER_LEVEL) {
+            existingSubmission = await queryRunner.query(
+              `SELECT id FROM "${tableName}" 
+             WHERE form_id = $1 AND submitted_by = $2`,
+              [formId, submittedBy]
+            );
+          }
+
+          if (existingSubmission && existingSubmission.length > 0) {
+            const existingId = existingSubmission[0].id;
+            console.log('✓ Found existing submission, updating:', existingId);
+
+            // Prepare update data
+            const updateData: Record<string, any> = {};
+            for (const category of form.categories) {
+              for (const question of category.questions) {
+                const columnName = question.slug;
+                const value = submissionData[question.slug];
+                if (value !== undefined) {
+                  updateData[columnName] = value;
+                }
+              }
+            }
+
+            // Use the existing updateSubmission method
+            const updatedSubmission = await this.updateSubmission(formId, existingId, updateData);
+
+            return {
+              ...updatedSubmission,
+              message: 'Form updated successfully',
+              isUpdate: true,
+            };
+          }
+        } catch (fetchError) {
+          console.error('❌ Error fetching/updating existing submission:', fetchError);
+        }
+
+        // If we couldn't update, throw user-friendly error
         if (submissionScope === FormSubmissionScope.SITE_LEVEL) {
-          throw new Error('You have already submitted this form for this site');
+          throw new Error(
+            'You have already submitted this form for this site. Please refresh the page to edit your submission.'
+          );
         } else if (submissionScope === FormSubmissionScope.COUNTRY_LEVEL) {
-          throw new Error('You have already submitted this form for this country');
+          throw new Error(
+            'You have already submitted this form for this country. Please refresh the page to edit your submission.'
+          );
         } else if (submissionScope === FormSubmissionScope.MEMBER_LEVEL) {
-          throw new Error('You have already submitted this form');
+          throw new Error(
+            'You have already submitted this form. Please refresh the page to edit your submission.'
+          );
         }
       }
       throw error;
@@ -1440,10 +1535,11 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     form: Form,
     memberId: string,
     submissionData: Record<string, any>
-  ): Promise<{ valid: boolean; error?: string }> {
+  ): Promise<{ valid: boolean; error?: string; existingSubmissionId?: string }> {
     const scope = form.submissionScope;
 
-    console.log(submissionData, "this is submission Data")
+    console.log(submissionData, 'this is submission Data');
+
     // SITE_LEVEL validation
     if (scope === FormSubmissionScope.SITE_LEVEL) {
       if (!submissionData.minigrid_siteId) {
@@ -1453,15 +1549,17 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       // Check if already submitted for this site
       if (form.allowOnlyOneSubmissionPerScope) {
         const existing = await this.dataSource.query(
-          `SELECT EXISTS(
-          SELECT 1 FROM "${form.tableName}" 
-          WHERE form_id = $1 AND "minigrid_siteId" = $2
-        ) as exists`,
+          `SELECT id FROM "${form.tableName}" 
+        WHERE form_id = $1 AND "minigrid_siteId" = $2`,
           [form.id, submissionData.minigrid_siteId]
         );
 
-        if (existing[0].exists) {
-          return { valid: false, error: 'A submission already exists for this site' };
+        if (existing.length > 0) {
+          return {
+            valid: false,
+            error: 'A submission already exists for this site',
+            existingSubmissionId: existing[0].id, // ← NEW: Return the ID
+          };
         }
       }
     }
@@ -1475,15 +1573,17 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       // Check if already submitted for this country
       if (form.allowOnlyOneSubmissionPerScope) {
         const existing = await this.dataSource.query(
-          `SELECT EXISTS(
-          SELECT 1 FROM "${form.tableName}" 
-          WHERE form_id = $1 AND submitted_by = $2 AND country = $3
-        ) as exists`,
+          `SELECT id FROM "${form.tableName}" 
+        WHERE form_id = $1 AND submitted_by = $2 AND country = $3`,
           [form.id, memberId, submissionData.country]
         );
 
-        if (existing[0].exists) {
-          return { valid: false, error: 'You have already submitted this form for this country' };
+        if (existing.length > 0) {
+          return {
+            valid: false,
+            error: 'You have already submitted this form for this country',
+            existingSubmissionId: existing[0].id, // ← NEW: Return the ID
+          };
         }
       }
     }
@@ -1493,15 +1593,17 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       // Check if already submitted
       if (form.allowOnlyOneSubmissionPerScope) {
         const existing = await this.dataSource.query(
-          `SELECT EXISTS(
-          SELECT 1 FROM "${form.tableName}" 
-          WHERE form_id = $1 AND submitted_by = $2
-        ) as exists`,
+          `SELECT id FROM "${form.tableName}" 
+        WHERE form_id = $1 AND submitted_by = $2`,
           [form.id, memberId]
         );
 
-        if (existing[0].exists) {
-          return { valid: false, error: 'You have already submitted this form' };
+        if (existing.length > 0) {
+          return {
+            valid: false,
+            error: 'You have already submitted this form',
+            existingSubmissionId: existing[0].id, // ← NEW: Return the ID
+          };
         }
       }
     }
@@ -2525,209 +2627,210 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     return columns.length > 0 ? columns.join(',\n        ') + ',\n        ' : '';
   }
 
-
   /**
- * Get historical suggestions for a specific question based on user's previous submissions
- * Looks back 3 years for similar questions across same form category
- */
-async getQuestionSuggestions(
-  currentFormId: string,
-  questionSlug: string,
-  memberId: string,
-  yearsBack: number = 3
-): Promise<Array<{
-  formTitle: string;
-  formYear: string;
-  submittedAt: Date;
-  answer: any;
-  formTypeId: string;
-}>> {
-  console.log('\n=== GET QUESTION SUGGESTIONS START ===');
-  console.log('Input:', { currentFormId, questionSlug, memberId, yearsBack });
+   * Get historical suggestions for a specific question based on user's previous submissions
+   * Looks back 3 years for similar questions across same form category
+   */
+  async getQuestionSuggestions(
+    currentFormId: string,
+    questionSlug: string,
+    memberId: string,
+    yearsBack: number = 3
+  ): Promise<
+    Array<{
+      formTitle: string;
+      formYear: string;
+      submittedAt: Date;
+      answer: any;
+      formTypeId: string;
+    }>
+  > {
+    console.log('\n=== GET QUESTION SUGGESTIONS START ===');
+    console.log('Input:', { currentFormId, questionSlug, memberId, yearsBack });
 
-  // STEP 1: Get current form with formType
-  const currentForm = await this.createQueryBuilder('form')
-    .leftJoinAndSelect('form.formType', 'formType')
-    .leftJoinAndSelect('form.categories', 'categories')
-    .leftJoinAndSelect('categories.questions', 'questions')
-    .where('form.id = :id', { id: currentFormId })
-    .orderBy('categories.sortOrder', 'ASC')
-    .addOrderBy('questions.sortOrder', 'ASC')
-    .getOne();
-  
-  console.log('Current Form Loaded:', {
-    id: currentForm?.id,
-    title: currentForm?.title,
-    formTypeName: currentForm?.formType?.name,
-    formTypeSlug: currentForm?.formType?.slug,
-    categoriesCount: currentForm?.categories?.length || 0,
-  });
-  
-  if (!currentForm || !currentForm.formType) {
-    console.log('❌ No current form or formType found');
-    return [];
-  }
+    // STEP 1: Get current form with formType
+    const currentForm = await this.createQueryBuilder('form')
+      .leftJoinAndSelect('form.formType', 'formType')
+      .leftJoinAndSelect('form.categories', 'categories')
+      .leftJoinAndSelect('categories.questions', 'questions')
+      .where('form.id = :id', { id: currentFormId })
+      .orderBy('categories.sortOrder', 'ASC')
+      .addOrderBy('questions.sortOrder', 'ASC')
+      .getOne();
 
-  // STEP 2: Extract base name from FormType (remove year)
-  // Examples:
-  // "AMDA 2024 - Project Form" → "AMDA Project Form"
-  // "AMDA-2025-Project" → "AMDA Project"
-  // "AMDA Project 2024" → "AMDA Project"
-  
-  const formTypeName = currentForm.formType.name;
-  const formTypeSlug = currentForm.formType.slug;
-  
-  // Remove common year patterns: "2024", "2025", " - ", etc.
-  const baseFormTypeName = formTypeName
-    .replace(/\b(19|20)\d{2}\b/g, '') // Remove years (1900-2099)
-    .replace(/[-_\s]+/g, ' ')          // Normalize separators
-    .trim()
-    .toLowerCase();
-  
-  console.log('FormType Pattern Extraction:', {
-    original: formTypeName,
-    baseName: baseFormTypeName,
-    slug: formTypeSlug,
-  });
-
-  // STEP 3: Find the question in current form
-  let currentQuestion: any = null;
-  
-  for (const category of currentForm.categories) {
-    const found = category.questions?.find(q => q.slug === questionSlug);
-    if (found) {
-      currentQuestion = found;
-      console.log('✓ Found current question:', {
-        slug: found.slug,
-        kpi: found.kpi,
-        type: found.type,
-      });
-      break;
-    }
-  }
-
-  if (!currentQuestion) {
-    console.log('❌ Question not found in current form:', questionSlug);
-    return [];
-  }
-
-  // STEP 4: Calculate date range
-  const cutoffDate = new Date();
-  cutoffDate.setFullYear(cutoffDate.getFullYear() - yearsBack);
-
-  console.log('Searching for related forms:', {
-    basePattern: baseFormTypeName,
-    cutoffDate: cutoffDate.toISOString(),
-    excludingFormId: currentFormId,
-  });
-
-  // STEP 5: Find ALL FormTypes that match the base pattern
-  // This is the KEY CHANGE - we match by name pattern, not exact formTypeId
-  
-  const allFormTypes = await this.formTypeRepo
-    .createQueryBuilder('formType')
-    .where('LOWER(REGEXP_REPLACE(formType.name, \'\\b(19|20)\\d{2}\\b\', \'\', \'g\')) LIKE :pattern', {
-      pattern: `%${baseFormTypeName}%`
-    })
-    .getMany();
-
-  const matchingFormTypeIds = allFormTypes.map(ft => ft.id);
-  
-  console.log('Matching FormTypes Found:', {
-    count: allFormTypes.length,
-    formTypes: allFormTypes.map(ft => ({
-      id: ft.id,
-      name: ft.name,
-      slug: ft.slug,
-    })),
-  });
-
-  if (matchingFormTypeIds.length === 0) {
-    console.log('❌ No matching form types found');
-    return [];
-  }
-
-  // STEP 6: Get all FORMS that belong to these FormTypes
-  const relatedForms = await this.createQueryBuilder('form')
-    .leftJoinAndSelect('form.formType', 'formType')
-    .leftJoinAndSelect('form.categories', 'categories')
-    .leftJoinAndSelect('categories.questions', 'questions')
-    .where('form.formTypeId IN (:...formTypeIds)', { 
-      formTypeIds: matchingFormTypeIds 
-    })
-    .andWhere('form.id != :currentFormId', { currentFormId })
-    .andWhere('form.status = :status', { status: FormStatus.PUBLISHED })
-    .andWhere('form.tableCreated = :tableCreated', { tableCreated: true })
-    .andWhere('form.createdAt >= :cutoffDate', { cutoffDate })
-    .orderBy('form.createdAt', 'DESC')
-    .addOrderBy('categories.sortOrder', 'ASC')
-    .addOrderBy('questions.sortOrder', 'ASC')
-    .getMany();
-
-  console.log(`Found ${relatedForms.length} related forms`);
-
-  // Debug: Show what we loaded
-  if (relatedForms.length > 0) {
-    relatedForms.forEach((form, idx) => {
-      const questionsCount = form.categories?.reduce((sum, cat) => 
-        sum + (cat.questions?.length || 0), 0) || 0;
-      
-      console.log(`  Form ${idx + 1}:`, {
-        id: form.id,
-        title: form.title,
-        formTypeName: form.formType?.name,
-        tableName: form.tableName,
-        categories: form.categories?.length || 0,
-        questions: questionsCount,
-      });
+    console.log('Current Form Loaded:', {
+      id: currentForm?.id,
+      title: currentForm?.title,
+      formTypeName: currentForm?.formType?.name,
+      formTypeSlug: currentForm?.formType?.slug,
+      categoriesCount: currentForm?.categories?.length || 0,
     });
-  }
 
-  const suggestions: Array<{
-    formTitle: string;
-    formYear: string;
-    submittedAt: Date;
-    answer: any;
-    formTypeId: string;
-  }> = [];
-
-  // STEP 7: Search through each related form
-  for (const form of relatedForms) {
-    if (!form.tableName) {
-      console.log(`  ⊘ Skipping ${form.title} - no table`);
-      continue;
+    if (!currentForm || !currentForm.formType) {
+      console.log('❌ No current form or formType found');
+      return [];
     }
 
-    if (!form.categories || form.categories.length === 0) {
-      console.log(`  ⊘ Skipping ${form.title} - no categories loaded`);
-      continue;
-    }
+    // STEP 2: Extract base name from FormType (remove year)
+    // Examples:
+    // "AMDA 2024 - Project Form" → "AMDA Project Form"
+    // "AMDA-2025-Project" → "AMDA Project"
+    // "AMDA Project 2024" → "AMDA Project"
 
-    // Find matching question by slug
-    let matchingQuestion: any = null;
-    
-    for (const category of form.categories) {
-      if (!category.questions) continue;
-      
-      const found = category.questions.find(q => q.slug === questionSlug);
+    const formTypeName = currentForm.formType.name;
+    const formTypeSlug = currentForm.formType.slug;
+
+    // Remove common year patterns: "2024", "2025", " - ", etc.
+    const baseFormTypeName = formTypeName
+      .replace(/\b(19|20)\d{2}\b/g, '') // Remove years (1900-2099)
+      .replace(/[-_\s]+/g, ' ') // Normalize separators
+      .trim()
+      .toLowerCase();
+
+    console.log('FormType Pattern Extraction:', {
+      original: formTypeName,
+      baseName: baseFormTypeName,
+      slug: formTypeSlug,
+    });
+
+    // STEP 3: Find the question in current form
+    let currentQuestion: any = null;
+
+    for (const category of currentForm.categories) {
+      const found = category.questions?.find(q => q.slug === questionSlug);
       if (found) {
-        matchingQuestion = found;
-        console.log(`  ✓ Found matching question in ${form.title}:`, {
+        currentQuestion = found;
+        console.log('✓ Found current question:', {
           slug: found.slug,
           kpi: found.kpi,
+          type: found.type,
         });
         break;
       }
     }
 
-    if (!matchingQuestion) {
-      console.log(`  ⊘ No matching question slug in ${form.title}`);
-      continue;
+    if (!currentQuestion) {
+      console.log('❌ Question not found in current form:', questionSlug);
+      return [];
     }
 
-    // STEP 8: Query for user's submission
-    try {
-      const submissionQuery = `
+    // STEP 4: Calculate date range
+    const cutoffDate = new Date();
+    cutoffDate.setFullYear(cutoffDate.getFullYear() - yearsBack);
+
+    console.log('Searching for related forms:', {
+      basePattern: baseFormTypeName,
+      cutoffDate: cutoffDate.toISOString(),
+      excludingFormId: currentFormId,
+    });
+
+    // STEP 5: Find ALL FormTypes that match the base pattern
+    // This is the KEY CHANGE - we match by name pattern, not exact formTypeId
+
+    const allFormTypes = await this.formTypeRepo
+      .createQueryBuilder('formType')
+      .where("LOWER(REGEXP_REPLACE(formType.name, '\\b(19|20)\\d{2}\\b', '', 'g')) LIKE :pattern", {
+        pattern: `%${baseFormTypeName}%`,
+      })
+      .getMany();
+
+    const matchingFormTypeIds = allFormTypes.map(ft => ft.id);
+
+    console.log('Matching FormTypes Found:', {
+      count: allFormTypes.length,
+      formTypes: allFormTypes.map(ft => ({
+        id: ft.id,
+        name: ft.name,
+        slug: ft.slug,
+      })),
+    });
+
+    if (matchingFormTypeIds.length === 0) {
+      console.log('❌ No matching form types found');
+      return [];
+    }
+
+    // STEP 6: Get all FORMS that belong to these FormTypes
+    const relatedForms = await this.createQueryBuilder('form')
+      .leftJoinAndSelect('form.formType', 'formType')
+      .leftJoinAndSelect('form.categories', 'categories')
+      .leftJoinAndSelect('categories.questions', 'questions')
+      .where('form.formTypeId IN (:...formTypeIds)', {
+        formTypeIds: matchingFormTypeIds,
+      })
+      .andWhere('form.id != :currentFormId', { currentFormId })
+      .andWhere('form.status = :status', { status: FormStatus.PUBLISHED })
+      .andWhere('form.tableCreated = :tableCreated', { tableCreated: true })
+      .andWhere('form.createdAt >= :cutoffDate', { cutoffDate })
+      .orderBy('form.createdAt', 'DESC')
+      .addOrderBy('categories.sortOrder', 'ASC')
+      .addOrderBy('questions.sortOrder', 'ASC')
+      .getMany();
+
+    console.log(`Found ${relatedForms.length} related forms`);
+
+    // Debug: Show what we loaded
+    if (relatedForms.length > 0) {
+      relatedForms.forEach((form, idx) => {
+        const questionsCount =
+          form.categories?.reduce((sum, cat) => sum + (cat.questions?.length || 0), 0) || 0;
+
+        console.log(`  Form ${idx + 1}:`, {
+          id: form.id,
+          title: form.title,
+          formTypeName: form.formType?.name,
+          tableName: form.tableName,
+          categories: form.categories?.length || 0,
+          questions: questionsCount,
+        });
+      });
+    }
+
+    const suggestions: Array<{
+      formTitle: string;
+      formYear: string;
+      submittedAt: Date;
+      answer: any;
+      formTypeId: string;
+    }> = [];
+
+    // STEP 7: Search through each related form
+    for (const form of relatedForms) {
+      if (!form.tableName) {
+        console.log(`  ⊘ Skipping ${form.title} - no table`);
+        continue;
+      }
+
+      if (!form.categories || form.categories.length === 0) {
+        console.log(`  ⊘ Skipping ${form.title} - no categories loaded`);
+        continue;
+      }
+
+      // Find matching question by slug
+      let matchingQuestion: any = null;
+
+      for (const category of form.categories) {
+        if (!category.questions) continue;
+
+        const found = category.questions.find(q => q.slug === questionSlug);
+        if (found) {
+          matchingQuestion = found;
+          console.log(`  ✓ Found matching question in ${form.title}:`, {
+            slug: found.slug,
+            kpi: found.kpi,
+          });
+          break;
+        }
+      }
+
+      if (!matchingQuestion) {
+        console.log(`  ⊘ No matching question slug in ${form.title}`);
+        continue;
+      }
+
+      // STEP 8: Query for user's submission
+      try {
+        const submissionQuery = `
         SELECT 
           "${matchingQuestion.slug}" as answer,
           submitted_at,
@@ -2738,136 +2841,140 @@ async getQuestionSuggestions(
         LIMIT 1
       `;
 
-      console.log(`  → Querying table: ${form.tableName}`);
-      const result = await this.dataSource.query(submissionQuery, [memberId]);
+        console.log(`  → Querying table: ${form.tableName}`);
+        const result = await this.dataSource.query(submissionQuery, [memberId]);
 
-      if (result.length > 0) {
-        const answerValue = result[0].answer;
-        
-        // Check if answer has actual value
-        if (answerValue !== null && answerValue !== undefined && answerValue !== '') {
-          // Extract year from form type name or form title
-          const yearFromFormType = form.formType?.name.match(/\b(19|20)\d{2}\b/)?.[0];
-          const yearFromFormTitle = form.title.match(/\b(19|20)\d{2}\b/)?.[0];
-          const formYear = yearFromFormType || yearFromFormTitle || new Date(form.createdAt).getFullYear().toString();
+        if (result.length > 0) {
+          const answerValue = result[0].answer;
 
-          console.log(`  ✓ Found submission with answer:`, {
-            form: form.title,
-            formType: form.formType?.name,
-            year: formYear,
-            answer: answerValue,
-            submittedAt: result[0].submitted_at,
-          });
+          // Check if answer has actual value
+          if (answerValue !== null && answerValue !== undefined && answerValue !== '') {
+            // Extract year from form type name or form title
+            const yearFromFormType = form.formType?.name.match(/\b(19|20)\d{2}\b/)?.[0];
+            const yearFromFormTitle = form.title.match(/\b(19|20)\d{2}\b/)?.[0];
+            const formYear =
+              yearFromFormType ||
+              yearFromFormTitle ||
+              new Date(form.createdAt).getFullYear().toString();
 
-          suggestions.push({
-            formTitle: form.title,
-            formYear: formYear,
-            submittedAt: result[0].submitted_at,
-            answer: answerValue,
-            formTypeId: form.formTypeId,
-          });
+            console.log(`  ✓ Found submission with answer:`, {
+              form: form.title,
+              formType: form.formType?.name,
+              year: formYear,
+              answer: answerValue,
+              submittedAt: result[0].submitted_at,
+            });
+
+            suggestions.push({
+              formTitle: form.title,
+              formYear: formYear,
+              submittedAt: result[0].submitted_at,
+              answer: answerValue,
+              formTypeId: form.formTypeId,
+            });
+          } else {
+            console.log(`  ○ Found submission but answer is empty`);
+          }
         } else {
-          console.log(`  ○ Found submission but answer is empty`);
+          console.log(`  ○ No submission found for this member`);
         }
-      } else {
-        console.log(`  ○ No submission found for this member`);
+      } catch (error) {
+        console.error(`  ✗ Error querying ${form.title}:`, error.message);
       }
-    } catch (error) {
-      console.error(`  ✗ Error querying ${form.title}:`, error.message);
     }
+
+    // STEP 9: Sort by year (most recent first)
+    suggestions.sort((a, b) => {
+      const yearA = parseInt(a.formYear);
+      const yearB = parseInt(b.formYear);
+      return yearB - yearA;
+    });
+
+    console.log(`\n=== SUGGESTIONS SUMMARY ===`);
+    console.log(`Total suggestions found: ${suggestions.length}`);
+    suggestions.forEach((s, idx) => {
+      console.log(`  ${idx + 1}. ${s.formTitle} (${s.formYear})`);
+    });
+    console.log('=== END ===\n');
+
+    return suggestions;
   }
 
-  // STEP 9: Sort by year (most recent first)
-  suggestions.sort((a, b) => {
-    const yearA = parseInt(a.formYear);
-    const yearB = parseInt(b.formYear);
-    return yearB - yearA;
-  });
+  /**
+   * Alternative matching strategy when slug doesn't match
+   * Tries to find questions with similar KPI text
+   */
+  async getQuestionSuggestionsByKPI(
+    currentFormId: string,
+    questionKPI: string,
+    memberId: string,
+    yearsBack: number = 3
+  ): Promise<
+    Array<{
+      formTitle: string;
+      formYear: string;
+      submittedAt: Date;
+      answer: any;
+      questionSlug: string;
+      questionKPI: string;
+      matchScore: number;
+    }>
+  > {
+    console.log('\n=== GET SUGGESTIONS BY KPI START ===');
+    console.log('Looking for questions similar to:', questionKPI);
 
-  console.log(`\n=== SUGGESTIONS SUMMARY ===`);
-  console.log(`Total suggestions found: ${suggestions.length}`);
-  suggestions.forEach((s, idx) => {
-    console.log(`  ${idx + 1}. ${s.formTitle} (${s.formYear})`);
-  });
-  console.log('=== END ===\n');
+    const currentForm = await this.findFormById(currentFormId);
 
-  return suggestions;
-}
+    if (!currentForm || !currentForm.formTypeId) {
+      return [];
+    }
 
+    const cutoffDate = new Date();
+    cutoffDate.setFullYear(cutoffDate.getFullYear() - yearsBack);
 
-/**
- * Alternative matching strategy when slug doesn't match
- * Tries to find questions with similar KPI text
- */
-async getQuestionSuggestionsByKPI(
-  currentFormId: string,
-  questionKPI: string,
-  memberId: string,
-  yearsBack: number = 3
-): Promise<Array<{
-  formTitle: string;
-  formYear: string;
-  submittedAt: Date;
-  answer: any;
-  questionSlug: string;
-  questionKPI: string;
-  matchScore: number;
-}>> {
-  console.log('\n=== GET SUGGESTIONS BY KPI START ===');
-  console.log('Looking for questions similar to:', questionKPI);
+    const relatedForms = await this.createQueryBuilder('form')
+      .leftJoinAndSelect('form.formType', 'formType')
+      .leftJoinAndSelect('form.categories', 'categories')
+      .leftJoinAndSelect('categories.questions', 'questions')
+      .where('form.formTypeId = :formTypeId', { formTypeId: currentForm.formTypeId })
+      .andWhere('form.id != :currentFormId', { currentFormId })
+      .andWhere('form.status = :status', { status: FormStatus.PUBLISHED })
+      .andWhere('form.tableCreated = :tableCreated', { tableCreated: true })
+      .andWhere('form.createdAt >= :cutoffDate', { cutoffDate })
+      .orderBy('form.createdAt', 'DESC')
+      .getMany();
 
-  const currentForm = await this.findFormById(currentFormId);
-  
-  if (!currentForm || !currentForm.formTypeId) {
-    return [];
-  }
+    console.log(`Found ${relatedForms.length} related forms for KPI matching`);
 
-  const cutoffDate = new Date();
-  cutoffDate.setFullYear(cutoffDate.getFullYear() - yearsBack);
+    const suggestions: Array<{
+      formTitle: string;
+      formYear: string;
+      submittedAt: Date;
+      answer: any;
+      questionSlug: string;
+      questionKPI: string;
+      matchScore: number;
+    }> = [];
 
-  const relatedForms = await this.createQueryBuilder('form')
-    .leftJoinAndSelect('form.formType', 'formType')
-    .leftJoinAndSelect('form.categories', 'categories')
-    .leftJoinAndSelect('categories.questions', 'questions')
-    .where('form.formTypeId = :formTypeId', { formTypeId: currentForm.formTypeId })
-    .andWhere('form.id != :currentFormId', { currentFormId })
-    .andWhere('form.status = :status', { status: FormStatus.PUBLISHED })
-    .andWhere('form.tableCreated = :tableCreated', { tableCreated: true })
-    .andWhere('form.createdAt >= :cutoffDate', { cutoffDate })
-    .orderBy('form.createdAt', 'DESC')
-    .getMany();
+    for (const form of relatedForms) {
+      if (!form.tableName || !form.categories) continue;
 
-  console.log(`Found ${relatedForms.length} related forms for KPI matching`);
+      // Find questions with similar KPI using fuzzy matching
+      const allQuestions = form.categories.flatMap(cat => cat.questions || []);
 
-  const suggestions: Array<{
-    formTitle: string;
-    formYear: string;
-    submittedAt: Date;
-    answer: any;
-    questionSlug: string;
-    questionKPI: string;
-    matchScore: number;
-  }> = [];
+      for (const question of allQuestions) {
+        const matchScore = this.calculateKPISimilarity(questionKPI, question.kpi);
 
-  for (const form of relatedForms) {
-    if (!form.tableName || !form.categories) continue;
+        // Only consider if similarity is above threshold (70%)
+        if (matchScore < 0.7) continue;
 
-    // Find questions with similar KPI using fuzzy matching
-    const allQuestions = form.categories.flatMap(cat => cat.questions || []);
-    
-    for (const question of allQuestions) {
-      const matchScore = this.calculateKPISimilarity(questionKPI, question.kpi);
-      
-      // Only consider if similarity is above threshold (70%)
-      if (matchScore < 0.7) continue;
+        console.log(`  ✓ Similar question found (${Math.round(matchScore * 100)}% match):`, {
+          form: form.title,
+          question: question.kpi,
+        });
 
-      console.log(`  ✓ Similar question found (${Math.round(matchScore * 100)}% match):`, {
-        form: form.title,
-        question: question.kpi,
-      });
-
-      try {
-        const submissionQuery = `
+        try {
+          const submissionQuery = `
           SELECT 
             "${question.slug}" as answer,
             submitted_at,
@@ -2878,69 +2985,70 @@ async getQuestionSuggestionsByKPI(
           LIMIT 1
         `;
 
-        const result = await this.dataSource.query(submissionQuery, [memberId]);
+          const result = await this.dataSource.query(submissionQuery, [memberId]);
 
-        if (result.length > 0 && result[0].answer !== null && result[0].answer !== undefined) {
-          const yearMatch = form.title.match(/\d{4}/);
-          const formYear = yearMatch ? yearMatch[0] : new Date(form.createdAt).getFullYear().toString();
+          if (result.length > 0 && result[0].answer !== null && result[0].answer !== undefined) {
+            const yearMatch = form.title.match(/\d{4}/);
+            const formYear = yearMatch
+              ? yearMatch[0]
+              : new Date(form.createdAt).getFullYear().toString();
 
-          suggestions.push({
-            formTitle: form.title,
-            formYear: formYear,
-            submittedAt: result[0].submitted_at,
-            answer: result[0].answer,
-            questionSlug: question.slug,
-            questionKPI: question.kpi,
-            matchScore: matchScore,
-          });
+            suggestions.push({
+              formTitle: form.title,
+              formYear: formYear,
+              submittedAt: result[0].submitted_at,
+              answer: result[0].answer,
+              questionSlug: question.slug,
+              questionKPI: question.kpi,
+              matchScore: matchScore,
+            });
+          }
+        } catch (error) {
+          console.error(`Error fetching KPI-based suggestion:`, error.message);
         }
-      } catch (error) {
-        console.error(`Error fetching KPI-based suggestion:`, error.message);
       }
     }
+
+    // Sort by match score and then by year
+    suggestions.sort((a, b) => {
+      if (Math.abs(a.matchScore - b.matchScore) > 0.1) {
+        return b.matchScore - a.matchScore;
+      }
+      return parseInt(b.formYear) - parseInt(a.formYear);
+    });
+
+    console.log(`Found ${suggestions.length} KPI-based suggestions`);
+    console.log('=== END ===\n');
+
+    return suggestions;
   }
 
-  // Sort by match score and then by year
-  suggestions.sort((a, b) => {
-    if (Math.abs(a.matchScore - b.matchScore) > 0.1) {
-      return b.matchScore - a.matchScore;
+  /**
+   * Simple similarity calculation (Levenshtein-like)
+   * Returns a score between 0 and 1
+   */
+  private calculateKPISimilarity(str1: string, str2: string): number {
+    const s1 = str1.toLowerCase().trim();
+    const s2 = str2.toLowerCase().trim();
+
+    // Exact match
+    if (s1 === s2) return 1.0;
+
+    // One contains the other
+    if (s1.includes(s2) || s2.includes(s1)) {
+      return 0.85;
     }
-    return parseInt(b.formYear) - parseInt(a.formYear);
-  });
 
-  console.log(`Found ${suggestions.length} KPI-based suggestions`);
-  console.log('=== END ===\n');
+    // Calculate word overlap
+    const words1 = new Set(s1.split(/\s+/));
+    const words2 = new Set(s2.split(/\s+/));
 
-  return suggestions;
-}
+    const intersection = new Set([...words1].filter(word => words2.has(word)));
+    const union = new Set([...words1, ...words2]);
 
-
-/**
- * Simple similarity calculation (Levenshtein-like)
- * Returns a score between 0 and 1
- */
-private calculateKPISimilarity(str1: string, str2: string): number {
-  const s1 = str1.toLowerCase().trim();
-  const s2 = str2.toLowerCase().trim();
-
-  // Exact match
-  if (s1 === s2) return 1.0;
-
-  // One contains the other
-  if (s1.includes(s2) || s2.includes(s1)) {
-    return 0.85;
+    // Jaccard similarity
+    return intersection.size / union.size;
   }
-
-  // Calculate word overlap
-  const words1 = new Set(s1.split(/\s+/));
-  const words2 = new Set(s2.split(/\s+/));
-  
-  const intersection = new Set([...words1].filter(word => words2.has(word)));
-  const union = new Set([...words1, ...words2]);
-  
-  // Jaccard similarity
-  return intersection.size / union.size;
-}
   /* -------------------------------------------------- */
   /*  Helper methods                                    */
   /* -------------------------------------------------- */

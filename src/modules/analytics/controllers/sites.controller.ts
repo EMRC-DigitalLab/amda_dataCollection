@@ -2,7 +2,6 @@
 
 import { Request, Response } from 'express';
 import { AppDataSource } from '../../../config/database';
-import { ResponseHelper } from '../../../shared/utils/response';
 import { SitesAnalyticsService } from '../services/site-analytics.service';
 
 export class SitesAnalyticsController {
@@ -50,7 +49,11 @@ export class SitesAnalyticsController {
       });
     } catch (error) {
       console.error('Error fetching average connections analytics:', error);
-      ResponseHelper.error(res, err.message, 400);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve average connections analytics',
+        error: error.message,
+      });
     }
   }
 
@@ -107,7 +110,11 @@ export class SitesAnalyticsController {
       });
     } catch (error) {
       console.error('Error fetching sites by country analytics:', error);
-      ResponseHelper.error(res, err.message, 400);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve sites by country analytics',
+        error: error.message,
+      });
     }
   }
 
@@ -160,7 +167,11 @@ export class SitesAnalyticsController {
       });
     } catch (error) {
       console.error('Error fetching new sites commissioned analytics:', error);
-      ResponseHelper.error(res, err.message, 400);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve new sites commissioned analytics',
+        error: error.message,
+      });
     }
   }
 
@@ -213,7 +224,11 @@ export class SitesAnalyticsController {
       });
     } catch (error) {
       console.error('Error fetching sites analytics dashboard:', error);
-      ResponseHelper.error(res, err.message, 400);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve sites analytics dashboard',
+        error: error.message,
+      });
     }
   }
 
@@ -232,7 +247,11 @@ export class SitesAnalyticsController {
       });
     } catch (error) {
       console.error('Error fetching site status distribution:', error);
-      ResponseHelper.error(res, err.message, 400);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve site status distribution',
+        error: error.message,
+      });
     }
   }
 
@@ -251,7 +270,11 @@ export class SitesAnalyticsController {
       });
     } catch (error) {
       console.error('Error fetching capacity analytics:', error);
-      ResponseHelper.error(res, err.message, 400);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve capacity analytics',
+        error: error.message,
+      });
     }
   }
 
@@ -279,6 +302,7 @@ export class SitesAnalyticsController {
         averageConnectionsPerSite: averageConnectionsAnalytics.currentAverage,
         totalCapacityKw: capacityAnalytics.totalCapacityKw,
         totalActiveSites: capacityAnalytics.totalSites,
+        sitesWithCapacity: capacityAnalytics.sitesWithCapacity,
         statusDistribution: statusDistribution.slice(0, 3), // Top 3 statuses
         generatedAt: new Date(),
       };
@@ -290,7 +314,11 @@ export class SitesAnalyticsController {
       });
     } catch (error) {
       console.error('Error fetching analytics summary:', error);
-      ResponseHelper.error(res, err.message, 400);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve analytics summary',
+        error: error.message,
+      });
     }
   }
 }

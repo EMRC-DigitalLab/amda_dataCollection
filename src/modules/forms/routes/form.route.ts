@@ -158,10 +158,10 @@ export function createFormRoutes(dataSource: DataSource): Router {
   );
 
   router.get(
-  '/:id/questions/:questionSlug/suggestions',
-  authMiddleware,
-  formController.getQuestionSuggestions
-);
+    '/:id/questions/:questionSlug/suggestions',
+    authMiddleware,
+    formController.getQuestionSuggestions
+  );
   /* ============================================================================ */
   /* Form Submission Routes (User-facing)                                        */
   /* ============================================================================ */

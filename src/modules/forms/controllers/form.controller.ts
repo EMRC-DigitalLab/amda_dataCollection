@@ -318,120 +318,105 @@ export class FormController {
     }
   };
 
- getQuestionSuggestions = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { id: formId, questionSlug } = req.params;
-    const memberId = req.user?.id;
+  getQuestionSuggestions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { id: formId, questionSlug } = req.params;
+      const memberId = req.user?.id;
 
-    if (!memberId) {
-      return ResponseHelper.error(res, 'Authentication required', 401);
+      if (!memberId) {
+        return ResponseHelper.error(res, 'Authentication required', 401);
+      }
+
+      const result = await this.service.getQuestionSuggestions(formId, questionSlug, memberId);
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Question suggestions retrieved successfully',
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+
+  /**
+   * Format answer for display based on question type
+   */
+  private formatSuggestionAnswer(
+    answer: any,
+    questionType: string,
+    options?: any
+  ): { display: string; preview?: string } {
+    if (answer === null || answer === undefined || answer === '') {
+      return { display: 'No answer provided' };
     }
 
-    const result = await this.service.getQuestionSuggestions(
-      formId,
-      questionSlug,
-      memberId
-    );
-
-    
-
-    res.json({
-      success: true,
-      data: result,
-      message: 'Question suggestions retrieved successfully',
-    });
-  } catch (err) {
-    ResponseHelper.error(res, err.message, 400);
-  }
-};
-
-/**
- * Format answer for display based on question type
- */
-private formatSuggestionAnswer(
-  answer: any,
-  questionType: string,
-  options?: any
-): { display: string; preview?: string } {
-  if (answer === null || answer === undefined || answer === '') {
-    return { display: 'No answer provided' };
-  }
-
-  switch (questionType) {
-    case 'text':
-    case 'email':
-    case 'phone':
-    case 'url':
-      return {
-        display: String(answer),
-        preview: String(answer).length > 50 
-          ? String(answer).substring(0, 47) + '...' 
-          : String(answer),
-      };
-
-    case 'textarea':
-      return {
-        display: String(answer),
-        preview: String(answer).length > 100 
-          ? String(answer).substring(0, 97) + '...' 
-          : String(answer),
-      };
-
-    case 'number':
-    case 'currency':
-      return {
-        display: questionType === 'currency' 
-          ? `$${Number(answer).toLocaleString()}` 
-          : String(answer),
-      };
-
-    case 'date':
-      return {
-        display: new Date(answer).toLocaleDateString(),
-      };
-
-    case 'datetime':
-      return {
-        display: new Date(answer).toLocaleString(),
-      };
-
-    case 'boolean':
-      return {
-        display: answer ? 'Yes' : 'No',
-      };
-
-    case 'select':
-      return {
-        display: String(answer),
-      };
-
-    case 'multiselect':
-      if (Array.isArray(answer)) {
-        const display = answer.join(', ');
+    switch (questionType) {
+      case 'text':
+      case 'email':
+      case 'phone':
+      case 'url':
         return {
-          display,
-          preview: display.length > 80 
-            ? display.substring(0, 77) + '...' 
-            : display,
+          display: String(answer),
+          preview:
+            String(answer).length > 50 ? String(answer).substring(0, 47) + '...' : String(answer),
         };
-      }
-      return { display: String(answer) };
 
-    case 'file':
-      // Assuming file answers store file paths or URLs
-      return {
-        display: 'File uploaded',
-        preview: String(answer),
-      };
+      case 'textarea':
+        return {
+          display: String(answer),
+          preview:
+            String(answer).length > 100 ? String(answer).substring(0, 97) + '...' : String(answer),
+        };
 
-    default:
-      return { display: String(answer) };
+      case 'number':
+      case 'currency':
+        return {
+          display:
+            questionType === 'currency' ? `$${Number(answer).toLocaleString()}` : String(answer),
+        };
+
+      case 'date':
+        return {
+          display: new Date(answer).toLocaleDateString(),
+        };
+
+      case 'datetime':
+        return {
+          display: new Date(answer).toLocaleString(),
+        };
+
+      case 'boolean':
+        return {
+          display: answer ? 'Yes' : 'No',
+        };
+
+      case 'select':
+        return {
+          display: String(answer),
+        };
+
+      case 'multiselect':
+        if (Array.isArray(answer)) {
+          const display = answer.join(', ');
+          return {
+            display,
+            preview: display.length > 80 ? display.substring(0, 77) + '...' : display,
+          };
+        }
+        return { display: String(answer) };
+
+      case 'file':
+        // Assuming file answers store file paths or URLs
+        return {
+          display: 'File uploaded',
+          preview: String(answer),
+        };
+
+      default:
+        return { display: String(answer) };
+    }
   }
-}
 
   /* ============================================================================ */
   /* Form Submission Management                                                   */
@@ -476,7 +461,7 @@ private formatSuggestionAnswer(
       // Validate eligibility
       const eligibility = await this.canUserSubmit(formId, memberId);
 
-      console.log(eligibility, "eligibility")
+      console.log(eligibility, 'eligibility');
 
       // if (!eligibility.canSubmit) {
       //   return res.status(400).json({
@@ -505,7 +490,11 @@ private formatSuggestionAnswer(
       }
 
       // Submit the form
-      const submission = await this.service.submitFormData({ formId, data: submissionData, submittedBy: memberId });
+      const submission = await this.service.submitFormData({
+        formId,
+        data: submissionData,
+        submittedBy: memberId,
+      });
 
       res.status(201).json({
         success: true,
@@ -517,7 +506,7 @@ private formatSuggestionAnswer(
       console.error('Error submitting form:', error);
       res.status(400).json({ error: error.message });
     }
-  }
+  };
   async canUserSubmit(
     formId: string,
     memberId: string,
@@ -528,7 +517,7 @@ private formatSuggestionAnswer(
     existingSubmissionId?: string;
   }> {
     const form = await this.service.findById(formId);
-    console.log(form, "form in can user submit")
+    console.log(form, 'form in can user submit');
 
     if (!form) {
       return { canSubmit: false, reason: 'Form not found' };

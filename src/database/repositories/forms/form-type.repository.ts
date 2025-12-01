@@ -322,12 +322,11 @@ export class FormTypeRepository implements IFormTypeRepository {
     }
   }
 
-
-/**
- * Clone a form type with all its forms for a new year
- * Uses optimized approach to prevent timeouts
- */
-async cloneFormTypeWithForms(
+  /**
+   * Clone a form type with all its forms for a new year
+   * Uses optimized approach to prevent timeouts
+   */
+  async cloneFormTypeWithForms(
     sourceFormTypeId: string,
     targetYear: number,
     options?: {
@@ -378,19 +377,17 @@ async cloneFormTypeWithForms(
       // Step 2: Validate year
       const existingFormType = await this.findByNameAndYear(sourceFormType.name, targetYear);
       if (existingFormType) {
-        throw new Error(
-          `Form type "${sourceFormType.name}" already exists for year ${targetYear}`
-        );
+        throw new Error(`Form type "${sourceFormType.name}" already exists for year ${targetYear}`);
       }
 
       // Step 3: Generate unique slug for new form type
       const namePrefix = options?.prefix || '';
       const newName = `${namePrefix}${sourceFormType.name}`.trim();
       const baseSlug = this.generateSlug(newName, targetYear);
-      
+
       let newSlug = baseSlug;
       let slugCounter = 1;
-      
+
       while (await this.existsBySlug(newSlug)) {
         newSlug = `${baseSlug}-${slugCounter}`;
         slugCounter++;
@@ -468,7 +465,7 @@ async cloneFormTypeWithForms(
     }
   }
 
-private async cloneSingleForm(
+  private async cloneSingleForm(
     sourceForm: Form,
     newFormTypeId: string,
     targetYear: number,
@@ -580,13 +577,5 @@ private async cloneSingleForm(
     } finally {
       await queryRunner.release();
     }
-  }
-
-
-  private generateSlug(name: string, year: number): string {
-    return `${name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')}-${year}`;
   }
 }

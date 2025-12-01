@@ -1,6 +1,7 @@
 // @ts-nocheck
 
 import { Injectable } from 'injection-js';
+import { Repository } from 'typeorm';
 import * as XLSX from 'xlsx';
 import { Category } from '../../../database/entities/category.entity';
 import { Form, FormStatus } from '../../../database/entities/form.entity';
@@ -12,13 +13,12 @@ import {
   FormSubmissionDto,
   UpdateFormDto,
 } from '../../../shared/types/form.types';
-import { IFormRepository } from '../interfaces/form.interface';
 import { FormNotificationService } from './form-notification.service'; // ADD THIS
 
 @Injectable()
 export class FormService {
   constructor(
-    private readonly repo: IFormRepository,
+    private readonly repo: Repository<Form>,
     private formNotificationService?: FormNotificationService // ADD THIS
   ) {}
 
@@ -1315,185 +1315,173 @@ export class FormService {
     await this.repo.deleteQuestion(questionId);
   }
 
-
   /**
- * Get suggestions for a specific question based on historical submissions
- */
-async getQuestionSuggestions(
-  formId: string,
-  questionSlug: string,
-  memberId: string
-): Promise<{
-  suggestions: Array<{
-    formTitle: string;
-    formYear: string;
-    submittedAt: Date;
-    answer: any;
-    displayAnswer: string;
-    answerPreview?: string;
-  }>;
-  questionType: string;
-  currentQuestion: {
-    kpi: string;
-    type: string;
-    options?: any;
-  };
-}> {
+   * Get suggestions for a specific question based on historical submissions
+   */
+  async getQuestionSuggestions(
+    formId: string,
+    questionSlug: string,
+    memberId: string
+  ): Promise<{
+    suggestions: Array<{
+      formTitle: string;
+      formYear: string;
+      submittedAt: Date;
+      answer: any;
+      displayAnswer: string;
+      answerPreview?: string;
+    }>;
+    questionType: string;
+    currentQuestion: {
+      kpi: string;
+      type: string;
+      options?: any;
+    };
+  }> {
+    // Get current form and question details
+    const form = await this.repo.findFormById(formId);
 
-  // Get current form and question details
-  const form = await this.repo.findFormById(formId);
-  
-  if (!form) {
-    throw new Error('Form not found');
-  }
+    if (!form) {
+      throw new Error('Form not found');
+    }
 
-  // Find the question in current form
-  let currentQuestion: Question | undefined;
-  
-  for (const category of form.categories) {
-    currentQuestion = category.questions.find(q => q.slug === questionSlug);
-    if (currentQuestion) break;
-  }
+    // Find the question in current form
+    let currentQuestion: Question | undefined;
 
+    for (const category of form.categories) {
+      currentQuestion = category.questions.find(q => q.slug === questionSlug);
+      if (currentQuestion) break;
+    }
 
-  // Get suggestions from repository
-  let suggestions = await this.repo.getQuestionSuggestions(
-    formId,
-    questionSlug,
-    memberId
-  );
-  console.log("Suggestions:", suggestions);
+    // Get suggestions from repository
+    let suggestions = await this.repo.getQuestionSuggestions(formId, questionSlug, memberId);
+    console.log('Suggestions:', suggestions);
 
-  // If no suggestions found by slug, try KPI matching
-  if (suggestions.length === 0) {
-    const kpiSuggestions = await this.repo.getQuestionSuggestionsByKPI(
-      formId,
-      currentQuestion.kpi,
-      memberId
-    );
-    
-    // Convert KPI suggestions to standard format
-    suggestions = kpiSuggestions.map(s => ({
-      formTitle: s.formTitle,
-      formYear: s.formYear,
-      submittedAt: s.submittedAt,
-      answer: s.answer,
-      formTypeId: '', // Not critical for display
-    }));
-  }
+    // If no suggestions found by slug, try KPI matching
+    if (suggestions.length === 0) {
+      const kpiSuggestions = await this.repo.getQuestionSuggestionsByKPI(
+        formId,
+        currentQuestion.kpi,
+        memberId
+      );
 
-  // Format suggestions based on question type
-  const formattedSuggestions = suggestions.map(suggestion => {
-    const formatted = this.formatSuggestionAnswer(
-      suggestion.answer,
-      currentQuestion!.type,
-      currentQuestion!.options
-    );
+      // Convert KPI suggestions to standard format
+      suggestions = kpiSuggestions.map(s => ({
+        formTitle: s.formTitle,
+        formYear: s.formYear,
+        submittedAt: s.submittedAt,
+        answer: s.answer,
+        formTypeId: '', // Not critical for display
+      }));
+    }
+
+    // Format suggestions based on question type
+    const formattedSuggestions = suggestions.map(suggestion => {
+      const formatted = this.formatSuggestionAnswer(
+        suggestion.answer,
+        currentQuestion!.type,
+        currentQuestion!.options
+      );
+
+      return {
+        formTitle: suggestion.formTitle,
+        formYear: suggestion.formYear,
+        submittedAt: suggestion.submittedAt,
+        answer: suggestion.answer,
+        displayAnswer: formatted.display,
+        answerPreview: formatted.preview,
+      };
+    });
 
     return {
-      formTitle: suggestion.formTitle,
-      formYear: suggestion.formYear,
-      submittedAt: suggestion.submittedAt,
-      answer: suggestion.answer,
-      displayAnswer: formatted.display,
-      answerPreview: formatted.preview,
+      suggestions: formattedSuggestions,
+      questionType: currentQuestion.type,
+      currentQuestion: {
+        kpi: currentQuestion.kpi,
+        type: currentQuestion.type,
+        options: currentQuestion.options,
+      },
     };
-  });
-
-  return {
-    suggestions: formattedSuggestions,
-    questionType: currentQuestion.type,
-    currentQuestion: {
-      kpi: currentQuestion.kpi,
-      type: currentQuestion.type,
-      options: currentQuestion.options,
-    },
-  };
-}
-
-/**
- * Format answer for display based on question type
- */
-private formatSuggestionAnswer(
-  answer: any,
-  questionType: string,
-  options?: any
-): { display: string; preview?: string } {
-  if (answer === null || answer === undefined || answer === '') {
-    return { display: 'No answer provided' };
   }
 
-  switch (questionType) {
-    case 'text':
-    case 'email':
-    case 'phone':
-    case 'url':
-      return {
-        display: String(answer),
-        preview: String(answer).length > 50 
-          ? String(answer).substring(0, 47) + '...' 
-          : String(answer),
-      };
+  /**
+   * Format answer for display based on question type
+   */
+  private formatSuggestionAnswer(
+    answer: any,
+    questionType: string,
+    options?: any
+  ): { display: string; preview?: string } {
+    if (answer === null || answer === undefined || answer === '') {
+      return { display: 'No answer provided' };
+    }
 
-    case 'textarea':
-      return {
-        display: String(answer),
-        preview: String(answer).length > 100 
-          ? String(answer).substring(0, 97) + '...' 
-          : String(answer),
-      };
-
-    case 'number':
-    case 'currency':
-      return {
-        display: questionType === 'currency' 
-          ? `$${Number(answer).toLocaleString()}` 
-          : String(answer),
-      };
-
-    case 'date':
-      return {
-        display: new Date(answer).toLocaleDateString(),
-      };
-
-    case 'datetime':
-      return {
-        display: new Date(answer).toLocaleString(),
-      };
-
-    case 'boolean':
-      return {
-        display: answer ? 'Yes' : 'No',
-      };
-
-    case 'select':
-      return {
-        display: String(answer),
-      };
-
-    case 'multiselect':
-      if (Array.isArray(answer)) {
-        const display = answer.join(', ');
+    switch (questionType) {
+      case 'text':
+      case 'email':
+      case 'phone':
+      case 'url':
         return {
-          display,
-          preview: display.length > 80 
-            ? display.substring(0, 77) + '...' 
-            : display,
+          display: String(answer),
+          preview:
+            String(answer).length > 50 ? String(answer).substring(0, 47) + '...' : String(answer),
         };
-      }
-      return { display: String(answer) };
 
-    case 'file':
-      // Assuming file answers store file paths or URLs
-      return {
-        display: 'File uploaded',
-        preview: String(answer),
-      };
+      case 'textarea':
+        return {
+          display: String(answer),
+          preview:
+            String(answer).length > 100 ? String(answer).substring(0, 97) + '...' : String(answer),
+        };
 
-    default:
-      return { display: String(answer) };
+      case 'number':
+      case 'currency':
+        return {
+          display:
+            questionType === 'currency' ? `$${Number(answer).toLocaleString()}` : String(answer),
+        };
+
+      case 'date':
+        return {
+          display: new Date(answer).toLocaleDateString(),
+        };
+
+      case 'datetime':
+        return {
+          display: new Date(answer).toLocaleString(),
+        };
+
+      case 'boolean':
+        return {
+          display: answer ? 'Yes' : 'No',
+        };
+
+      case 'select':
+        return {
+          display: String(answer),
+        };
+
+      case 'multiselect':
+        if (Array.isArray(answer)) {
+          const display = answer.join(', ');
+          return {
+            display,
+            preview: display.length > 80 ? display.substring(0, 77) + '...' : display,
+          };
+        }
+        return { display: String(answer) };
+
+      case 'file':
+        // Assuming file answers store file paths or URLs
+        return {
+          display: 'File uploaded',
+          preview: String(answer),
+        };
+
+      default:
+        return { display: String(answer) };
+    }
   }
-}
 
   async reorderQuestions(categoryId: string, questionIds: string[]): Promise<void> {
     // Update sort order for each question
@@ -1642,7 +1630,6 @@ private formatSuggestionAnswer(
       ...validationResult.processedData,
       minigrid_siteId: updates?.minigrid_siteId,
     };
-
 
     // Update submission through repository
     return this.repo.updateSubmission(formId, submissionId, updatedSubmission);
@@ -2007,8 +1994,7 @@ private formatSuggestionAnswer(
         });
 
         result[formTypeName].totalSubmissions += submissions.length;
-      } catch (error) {
-      }
+      } catch (error) {}
     }
 
     return result;

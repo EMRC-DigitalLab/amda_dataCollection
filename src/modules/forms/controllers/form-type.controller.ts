@@ -174,120 +174,115 @@ export class FormTypeController {
       ResponseHelper.error(res, error.message, 400);
     }
   };
-/**
- * Replicate a form type with all its forms to a new year
- * POST /api/form-types/:id/replicate
- */
-replicateFormType = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const {
-      targetYear,
-      prefix,
-      includeDrafts = false,
-      preservePublishedStatus = false,
-    } = req.body;
+  /**
+   * Replicate a form type with all its forms to a new year
+   * POST /api/form-types/:id/replicate
+   */
+  replicateFormType = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const {
+        targetYear,
+        prefix,
+        includeDrafts = false,
+        preservePublishedStatus = false,
+      } = req.body;
 
-    if (!targetYear) {
-      res.status(400).json({
-        success: false,
-        message: 'Target year is required',
-      });
-      return;
-    }
+      if (!targetYear) {
+        res.status(400).json({
+          success: false,
+          message: 'Target year is required',
+        });
+        return;
+      }
 
-    // Set longer timeout for this operation (5 minutes)
-    req.setTimeout(300000);
+      // Set longer timeout for this operation (5 minutes)
+      req.setTimeout(300000);
 
-    console.log(`Replication request received for form type ${id} to year ${targetYear}`);
+      console.log(`Replication request received for form type ${id} to year ${targetYear}`);
 
-    const replicatedFormType = await this.formTypeService.replicateFormType(id, targetYear, {
-      prefix,
-      includeDrafts,
-      preservePublishedStatus,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: `Form type successfully replicated to year ${targetYear}`,
-      data: replicatedFormType,
-    });
-  } catch (error) {
-    console.error('Replication controller error:', error);
-    ResponseHelper.error(res, error.message, 400);
-  }
-};
-
-/**
- * Replicate a form type to multiple years at once
- * POST /api/form-types/:id/replicate-multiple
- */
-replicateFormTypeToMultipleYears = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const {
-      targetYears,
-      prefix,
-      includeDrafts = false,
-      preservePublishedStatus = false,
-    } = req.body;
-
-    if (!targetYears || !Array.isArray(targetYears) || targetYears.length === 0) {
-      res.status(400).json({
-        success: false,
-        message: 'Target years array is required',
-      });
-      return;
-    }
-
-    const result = await this.formTypeService.replicateFormTypeToMultipleYears(
-      id,
-      targetYears,
-      {
+      const replicatedFormType = await this.formTypeService.replicateFormType(id, targetYear, {
         prefix,
         includeDrafts,
         preservePublishedStatus,
+      });
+
+      res.status(201).json({
+        success: true,
+        message: `Form type successfully replicated to year ${targetYear}`,
+        data: replicatedFormType,
+      });
+    } catch (error) {
+      console.error('Replication controller error:', error);
+      ResponseHelper.error(res, error.message, 400);
+    }
+  };
+
+  /**
+   * Replicate a form type to multiple years at once
+   * POST /api/form-types/:id/replicate-multiple
+   */
+  replicateFormTypeToMultipleYears = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const {
+        targetYears,
+        prefix,
+        includeDrafts = false,
+        preservePublishedStatus = false,
+      } = req.body;
+
+      if (!targetYears || !Array.isArray(targetYears) || targetYears.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'Target years array is required',
+        });
+        return;
       }
-    );
 
-    res.status(201).json({
-      success: true,
-      message: `Replication completed. ${result.successful.length} successful, ${result.failed.length} failed`,
-      data: {
-        successful: result.successful,
-        failed: result.failed,
-      },
-    });
-  } catch (error) {
-    ResponseHelper.error(res, error.message, 400);
-  }
-};
+      const result = await this.formTypeService.replicateFormTypeToMultipleYears(id, targetYears, {
+        prefix,
+        includeDrafts,
+        preservePublishedStatus,
+      });
 
-/**
- * Get replication preview
- * GET /api/form-types/:id/replication-preview
- */
-getReplicationPreview = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { id } = req.params;
+      res.status(201).json({
+        success: true,
+        message: `Replication completed. ${result.successful.length} successful, ${result.failed.length} failed`,
+        data: {
+          successful: result.successful,
+          failed: result.failed,
+        },
+      });
+    } catch (error) {
+      ResponseHelper.error(res, error.message, 400);
+    }
+  };
 
-    const preview = await this.formTypeService.getReplicationPreview(id);
+  /**
+   * Get replication preview
+   * GET /api/form-types/:id/replication-preview
+   */
+  getReplicationPreview = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { id } = req.params;
 
-    res.json({
-      success: true,
-      data: preview,
-    });
-  } catch (error) {
-    ResponseHelper.error(res, error.message, 400);
-  }
-};
-  
+      const preview = await this.formTypeService.getReplicationPreview(id);
+
+      res.json({
+        success: true,
+        data: preview,
+      });
+    } catch (error) {
+      ResponseHelper.error(res, error.message, 400);
+    }
+  };
 }

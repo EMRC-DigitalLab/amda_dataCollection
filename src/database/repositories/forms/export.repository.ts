@@ -1,13 +1,14 @@
 // @ts-nocheck
-import { Injectable } from 'injection-js';
 import { DataSource, Repository } from 'typeorm';
-import { ExportFilters, IExportRepository } from '../../../modules/forms/interfaces/export.interface';
+import {
+  ExportFilters,
+  IExportRepository,
+} from '../../../modules/forms/interfaces/export.interface';
 import { FormType } from '../../entities/form-type.entity';
 import { Form } from '../../entities/form.entity';
 import { Member } from '../../entities/member.entity';
 import { MinigridSite } from '../../entities/minigrid-site.entity';
 
-@Injectable()
 export class ExportRepository implements IExportRepository {
   private formRepo: Repository<Form>;
   private formTypeRepo: Repository<FormType>;
@@ -15,10 +16,10 @@ export class ExportRepository implements IExportRepository {
   private siteRepo: Repository<MinigridSite>;
 
   constructor(private dataSource: DataSource) {
-    this.formRepo = this.dataSource.getRepository(Form);
-    this.formTypeRepo = this.dataSource.getRepository(FormType);
-    this.memberRepo = this.dataSource.getRepository(Member);
-    this.siteRepo = this.dataSource.getRepository(MinigridSite);
+    this.formRepo = dataSource.getRepository(Form);
+    this.formTypeRepo = dataSource.getRepository(FormType);
+    this.memberRepo = dataSource.getRepository(Member);
+    this.siteRepo = dataSource.getRepository(MinigridSite);
   }
 
   async getFormSubmissionsByFormType(
@@ -27,7 +28,8 @@ export class ExportRepository implements IExportRepository {
     memberId?: string,
     siteId?: string
   ): Promise<any[]> {
-    const queryBuilder = this.formRepo.createQueryBuilder('f')
+    const queryBuilder = this.formRepo
+      .createQueryBuilder('f')
       .leftJoinAndSelect('f.formType', 'ft')
       .leftJoinAndSelect('f.categories', 'categories')
       .leftJoinAndSelect('categories.questions', 'questions')
@@ -80,7 +82,7 @@ export class ExportRepository implements IExportRepository {
           form.title,
           form.slug,
           form.formType?.name || 'Unknown',
-          form.formType?.year || null
+          form.formType?.year || null,
         ];
         let paramCount = 4;
 
@@ -113,7 +115,8 @@ export class ExportRepository implements IExportRepository {
     year?: number,
     formTypeId?: string
   ): Promise<any[]> {
-    let formQuery = this.formRepo.createQueryBuilder('f')
+    let formQuery = this.formRepo
+      .createQueryBuilder('f')
       .leftJoinAndSelect('f.formType', 'ft')
       .leftJoinAndSelect('f.categories', 'categories')
       .leftJoinAndSelect('categories.questions', 'questions')
@@ -157,10 +160,11 @@ export class ExportRepository implements IExportRepository {
         `;
 
         const submissions = await this.dataSource.query(query, [
-          form.title, form.slug,
+          form.title,
+          form.slug,
           form.formType?.name || 'Unknown',
           form.formType?.year || null,
-          memberId
+          memberId,
         ]);
 
         allSubmissions.push(...submissions);
@@ -177,7 +181,8 @@ export class ExportRepository implements IExportRepository {
     year?: number,
     formTypeId?: string
   ): Promise<any[]> {
-    let formQuery = this.formRepo.createQueryBuilder('f')
+    let formQuery = this.formRepo
+      .createQueryBuilder('f')
       .leftJoinAndSelect('f.formType', 'ft')
       .leftJoinAndSelect('f.categories', 'categories')
       .leftJoinAndSelect('categories.questions', 'questions')
@@ -221,10 +226,11 @@ export class ExportRepository implements IExportRepository {
         `;
 
         const submissions = await this.dataSource.query(query, [
-          form.title, form.slug,
+          form.title,
+          form.slug,
           form.formType?.name || 'Unknown',
           form.formType?.year || null,
-          siteId
+          siteId,
         ]);
 
         allSubmissions.push(...submissions);
@@ -242,7 +248,8 @@ export class ExportRepository implements IExportRepository {
     memberId?: string,
     siteId?: string
   ): Promise<any[]> {
-    let formQuery = this.formRepo.createQueryBuilder('f')
+    let formQuery = this.formRepo
+      .createQueryBuilder('f')
       .leftJoinAndSelect('f.formType', 'ft')
       .leftJoinAndSelect('f.categories', 'categories')
       .leftJoinAndSelect('categories.questions', 'questions')
@@ -285,9 +292,10 @@ export class ExportRepository implements IExportRepository {
         `;
 
         const params: any[] = [
-          form.title, form.slug,
+          form.title,
+          form.slug,
           form.formType?.name || 'Unknown',
-          form.formType?.year || null
+          form.formType?.year || null,
         ];
         let paramCount = 4;
 
@@ -333,9 +341,19 @@ export class ExportRepository implements IExportRepository {
   private buildColumnList(form: Form): string[] {
     const columns: string[] = [];
     const reservedColumns = new Set([
-      'id', 'form_id', 'submitted_by', 'minigrid_siteId', 'country',
-      'submitted_at', 'status', 'admin_status', 'admin_comment',
-      'reviewed_by', 'reviewed_at', 'created_at', 'updated_at'
+      'id',
+      'form_id',
+      'submitted_by',
+      'minigrid_siteId',
+      'country',
+      'submitted_at',
+      'status',
+      'admin_status',
+      'admin_comment',
+      'reviewed_by',
+      'reviewed_at',
+      'created_at',
+      'updated_at',
     ]);
 
     if (form.categories) {
@@ -354,7 +372,8 @@ export class ExportRepository implements IExportRepository {
   }
 
   async getFormTypesByYear(year?: number): Promise<any[]> {
-    let query = this.formTypeRepo.createQueryBuilder('ft')
+    let query = this.formTypeRepo
+      .createQueryBuilder('ft')
       .leftJoinAndSelect('ft.forms', 'f')
       .orderBy('ft.name', 'ASC');
 
@@ -366,8 +385,16 @@ export class ExportRepository implements IExportRepository {
   }
 
   async getMembersByStatus(status?: string): Promise<any[]> {
-    let query = this.memberRepo.createQueryBuilder('m')
-      .select(['m.id', 'm.companyName', 'm.email', 'm.membershipStatus', 'm.membershipType', 'm.createdAt'])
+    let query = this.memberRepo
+      .createQueryBuilder('m')
+      .select([
+        'm.id',
+        'm.companyName',
+        'm.email',
+        'm.membershipStatus',
+        'm.membershipType',
+        'm.createdAt',
+      ])
       .orderBy('m.companyName', 'ASC');
 
     if (status) {
@@ -378,9 +405,22 @@ export class ExportRepository implements IExportRepository {
   }
 
   async getSitesByMember(memberId?: string): Promise<any[]> {
-    let query = this.siteRepo.createQueryBuilder('s')
+    let query = this.siteRepo
+      .createQueryBuilder('s')
       .leftJoinAndSelect('s.member', 'm')
-      .select(['s.id', 's.siteId', 's.name', 's.country', 's.region', 's.district', 's.village', 's.status', 's.createdAt', 'm.id', 'm.companyName'])
+      .select([
+        's.id',
+        's.siteId',
+        's.name',
+        's.country',
+        's.region',
+        's.district',
+        's.village',
+        's.status',
+        's.createdAt',
+        'm.id',
+        'm.companyName',
+      ])
       .orderBy('s.name', 'ASC');
 
     if (memberId) {
@@ -403,7 +443,7 @@ export class ExportRepository implements IExportRepository {
       formTypes: [...new Set(submissions.map(s => s.form_type_name).filter(Boolean))],
       memberCount: new Set(submissions.map(s => s.submitted_by).filter(Boolean)).size,
       siteCount: new Set(submissions.map(s => s.minigrid_siteId).filter(Boolean)).size,
-      dateRange: { earliest: null, latest: null }
+      dateRange: { earliest: null, latest: null },
     };
 
     if (submissions.length > 0) {

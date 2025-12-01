@@ -1,4 +1,12 @@
-import { IsEnum, IsOptional, IsString, IsNumber, IsDateString, IsUUID, ValidateNested } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsNumber,
+  IsDateString,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ExportType, ExportFormat } from '../interfaces/export.interface';
 

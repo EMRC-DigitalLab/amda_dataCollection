@@ -5,30 +5,22 @@ export interface IExportRepository {
     memberId?: string,
     siteId?: string
   ): Promise<any[]>;
-  
-  getFormSubmissionsByMember(
-    memberId: string,
-    year?: any,
-    formTypeId?: string
-  ): Promise<any[]>;
-  
-  getFormSubmissionsBySite(
-    siteId: string,
-    year?: number,
-    formTypeId?: string
-  ): Promise<any[]>;
-  
+
+  getFormSubmissionsByMember(memberId: string, year?: any, formTypeId?: string): Promise<any[]>;
+
+  getFormSubmissionsBySite(siteId: string, year?: number, formTypeId?: string): Promise<any[]>;
+
   getAllFormSubmissions(
     year?: number,
     formTypeId?: string,
     memberId?: string,
     siteId?: string
   ): Promise<any[]>;
-  
+
   getFormTypesByYear(year?: number): Promise<any[]>;
-  
+
   getMembersByStatus(status?: string): Promise<any[]>;
-  
+
   getSitesByMember(memberId?: string): Promise<any[]>;
 }
 
@@ -40,14 +32,14 @@ export enum ExportType {
   MEMBER_SUBMISSIONS_YEARLY = 'MEMBER_SUBMISSIONS_YEARLY',
   SITE_SUBMISSIONS_ALL = 'SITE_SUBMISSIONS_ALL',
   SITE_SUBMISSIONS_YEARLY = 'SITE_SUBMISSIONS_YEARLY',
-  CUSTOM_FILTERED = 'CUSTOM_FILTERED'
+  CUSTOM_FILTERED = 'CUSTOM_FILTERED',
 }
 
 export enum ExportFormat {
   CSV = 'csv',
   XLSX = 'xlsx',
   JSON = 'json',
-  PDF = 'pdf'
+  PDF = 'pdf',
 }
 
 export interface ExportFilters {
