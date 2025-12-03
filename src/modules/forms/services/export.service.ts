@@ -67,8 +67,7 @@ export class ExportService {
 
     if (filters.submissionStatus) {
       filteredData = filteredData.filter(
-        item =>
-          item.status === filters.submissionStatus || item.admin_status === filters.submissionStatus
+        item => item.status === filters.submissionStatus
       );
     }
 
@@ -124,7 +123,6 @@ export class ExportService {
     cleanItem['Form Type'] = item.form_type_name;
     cleanItem['Form Year'] = item.form_year;
     cleanItem['Status'] = item.status;
-    cleanItem['Admin Status'] = item.admin_status;
     cleanItem['Admin Comment'] = item.admin_comment || '';
     cleanItem['Submitted At'] = item.submitted_at;
     cleanItem['Created At'] = item.created_at;
@@ -145,7 +143,6 @@ export class ExportService {
       'country',
       'submitted_at',
       'status',
-      'admin_status',
       'admin_comment',
       'reviewed_by',
       'reviewed_at',
@@ -887,9 +884,9 @@ export class ExportService {
     const formTypes = [...new Set(data.map(item => item['Form Type']).filter(Boolean))];
     
     const statusBreakdown = {
-      pending: data.filter(item => item['Admin Status'] === 'PENDING').length,
-      approved: data.filter(item => item['Admin Status'] === 'APPROVED').length,
-      rejected: data.filter(item => item['Admin Status'] === 'REJECTED').length,
+      submitted: data.filter(item => item['Status'] === 'SUBMITTED').length,
+      approved: data.filter(item => item['Status'] === 'APPROVED').length,
+      rejected: data.filter(item => item['Status'] === 'REJECTED').length,
     };
 
     // Summary box
@@ -913,7 +910,7 @@ export class ExportService {
 
     // Right column - Status breakdown
     doc.text(`Status Breakdown:`, 280, summaryY);
-    doc.text(`• Pending: ${statusBreakdown.pending}`, 290, summaryY + 15);
+    doc.text(`• Submitted: ${statusBreakdown.submitted}`, 290, summaryY + 15);
     doc.text(`• Approved: ${statusBreakdown.approved}`, 290, summaryY + 30);
     doc.text(`• Rejected: ${statusBreakdown.rejected}`, 290, summaryY + 45);
 
@@ -947,8 +944,8 @@ export class ExportService {
     doc.y += 25;
 
     // Table headers
-    const headers = ['Form Title', 'Member', 'Status', 'Admin Status', 'Submitted Date'];
-    const columnWidths = [140, 120, 80, 90, 85];
+    const headers = ['Form Title', 'Member', 'Status', 'Submitted Date'];
+    const columnWidths = [140, 120, 90, 125];
     const headerY = doc.y;
 
     // Header background
@@ -1019,7 +1016,6 @@ export class ExportService {
         this.truncateText(item['Form Title'] || '', 20),
         this.truncateText(item['Member Company'] || '', 18),
         item['Status'] || '',
-        item['Admin Status'] || '',
         item['Submitted At'] ? new Date(item['Submitted At']).toLocaleDateString() : ''
       ];
 
@@ -1611,7 +1607,6 @@ private async createSimplifiedGroupedSubmissionsSheet(
     'Submission ID', 'id',
     'Submitted At', 'submitted_at',
     'Status', 'status',
-    'Admin Status', 'admin_status',
     'Member Company', 'member_company',
     'Member Email', 'member_email',
     'Site Name', 'site_name',
@@ -1749,7 +1744,7 @@ private async createSimplifiedGroupedSubmissionsSheet(
       submission.submitted_at || submission.created_at
     ).toLocaleDateString();
     sheet.getCell('A2').value =
-      `Submission ID: ${submission.id} | Submitted: ${submittedDate} | Status: ${submission.admin_status || submission.status}`;
+      `Submission ID: ${submission.id} | Submitted: ${submittedDate} | Status: ${submission.status}`;
     sheet.getCell('A2').font = {
       name: 'Calibri',
       italic: true,
@@ -1813,7 +1808,7 @@ private async createSimplifiedGroupedSubmissionsSheet(
     const metadataColumns = [
       { header: 'Submission ID', key: 'id', width: 15 },
       { header: 'Submitted At', key: 'submitted_at', width: 20 },
-      { header: 'Status', key: 'admin_status', width: 12 },
+      { header: 'Status', key: 'status', width: 12 },
       { header: 'Member', key: 'member_company', width: 20 },
       { header: 'Site', key: 'site_name', width: 20 },
     ];
@@ -2385,7 +2380,7 @@ private async createSimplifiedGroupedSubmissionsSheet(
       } else if (col.key === 'id' && (!value || value === 'undefined')) {
         value = submission.id || 'N/A';
       } else if (col.key === 'admin_status') {
-        value = submission.admin_status || submission.status || 'N/A';
+        value = submission.status || 'N/A';
       } else if (col.key === 'member_company') {
         value = submission.member_company || 'N/A';
       }
@@ -2453,7 +2448,7 @@ private async createSimplifiedGroupedSubmissionsSheet(
       ['Form Title', formData.title],
       ['Form Type', formData.formType?.name || 'N/A'],
       ['Form Year', formData.year || 'N/A'],
-      ['Status', submission.admin_status || submission.status || 'N/A'],
+      ['Status', submission.status || 'N/A'],
       ['Member Company', submission.member_company || 'N/A'],
       ['Member Email', submission.member_email || 'N/A'],
       ['Site Name', submission.site_name || 'N/A'],
@@ -2515,7 +2510,6 @@ private async createSimplifiedGroupedSubmissionsSheet(
       'country',
       'submitted_at',
       'status',
-      'admin_status',
       'admin_comment',
       'reviewed_by',
       'reviewed_at',
@@ -2679,7 +2673,7 @@ private async createSimplifiedGroupedSubmissionsSheet(
     const metadataColumns = [
       { header: 'Submission ID', key: 'id', width: 15 },
       { header: 'Submitted At', key: 'submitted_at', width: 20 },
-      { header: 'Status', key: 'admin_status', width: 12 },
+      { header: 'Status', key: 'status', width: 12 },
       { header: 'Member', key: 'member_company', width: 20 },
       { header: 'Site', key: 'site_name', width: 20 },
     ];
@@ -2960,7 +2954,7 @@ private async createSimplifiedGroupedSubmissionsSheet(
       submission.submitted_at || submission.created_at
     ).toLocaleDateString();
     sheet.getCell('A2').value =
-      `Submission ID: ${submission.id} | Submitted: ${submittedDate} | Status: ${submission.admin_status || submission.status}`;
+      `Submission ID: ${submission.id} | Submitted: ${submittedDate} | Status: ${submission.status}`;
     sheet.getCell('A2').font = {
       name: 'Calibri',
       italic: true,
@@ -3001,7 +2995,7 @@ private async createSimplifiedGroupedSubmissionsSheet(
       ['Form Title', submission.form_title],
       ['Form Type', submission.form_type_name],
       ['Form Year', submission.form_year],
-      ['Status', submission.admin_status || submission.status],
+      ['Status', submission.status],
       ['Member Company', submission.member_company || 'N/A'],
       ['Member Email', submission.member_email || 'N/A'],
       ['Site Name', submission.site_name || 'N/A'],
@@ -3063,7 +3057,6 @@ private async createSimplifiedGroupedSubmissionsSheet(
       'country',
       'submitted_at',
       'status',
-      'admin_status',
       'admin_comment',
       'reviewed_by',
       'reviewed_at',
@@ -3093,9 +3086,8 @@ private async createSimplifiedGroupedSubmissionsSheet(
       // Format value based on type
       if (typeof value === 'object') {
         displayValue = JSON.stringify(value);
-      } else if (value instanceof Date) {
-        displayValue = value.toLocaleDateString();
-      } else if (typeof value === 'boolean') {
+      } 
+    else if (typeof value === 'boolean') {
         displayValue = value ? 'Yes' : 'No';
       }
 

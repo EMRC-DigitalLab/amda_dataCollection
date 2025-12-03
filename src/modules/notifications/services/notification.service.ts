@@ -29,9 +29,11 @@ export class NotificationService {
     private templateService: TemplateService,
     private channelFactory: NotificationChannelFactory,
     private queueService: NotificationQueueService,
-    private webSocketNotificationService?: WebSocketNotificationService
+    private webSocketNotificationService?: WebSocketNotificationService,
+    private dataSource?: Repository<Notification>
   ) {
-    this.notificationRepository = AppDataSource.getRepository(Notification);
+    // Use AppDataSource as fallback for backward compatibility
+    this.notificationRepository = dataSource || AppDataSource.getRepository(Notification);
     this.preferenceRepository = AppDataSource.getRepository(NotificationPreference);
   }
 
@@ -371,6 +373,16 @@ export class NotificationService {
       await this.notificationRepository.save(notification);
       throw error;
     }
+  }
+
+  /**
+   * Get single notification by ID
+   */
+  async getNotificationById(id: string): Promise<Notification | null> {
+    return await this.notificationRepository.findOne({
+      where: { id, isDeleted: false },
+      relations: ['template'],
+    });
   }
 
   /**
