@@ -19,7 +19,6 @@ export class MinigridSiteController {
 
   createMinigridSite = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Validate input
       const dto = plainToClass(CreateMinigridSiteDto, req.body);
       const errors = await validate(dto);
 
@@ -77,7 +76,6 @@ export class MinigridSiteController {
     }
   };
 
-  // New method: Get all minigrid sites by userId
   getMinigridSitesByUserId = async (
     req: Request,
     res: Response,
@@ -105,11 +103,8 @@ export class MinigridSiteController {
     }
   };
 
-  // Alternative method: Get current authenticated user's minigrid sites
   getMyMinigridSites = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      // Assuming you have user info in req.user from auth middleware
-
       const userId = (req as any).user?.id;
 
       if (!userId) {
@@ -140,7 +135,6 @@ export class MinigridSiteController {
     try {
       const { id } = req.params;
 
-      // Validate input
       const dto = plainToClass(UpdateMinigridSiteDto, req.body);
       const errors = await validate(dto);
 
@@ -175,7 +169,58 @@ export class MinigridSiteController {
     }
   };
 
-  // Additional useful method: Get minigrid sites by status
+  bulkDeleteMinigridSites = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { ids } = req.body;
+
+      if (!Array.isArray(ids)) {
+        throw new AppError('IDs must be provided as an array', 400);
+      }
+
+      const result = await this.minigridSiteService.bulkDeleteMinigridSites(ids);
+
+      res.json({
+        data: result,
+        message: result.message,
+      });
+    } catch (error) {
+      ResponseHelper.error(res, error.message, 400);
+    }
+  };
+
+  bulkDeleteMyMinigridSites = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const userId = (req as any).user?.id;
+
+      if (!userId) {
+        throw new AppError('User not authenticated', 401);
+      }
+
+      const { ids } = req.body;
+
+      if (!Array.isArray(ids)) {
+        throw new AppError('IDs must be provided as an array', 400);
+      }
+
+      const result = await this.minigridSiteService.bulkDeleteUserMinigridSites(userId, ids);
+
+      res.json({
+        data: result,
+        message: result.message,
+      });
+    } catch (error) {
+      ResponseHelper.error(res, error.message, 400);
+    }
+  };
+
   getMinigridSitesByStatus = async (
     req: Request,
     res: Response,
@@ -203,7 +248,6 @@ export class MinigridSiteController {
     }
   };
 
-  // Additional useful method: Get minigrid site statistics for a user
   getUserMinigridSiteStats = async (
     req: Request,
     res: Response,
@@ -221,21 +265,4 @@ export class MinigridSiteController {
       ResponseHelper.error(res, error.message, 400);
     }
   };
-
-  // getActiveMinigridSites = async (
-  //   req: Request,
-  //   res: Response,
-  //   next: NextFunction
-  // ): Promise<void> => {
-  //   try {
-  //     const minigridSites = await this.minigridSiteService.getActiveMinigridSites();
-
-  //     res.json({
-  //       data: minigridSites,
-  //       message: 'Active minigrid sites retrieved successfully',
-  //     });
-  //   } catch (error) {
-  //     ResponseHelper.error(res, error.message, 400);
-  //   }
-  // };
 }

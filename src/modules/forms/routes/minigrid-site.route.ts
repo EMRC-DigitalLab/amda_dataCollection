@@ -7,22 +7,24 @@ export function createMinigridRoutes(dataSource: DataSource): Router {
   const router = Router();
   const minigridSiteController = new MinigridSiteController(dataSource);
 
-  // Public routes (if any)
-  // router.get('/active', minigridSiteController.getActiveMinigridSites);
-
   // CRUD operations
-  router.post(
-    '/',
-    authMiddleware,
-    // validationMiddleware(CreateMinigridSiteDto),
-    minigridSiteController.createMinigridSite
-  );
+  router.post('/', authMiddleware, minigridSiteController.createMinigridSite);
 
   // Get all minigrid sites (admin/general view)
   router.get('/', authMiddleware, minigridSiteController.getAllMinigridSites);
 
   // Get current authenticated user's minigrid sites
   router.get('/my-sites', authMiddleware, minigridSiteController.getMyMinigridSites);
+
+  // Bulk delete authenticated user's minigrid sites
+  router.post(
+    '/my-sites/bulk-delete',
+    authMiddleware,
+    minigridSiteController.bulkDeleteMyMinigridSites
+  );
+
+  // Bulk delete minigrid sites (admin)
+  router.post('/bulk-delete', authMiddleware, minigridSiteController.bulkDeleteMinigridSites);
 
   // Get minigrid sites by specific userId
   router.get('/user/:userId', authMiddleware, minigridSiteController.getMinigridSitesByUserId);

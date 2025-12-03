@@ -157,6 +157,11 @@ export function createFormRoutes(dataSource: DataSource): Router {
     formController.reorderQuestions
   );
 
+  router.get(
+    '/:id/questions/:questionSlug/suggestions',
+    authMiddleware,
+    formController.getQuestionSuggestions
+  );
   /* ============================================================================ */
   /* Form Submission Routes (User-facing)                                        */
   /* ============================================================================ */
@@ -414,12 +419,7 @@ export function createFormRoutes(dataSource: DataSource): Router {
   /* ============================================================================ */
 
   // Bulk delete submissions
-  router.post(
-    '/:id/submissions/bulk-delete',
-    authMiddleware,
-    adminMiddleware,
-    formController.bulkDeleteSubmissions
-  );
+  router.post('/:id/submissions/bulk-delete', authMiddleware, formController.bulkDeleteSubmissions);
 
   // Bulk update submission status
   router.post(

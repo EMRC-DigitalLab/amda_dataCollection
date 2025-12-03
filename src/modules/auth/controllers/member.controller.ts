@@ -13,7 +13,6 @@ export class MemberController {
   private memberService: MemberService;
 
   constructor(private readonly dataSource: DataSource) {
-    // We are working on the member controller, therefore we'd need to access external repository, like the user repo, form, and member repo (inclusive)
     this.memberService = new MemberService(
       new MemberRepository(dataSource),
       new UserRepository(dataSource),

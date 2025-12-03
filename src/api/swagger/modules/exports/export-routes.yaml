@@ -1,0 +1,586 @@
+paths:
+  /api/exports:
+    post:
+      tags:
+        - Exports
+      summary: Export form submissions based on criteria
+      description: Export form submissions with various filtering options and output formats
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
+            examples:
+              formTypeExport:
+                summary: Export specific form type for current year
+                value:
+                  exportType: "FORM_TYPE_CURRENT"
+                  format: "csv"
+                  formTypeId: "123e4567-e89b-12d3-a456-426614174000"
+              memberExport:
+                summary: Export all submissions by member
+                value:
+                  exportType: "MEMBER_SUBMISSIONS_ALL"
+                  format: "xlsx"
+                  memberId: "123e4567-e89b-12d3-a456-426614174001"
+      responses:
+        '200':
+          description: Export completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/exports/bulk:
+    post:
+      tags:
+        - Exports
+      summary: Bulk export multiple data sets
+      description: Export multiple form types, members, or sites in a single operation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkExportRequest'
+      responses:
+        '200':
+          description: Bulk export completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExportResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/exports/preview:
+    get:
+      tags:
+        - Exports
+      summary: Get preview of data to be exported
+      description: Preview a limited number of records before performing full export
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: exportType
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/ExportType'
+        - name: formTypeId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: memberId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: siteId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Preview data retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/exports/summary:
+    get:
+      tags:
+        - Exports
+      summary: Get summary of export data
+      description: Get statistics about the data that would be exported
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: exportType
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/ExportType'
+        - name: formTypeId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: memberId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: siteId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: submissionStatus
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Export summary retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/ExportSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/exports/types:
+    get:
+      tags:
+        - Exports
+      summary: Get available export types
+      description: Retrieve all available export type options
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Export types retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        value:
+                          $ref: '#/components/schemas/ExportType'
+                        label:
+                          type: string
+
+  /api/exports/formats:
+    get:
+      tags:
+        - Exports
+      summary: Get available export formats
+      description: Retrieve all available export format options
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Export formats retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        value:
+                          $ref: '#/components/schemas/ExportFormat'
+                        label:
+                          type: string
+
+  /api/exports/files:
+    get:
+      tags:
+        - Exports
+      summary: List all export files
+      description: Get a list of all generated export files
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Export files retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        fileName:
+                          type: string
+                        size:
+                          type: number
+                        created:
+                          type: string
+                          format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/exports/files/{fileName}/download:
+    get:
+      tags:
+        - Exports
+      summary: Download export file
+      description: Download a previously generated export file
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: fileName
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Name of the export file to download
+      responses:
+        '200':
+          description: File download initiated
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/exports/files/{fileName}:
+    delete:
+      tags:
+        - Exports
+      summary: Delete export file
+      description: Delete a previously generated export file
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: fileName
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Name of the export file to delete
+      responses:
+        '200':
+          description: File deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/exports/form-types/{formTypeId}:
+    get:
+      tags:
+        - Exports
+      summary: Export submissions for specific form type
+      description: Export all submissions for a specific form type
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: formTypeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: format
+          in: query
+          schema:
+            $ref: '#/components/schemas/ExportFormat'
+        - name: memberId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: siteId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Form type submissions exported successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/exports/members/{memberId}:
+    get:
+      tags:
+        - Exports
+      summary: Export all submissions by member
+      description: Export all form submissions made by a specific member
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: format
+          in: query
+          schema:
+            $ref: '#/components/schemas/ExportFormat'
+        - name: formTypeId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Member submissions exported successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/exports/sites/{siteId}:
+    get:
+      tags:
+        - Exports
+      summary: Export all submissions by site
+      description: Export all form submissions made for a specific site
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: format
+          in: query
+          schema:
+            $ref: '#/components/schemas/ExportFormat'
+        - name: formTypeId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Site submissions exported successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/exports/all:
+    get:
+      tags:
+        - Exports
+      summary: Export all submissions with optional filters
+      description: Export all form submissions across all form types and years with optional filters
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: format
+          in: query
+          schema:
+            $ref: '#/components/schemas/ExportFormat'
+        - name: formTypeId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: memberId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: siteId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: All submissions exported successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/exports/custom:
+    post:
+      tags:
+        - Exports
+      summary: Export with custom filters
+      description: Export form submissions with advanced custom filtering options
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
+            examples:
+              customExport:
+                summary: Custom export with date range
+                value:
+                  exportType: "CUSTOM_FILTERED"
+                  format: "xlsx"
+                  year: 2024
+                  formTypeId: "123e4567-e89b-12d3-a456-426614174000"
+                  dateRange:
+                    start: "2024-01-01"
+                    end: "2024-12-31"
+      responses:
+        '200':
+          description: Custom export completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'

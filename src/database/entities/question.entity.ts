@@ -39,4 +39,5 @@ export class Question extends BaseEntity {
   /* relation ------------------------------------------------------------- */
   @ManyToOne(() => Category, category => category.questions, { onDelete: 'CASCADE' })
   category!: Category;
+  validation: any;
 }

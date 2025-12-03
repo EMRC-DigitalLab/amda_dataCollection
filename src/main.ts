@@ -39,8 +39,8 @@ if (isProduction) {
 
 import { createApiRouter } from '@/api/routes';
 import { getSwaggerInfo, swaggerSpec } from '@/api/swagger/schemas/swagger.config';
-import { config, connectRedis } from '@/config';
-import { AppDataSource, connectDatabase } from '@/config/database';
+import { config } from '@/config';
+import { connectDatabase } from '@/config/database';
 import { errorHandler, notFoundHandler } from '@/shared/middleware/error.middleware';
 import { generalRateLimit } from '@/shared/middleware/rate-limit.middleware';
 // import { WebSocketService } from '@/shared/websocket/websocket.service';
@@ -278,11 +278,11 @@ class Application {
       await connectDatabase();
 
       if (config.environment === 'development' && config.database.autoGenerateMigrations) {
-        await AppDataSource.synchronize();
-        logger.info('Database synchronized with entities');
+        // await AppDataSource.synchronize();
+        // logger.info('Database synchronized with entities');
       } else if (config.database.runMigrationsOnStartup) {
-        await AppDataSource.runMigrations();
-        logger.info('Database migrations completed');
+        // await AppDataSource.runMigrations();
+        // logger.info('Database migrations completed');
 
         const { TemplateService } = await import(
           '@/modules/notifications/services/template.service'

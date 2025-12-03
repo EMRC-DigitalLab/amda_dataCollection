@@ -14,11 +14,13 @@ export interface AverageConnectionsAnalytics {
   trend: Array<{
     year: number;
     averageConnections: number;
+    siteCount: number;
   }>;
 }
 
 export interface SitesByCountryAnalytics {
   totalSites: number;
+  period: string;
   breakdown: Array<{
     country: string;
     totalSites: number;
@@ -37,4 +39,29 @@ export interface NewSitesCommissionedAnalytics {
     count: number;
     percentage: number;
   }>;
+}
+
+export interface CapacityAnalytics {
+  totalCapacityKw: number;
+  averageCapacityKw: number;
+  maxCapacityKw: number;
+  totalSites: number;
+  sitesWithCapacity: number;
+}
+
+export interface StatusDistributionAnalytics {
+  status: string;
+  count: number;
+  percentage: number;
+}
+
+export interface SitesAnalyticsDashboard {
+  connections: ConnectionsAnalytics;
+  averageConnections: AverageConnectionsAnalytics;
+  sitesByCountry: SitesByCountryAnalytics;
+  newSitesCommissioned: NewSitesCommissionedAnalytics;
+  metadata: {
+    generatedAt: Date;
+    period: string;
+  };
 }

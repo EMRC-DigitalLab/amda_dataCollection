@@ -10,7 +10,6 @@ export class MinigridSiteService implements IMinigridSiteService {
   constructor(private readonly minigridSiteRepository: MinigridSiteRepository) {}
 
   async createMinigridSite(data: CreateMinigridSiteDto): Promise<MinigridSite> {
-    // Check if minigrid site with same name already exists
     const existingMinigridSite = await this.minigridSiteRepository.findByName(data.name);
     if (existingMinigridSite) {
       throw new AppError('Minigrid site with this name already exists', 409);
@@ -55,7 +54,6 @@ export class MinigridSiteService implements IMinigridSiteService {
     return minigridSite;
   }
 
-  // New method: Get minigrid sites by userId
   async getMinigridSitesByUserId(
     userId: string,
     page: number = 1,
@@ -77,15 +75,16 @@ export class MinigridSiteService implements IMinigridSiteService {
       this.minigridSiteRepository.countByUserId(userId),
     ]);
 
+    console.log(data, total, 'sites');
+
     return {
       data,
-      total,
+      total: data?.length || 0,
       page,
       limit,
     };
   }
 
-  // New method: Get minigrid sites by status
   async getMinigridSitesByStatus(
     status: string,
     page: number = 1,
@@ -96,7 +95,6 @@ export class MinigridSiteService implements IMinigridSiteService {
     page: number;
     limit: number;
   }> {
-    // Validate status
     const validStatuses = [
       'Operational',
       'Under Construction',
@@ -127,9 +125,7 @@ export class MinigridSiteService implements IMinigridSiteService {
     };
   }
 
-  // New method: Get user minigrid site statistics
   async getUserMinigridSiteStats(userId: string): Promise<MinigridSiteStats> {
-    // Get all user's minigrid sites
     const userSites = await this.minigridSiteRepository.findByUserId(userId);
 
     if (userSites.length === 0) {
@@ -146,7 +142,6 @@ export class MinigridSiteService implements IMinigridSiteService {
       };
     }
 
-    // Calculate statistics
     const totalSites = userSites.length;
     const operationalSites = userSites.filter(site => site.status === 'Operational').length;
     const underConstructionSites = userSites.filter(
@@ -156,7 +151,6 @@ export class MinigridSiteService implements IMinigridSiteService {
     const maintenanceSites = userSites.filter(site => site.status === 'Maintenance').length;
     const decommissionedSites = userSites.filter(site => site.status === 'Decommissioned').length;
 
-    // Calculate total installed capacity and connected customers
     const totalInstalledCapacity = userSites.reduce((sum, site) => {
       const capacity = parseFloat(site.installedCapacityKw) || 0;
       return sum + capacity;
@@ -167,7 +161,6 @@ export class MinigridSiteService implements IMinigridSiteService {
       return sum + customers;
     }, 0);
 
-    // Create status distribution
     const statusCounts = {
       Operational: operationalSites,
       'Under Construction': underConstructionSites,
@@ -181,7 +174,7 @@ export class MinigridSiteService implements IMinigridSiteService {
       .map(([status, count]) => ({
         status,
         count,
-        percentage: Math.round((count / totalSites) * 100 * 100) / 100, // Round to 2 decimal places
+        percentage: Math.round((count / totalSites) * 100 * 100) / 100,
       }));
 
     return {
@@ -203,7 +196,6 @@ export class MinigridSiteService implements IMinigridSiteService {
       throw new AppError('Minigrid site not found', 404);
     }
 
-    // Check if name is being updated and if it conflicts with existing
     if (data.name && data.name !== existingMinigridSite.name) {
       const nameConflict = await this.minigridSiteRepository.findByName(data.name);
       if (nameConflict) {
@@ -229,5 +221,59 @@ export class MinigridSiteService implements IMinigridSiteService {
     if (!deleted) {
       throw new AppError('Failed to delete minigrid site', 500);
     }
+  }
+
+  async bulkDeleteMinigridSites(
+    ids: string[]
+  ): Promise<{ success: boolean; deletedCount: number; message: string }> {
+    if (!ids || ids.length === 0) {
+      throw new AppError('No site IDs provided for deletion', 400);
+    }
+
+    const existingSites = await Promise.all(
+      ids.map(id => this.minigridSiteRepository.findById(id))
+    );
+
+    const validIds = existingSites.filter(site => site !== null).map(site => site!.id);
+
+    if (validIds.length === 0) {
+      throw new AppError('None of the provided site IDs exist', 404);
+    }
+
+    const result = await this.minigridSiteRepository.bulkDelete(validIds);
+
+    return {
+      success: result.success,
+      deletedCount: result.deletedCount,
+      message: `Successfully deleted ${result.deletedCount} out of ${ids.length} minigrid sites`,
+    };
+  }
+
+  async bulkDeleteUserMinigridSites(
+    userId: string,
+    ids: string[]
+  ): Promise<{ success: boolean; deletedCount: number; message: string }> {
+    if (!ids || ids.length === 0) {
+      throw new AppError('No site IDs provided for deletion', 400);
+    }
+
+    const userSites = await this.minigridSiteRepository.findByUserId(userId);
+    const userSiteIds = userSites.map(site => site.id);
+
+    console.log(userSiteIds, ids, 'these are the sites id coming');
+
+    const validIds = ids.filter(id => userSiteIds.includes(id));
+
+    if (validIds.length === 0) {
+      throw new AppError('None of the provided sites belong to this user or do not exist', 403);
+    }
+
+    const result = await this.minigridSiteRepository.bulkDeleteByUserId(userId, validIds);
+
+    return {
+      success: result.success,
+      deletedCount: result.deletedCount,
+      message: `Successfully deleted ${result.deletedCount} out of ${ids.length} minigrid sites`,
+    };
   }
 }
