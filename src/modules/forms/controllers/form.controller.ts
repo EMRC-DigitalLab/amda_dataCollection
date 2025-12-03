@@ -82,6 +82,19 @@ export class FormController {
     }
   };
 
+  forceDelete = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.forceDelete(req.params.id);
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: `Form and ${result.deletedSubmissions} submissions deleted successfully`,
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+
   findById = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const form = await this.service.findById(req.params.id);
@@ -1021,6 +1034,24 @@ export class FormController {
         success: true,
         data: submission,
         message: 'Submission rejected successfully',
+      });
+    } catch (err) {
+      ResponseHelper.error(res, err.message, 400);
+    }
+  };
+
+  bulkApproveSubmissions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { reason } = req.body;
+      const result = await this.service.bulkApproveAllSubmissions(
+        req.params.id,
+        req.user?.id,
+        reason
+      );
+      res.json({
+        success: true,
+        data: result,
+        message: `${result.approvedCount} submissions approved successfully`,
       });
     } catch (err) {
       ResponseHelper.error(res, err.message, 400);

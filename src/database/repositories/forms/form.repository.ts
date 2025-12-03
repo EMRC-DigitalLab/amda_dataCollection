@@ -148,6 +148,50 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     }
   }
 
+  async deleteAllSubmissions(tableName: string): Promise<void> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+
+    try {
+      // Delete all rows from the submission table
+      await queryRunner.query(`DELETE FROM "${tableName}"`);
+    } catch (error) {
+      throw new Error(`Failed to delete submissions from table ${tableName}: ${error.message}`);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+ async bulkUpdateSubmissionStatus(tableName: string, updateData: any): Promise<{ affected: number }> {
+  const queryRunner = this.dataSource.createQueryRunner();
+  await queryRunner.connect();
+
+  try {
+    // Build the SET clause dynamically
+    const keys = Object.keys(updateData);
+    const setClause = keys
+      .map((key, index) => `"${key}" = $${index + 1}`)
+      .join(', ');
+
+    // Only update PENDING submissions
+    const query = `
+      UPDATE "${tableName}" 
+      SET ${setClause}
+      WHERE admin_status = 'PENDING'
+    `;
+    
+    const values = Object.values(updateData);
+    const result = await queryRunner.query(query, values);
+    
+    // PostgreSQL returns an array where result[1] is the row count
+    return { affected: result[1] || 0 };
+  } catch (error) {
+    throw new Error(`Failed to bulk update submission status: ${error.message}`);
+  } finally {
+    await queryRunner.release();
+  }
+}
+
   async findFormById(id: string): Promise<Form | null> {
     return this.findOne({
       where: { id },
@@ -727,36 +771,36 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     await this.dataSource.query(sql, [formId, ...submissionIds]);
   }
 
-  async bulkUpdateSubmissionStatus(
-    formId: string,
-    submissionIds: string[],
-    status: string,
-    reviewerId?: string
-  ): Promise<void> {
-    const form = await this.findFormById(formId);
-    if (!form?.tableName) throw new Error('Form table not found');
+  // async bulkUpdateSubmissionStatus(
+  //   formId: string,
+  //   submissionIds: string[],
+  //   status: string,
+  //   reviewerId?: string
+  // ): Promise<void> {
+  //   const form = await this.findFormById(formId);
+  //   if (!form?.tableName) throw new Error('Form table not found');
 
-    const tableName = form.tableName;
-    const placeholders = submissionIds.map((_, index) => `${index + 3}`).join(', ');
+  //   const tableName = form.tableName;
+  //   const placeholders = submissionIds.map((_, index) => `${index + 3}`).join(', ');
 
-    let sql = `
-      UPDATE "${tableName}" 
-      SET "status" = $1, "updated_at" = CURRENT_TIMESTAMP
-    `;
-    const params = [status];
+  //   let sql = `
+  //     UPDATE "${tableName}" 
+  //     SET "status" = $1, "updated_at" = CURRENT_TIMESTAMP
+  //   `;
+  //   const params = [status];
 
-    if (reviewerId) {
-      sql += `, "reviewed_by" = $2`;
-      params.push(reviewerId);
-      sql += ` WHERE form_id = $3 AND id IN (${placeholders})`;
-      params.push(formId, ...submissionIds);
-    } else {
-      sql += ` WHERE form_id = $2 AND id IN (${placeholders})`;
-      params.push(formId, ...submissionIds);
-    }
+  //   if (reviewerId) {
+  //     sql += `, "reviewed_by" = $2`;
+  //     params.push(reviewerId);
+  //     sql += ` WHERE form_id = $3 AND id IN (${placeholders})`;
+  //     params.push(formId, ...submissionIds);
+  //   } else {
+  //     sql += ` WHERE form_id = $2 AND id IN (${placeholders})`;
+  //     params.push(formId, ...submissionIds);
+  //   }
 
-    await this.dataSource.query(sql, params);
-  }
+  //   await this.dataSource.query(sql, params);
+  // }
 
   async getFormStatistics(formId: string): Promise<any> {
     const form = await this.findFormById(formId);
