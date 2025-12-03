@@ -68,6 +68,9 @@ export function createFormRoutes(dataSource: DataSource): Router {
   // Delete form and its dynamic table
   router.delete('/:id', authMiddleware, adminMiddleware, formController.delete);
 
+  // Force delete form with all submissions
+  router.delete('/:id/force', authMiddleware, adminMiddleware, formController.forceDelete);
+
   // Duplicate/Clone form
   router.post('/:id/clone', authMiddleware, adminMiddleware, formController.cloneForm);
 
@@ -262,6 +265,14 @@ export function createFormRoutes(dataSource: DataSource): Router {
     authMiddleware,
     adminMiddleware,
     formController.rejectSubmission
+  );
+
+  // Bulk approve all pending submissions for a form
+  router.post(
+    '/:id/submissions/bulk-approve',
+    authMiddleware,
+    adminMiddleware,
+    formController.bulkApproveSubmissions
   );
 
   router.get(

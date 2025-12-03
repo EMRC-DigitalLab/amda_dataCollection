@@ -3,6 +3,7 @@ import * as ExcelJS from 'exceljs';
 import * as fs from 'fs';
 import { Parser } from 'json2csv';
 import * as path from 'path';
+import PDFDocument from 'pdfkit';
 import * as XLSX from 'xlsx';
 import { FormStatus } from '../../../database/entities/form.entity';
 import { FormRepository } from '../../../database/repositories/forms/form.repository';
@@ -90,6 +91,9 @@ export class ExportService {
         break;
       case ExportFormat.JSON:
         fileSize = await this.exportToJSON(cleanedData, filePath);
+        break;
+      case ExportFormat.PDF:
+        fileSize = await this.exportToPDF(cleanedData, filePath, requestDto.exportType, filters);
         break;
       default:
         throw new Error(`Unsupported export format: ${requestDto.format}`);
@@ -802,6 +806,265 @@ export class ExportService {
 
     const stats = fs.statSync(filePath);
     return stats.size;
+  }
+
+  private async exportToPDF(data: any[], filePath: string, exportType?: ExportType, filters?: ExportFilters): Promise<number> {
+    const doc = new PDFDocument({
+      size: 'A4',
+      margins: { top: 50, bottom: 50, left: 50, right: 50 }
+    });
+
+    doc.pipe(fs.createWriteStream(filePath));
+
+    // Header with logo space and title
+    this.addPDFHeader(doc);
+    
+    // Summary information
+    this.addPDFSummary(doc, data, exportType, filters);
+    
+    // Data tables
+    this.addPDFDataTables(doc, data);
+    
+    // Footer
+    this.addPDFFooter(doc);
+
+    doc.end();
+
+    // Wait for PDF to be written
+    await new Promise((resolve) => {
+      doc.on('end', resolve);
+    });
+
+    const stats = fs.statSync(filePath);
+    return stats.size;
+  }
+
+  private addPDFHeader(doc: PDFKit.PDFDocument): void {
+    const pageWidth = doc.page.width - 100; // Account for margins
+
+    // Title
+    doc.fontSize(24)
+       .fillColor('#2c3e50')
+       .font('Helvetica-Bold')
+       .text('AMDA Data Collection Report', 50, 50, { align: 'center', width: pageWidth });
+
+    // Subtitle
+    doc.fontSize(12)
+       .fillColor('#7f8c8d')
+       .font('Helvetica')
+       .text('Comprehensive Form Submission Export', 50, 85, { align: 'center', width: pageWidth });
+
+    // Date and time
+    doc.fontSize(10)
+       .fillColor('#95a5a6')
+       .text(`Generated on: ${new Date().toLocaleString()}`, 50, 110, { align: 'center', width: pageWidth });
+
+    // Divider line
+    doc.strokeColor('#ecf0f1')
+       .lineWidth(1)
+       .moveTo(50, 130)
+       .lineTo(doc.page.width - 50, 130)
+       .stroke();
+
+    doc.y = 150; // Set starting position for content
+  }
+
+  private addPDFSummary(doc: PDFKit.PDFDocument, data: any[], exportType?: ExportType, filters?: ExportFilters): void {
+    const pageWidth = doc.page.width - 100;
+    
+    // Summary section title
+    doc.fontSize(16)
+       .fillColor('#2c3e50')
+       .font('Helvetica-Bold')
+       .text('📊 Export Summary', 50, doc.y, { width: pageWidth });
+
+    doc.y += 25;
+
+    // Summary statistics
+    const totalRecords = data.length;
+    const uniqueMembers = new Set(data.map(item => item['Member Company']).filter(Boolean)).size;
+    const uniqueSites = new Set(data.map(item => item['Site Name']).filter(Boolean)).size;
+    const formTypes = [...new Set(data.map(item => item['Form Type']).filter(Boolean))];
+    
+    const statusBreakdown = {
+      pending: data.filter(item => item['Admin Status'] === 'PENDING').length,
+      approved: data.filter(item => item['Admin Status'] === 'APPROVED').length,
+      rejected: data.filter(item => item['Admin Status'] === 'REJECTED').length,
+    };
+
+    // Summary box
+    doc.rect(50, doc.y, pageWidth, 120)
+       .fillColor('#f8f9fa')
+       .fill()
+       .stroke();
+
+    const summaryY = doc.y + 15;
+    
+    // Summary content in columns
+    doc.fontSize(10)
+       .fillColor('#2c3e50')
+       .font('Helvetica');
+
+    // Left column
+    doc.text(`Total Records: ${totalRecords}`, 70, summaryY);
+    doc.text(`Unique Members: ${uniqueMembers}`, 70, summaryY + 15);
+    doc.text(`Unique Sites: ${uniqueSites}`, 70, summaryY + 30);
+    doc.text(`Form Types: ${formTypes.length}`, 70, summaryY + 45);
+
+    // Right column - Status breakdown
+    doc.text(`Status Breakdown:`, 280, summaryY);
+    doc.text(`• Pending: ${statusBreakdown.pending}`, 290, summaryY + 15);
+    doc.text(`• Approved: ${statusBreakdown.approved}`, 290, summaryY + 30);
+    doc.text(`• Rejected: ${statusBreakdown.rejected}`, 290, summaryY + 45);
+
+    // Export filters
+    if (filters) {
+      doc.text(`Filters Applied:`, 70, summaryY + 65);
+      if (filters.year) doc.text(`• Year: ${filters.year}`, 80, summaryY + 80);
+      if (filters.formTypeId) doc.text(`• Form Type: Applied`, 80, summaryY + 95);
+      if (filters.memberId) doc.text(`• Member: Specific Member`, 280, summaryY + 80);
+      if (filters.siteId) doc.text(`• Site: Specific Site`, 280, summaryY + 95);
+    }
+
+    doc.y += 140; // Move past summary box
+  }
+
+  private addPDFDataTables(doc: PDFKit.PDFDocument, data: any[]): void {
+    const pageWidth = doc.page.width - 100;
+    
+    // Check if new page is needed
+    if (doc.y > doc.page.height - 200) {
+      doc.addPage();
+      doc.y = 50;
+    }
+
+    // Data section title
+    doc.fontSize(16)
+       .fillColor('#2c3e50')
+       .font('Helvetica-Bold')
+       .text('📝 Submission Details', 50, doc.y, { width: pageWidth });
+
+    doc.y += 25;
+
+    // Table headers
+    const headers = ['Form Title', 'Member', 'Status', 'Admin Status', 'Submitted Date'];
+    const columnWidths = [140, 120, 80, 90, 85];
+    const headerY = doc.y;
+
+    // Header background
+    doc.rect(50, headerY, pageWidth, 20)
+       .fillColor('#34495e')
+       .fill();
+
+    // Header text
+    doc.fontSize(9)
+       .fillColor('#ffffff')
+       .font('Helvetica-Bold');
+
+    let xPos = 50;
+    headers.forEach((header, index) => {
+      doc.text(header, xPos + 5, headerY + 6, { width: columnWidths[index] - 5 });
+      xPos += columnWidths[index];
+    });
+
+    doc.y = headerY + 25;
+
+    // Data rows
+    doc.fillColor('#2c3e50')
+       .font('Helvetica')
+       .fontSize(8);
+
+    let rowIndex = 0;
+    const maxRowsPerPage = 25;
+
+    for (const item of data.slice(0, 50)) { // Limit to 50 records for PDF readability
+      if (rowIndex >= maxRowsPerPage) {
+        doc.addPage();
+        doc.y = 50;
+        rowIndex = 0;
+        
+        // Re-add headers on new page
+        doc.fontSize(9)
+           .fillColor('#ffffff')
+           .font('Helvetica-Bold');
+        
+        doc.rect(50, doc.y, pageWidth, 20)
+           .fillColor('#34495e')
+           .fill();
+
+        xPos = 50;
+        headers.forEach((header, index) => {
+          doc.text(header, xPos + 5, doc.y + 6, { width: columnWidths[index] - 5 });
+          xPos += columnWidths[index];
+        });
+
+        doc.y += 25;
+        doc.fillColor('#2c3e50')
+           .font('Helvetica')
+           .fontSize(8);
+      }
+
+      const rowY = doc.y;
+      const rowHeight = 18;
+
+      // Alternate row colors
+      if (rowIndex % 2 === 1) {
+        doc.rect(50, rowY, pageWidth, rowHeight)
+           .fillColor('#f8f9fa')
+           .fill();
+      }
+
+      // Row data
+      const values = [
+        this.truncateText(item['Form Title'] || '', 20),
+        this.truncateText(item['Member Company'] || '', 18),
+        item['Status'] || '',
+        item['Admin Status'] || '',
+        item['Submitted At'] ? new Date(item['Submitted At']).toLocaleDateString() : ''
+      ];
+
+      xPos = 50;
+      values.forEach((value, index) => {
+        doc.fillColor('#2c3e50')
+           .text(String(value), xPos + 5, rowY + 5, { width: columnWidths[index] - 5 });
+        xPos += columnWidths[index];
+      });
+
+      doc.y = rowY + rowHeight;
+      rowIndex++;
+    }
+
+    if (data.length > 50) {
+      doc.y += 10;
+      doc.fontSize(10)
+         .fillColor('#7f8c8d')
+         .text(`Note: Showing first 50 of ${data.length} total records for PDF readability.`, 50, doc.y);
+    }
+  }
+
+  private addPDFFooter(doc: PDFKit.PDFDocument): void {
+    const pageWidth = doc.page.width - 100;
+    const footerY = doc.page.height - 50;
+
+    // Footer divider
+    doc.strokeColor('#ecf0f1')
+       .lineWidth(1)
+       .moveTo(50, footerY - 20)
+       .lineTo(doc.page.width - 50, footerY - 20)
+       .stroke();
+
+    // Footer text
+    doc.fontSize(8)
+       .fillColor('#95a5a6')
+       .font('Helvetica')
+       .text('AMDA Mini Grid Data Collection Tool', 50, footerY, { align: 'center', width: pageWidth });
+
+    doc.text('This report contains confidential information. Handle with care.', 50, footerY + 12, { align: 'center', width: pageWidth });
+  }
+
+  private truncateText(text: string, maxLength: number): string {
+    if (!text || text.length <= maxLength) return text || '';
+    return text.substring(0, maxLength - 3) + '...';
   }
 
   private generateFileName(

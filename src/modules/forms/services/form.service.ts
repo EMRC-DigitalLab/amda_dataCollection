@@ -69,6 +69,34 @@ export class FormService {
     await this.repo.deleteForm(id);
   }
 
+  async forceDelete(id: string): Promise<{ deletedSubmissions: number; formDeleted: boolean }> {
+    const form = await this.findById(id);
+    let deletedSubmissions = 0;
+
+    // If form has a submission table, delete all submissions first
+    if (form.tableCreated && form.tableName) {
+      try {
+        const submissionCount = await this.getSubmissionCount(id);
+        if (submissionCount > 0) {
+          // Delete all submissions from the dynamic table
+          await this.repo.deleteAllSubmissions(form.tableName);
+          deletedSubmissions = submissionCount;
+        }
+      } catch (error) {
+        // Continue with form deletion even if submissions deletion fails
+        console.warn(`Warning: Could not delete submissions for form ${id}: ${error.message}`);
+      }
+    }
+
+    // Delete the form itself
+    await this.repo.deleteForm(id);
+
+    return {
+      deletedSubmissions,
+      formDeleted: true
+    };
+  }
+
   async findById(id: string): Promise<Form> {
     const form = await this.repo.findFormById(id);
     if (!form) throw new Error('Form not found');
@@ -1668,6 +1696,50 @@ export class FormService {
     };
 
     return this.repo.updateSubmission(formId, submissionId, updateData);
+  }
+
+  async bulkApproveAllSubmissions(
+    formId: string,
+    reviewerId: string,
+    reason?: string
+  ): Promise<{ approvedCount: number; skippedCount: number; errors: string[] }> {
+    const form = await this.findById(formId);
+    
+    if (!form.tableName) {
+      throw new Error('Form has no submission table');
+    }
+
+    // Get all submissions that are not already approved
+    const submissions = await this.repo.getFormSubmissions(formId, {
+      page: 1,
+      limit: 10000, // Get all submissions
+      status: 'PENDING' // Only pending submissions
+    });
+
+    let approvedCount = 0;
+    let skippedCount = 0;
+    const errors: string[] = [];
+
+    const updateData = {
+      status: 'APPROVED',
+      reviewed_by: reviewerId,
+      reviewed_at: new Date(),
+      review_reason: reason || 'Bulk approval by admin',
+    };
+
+    // Update all pending submissions to approved in bulk
+    try {
+      const result = await this.repo.bulkUpdateSubmissionStatus(form.tableName, updateData);
+      approvedCount = result.affected || 0;
+    } catch (error) {
+      errors.push(`Failed to bulk update submissions: ${error.message}`);
+    }
+
+    return {
+      approvedCount,
+      skippedCount,
+      errors
+    };
   }
 
   /* ============================================================================ */
