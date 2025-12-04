@@ -18,7 +18,6 @@ export class CertificateController {
         badgeType,
         completionDate,
         memberId,
-        siteId,
         formType,
         completionRate,
         signatoryName,
@@ -41,12 +40,10 @@ export class CertificateController {
         badgeType,
         completionDate,
         memberId,
-        siteId,
         formType,
         completionRate,
         signatoryName,
         signatoryTitle,
-
         overallCompletionRate,
         totalSitesCount,
         completedFormsCount,
@@ -115,21 +112,6 @@ export class CertificateController {
     }
   };
 
-  getCertificatesBySite = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { siteId } = req.params;
-      const certificates = await this.service.getCertificatesBySite(siteId);
-
-      res.status(200).json({
-        message: 'Certificates retrieved successfully',
-        data: certificates,
-        count: certificates.length,
-      });
-    } catch (error: any) {
-      console.error('Error retrieving certificates:', error);
-      ResponseHelper.error(res, error.message, 400);
-    }
-  };
 
   getAllCertificates = async (req: Request, res: Response): Promise<void> => {
     try {

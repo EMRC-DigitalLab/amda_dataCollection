@@ -10,7 +10,6 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Member } from './member.entity';
-import { MinigridSite } from './minigrid-site.entity';
 
 @Entity('certificates')
 export class Certificate {
@@ -78,20 +77,10 @@ export class Certificate {
   })
   memberId!: string;
 
-  @Column({
-    type: 'uuid',
-    nullable: true,
-  })
-  siteId?: string;
-
   // Relations
   @ManyToOne(() => Member, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'memberId' })
   member!: Member;
-
-  @ManyToOne(() => MinigridSite, { onDelete: 'SET NULL', nullable: true })
-  @JoinColumn({ name: 'siteId' })
-  site?: MinigridSite;
 
   @CreateDateColumn()
   createdAt!: Date;

@@ -1892,6 +1892,8 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       }));
     }
 
+    console.log(results,"this is results")
+
     // When not populating, still extract the answers properly
     return results.map((row: any) => ({
       ...row,

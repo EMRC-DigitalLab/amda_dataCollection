@@ -2,16 +2,16 @@
 
 import * as bcrypt from 'bcryptjs';
 import {
-  BeforeInsert,
-  BeforeUpdate,
-  Column,
-  CreateDateColumn,
-  Entity,
-  Index,
-  OneToMany,
-  PrimaryGeneratedColumn,
-  UpdateDateColumn,
-  ValueTransformer,
+    BeforeInsert,
+    BeforeUpdate,
+    Column,
+    CreateDateColumn,
+    Entity,
+    Index,
+    OneToMany,
+    PrimaryGeneratedColumn,
+    UpdateDateColumn,
+    ValueTransformer,
 } from 'typeorm';
 import { MinigridSite } from './minigrid-site.entity';
 
@@ -72,6 +72,9 @@ export class Member {
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   password!: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  lastLoginAt?: Date;
 
   @Column({ type: 'timestamp', nullable: true })
   lastLoginAt?: Date;
@@ -384,9 +387,14 @@ export class Member {
 
   updateLastLogin(): void {
     this.lastLoginAt = new Date();
+    this.lastLoginAt = new Date();
     if (this.isFirstLogin) {
       this.isFirstLogin = false;
     }
+  }
+
+  updateActivity(): void {
+    this.lastLoginAt = new Date();
   }
 
   // MEMBERSHIP MANAGEMENT METHODS

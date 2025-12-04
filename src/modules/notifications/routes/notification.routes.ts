@@ -14,6 +14,7 @@ import { SmsChannel } from '../channels/sms.channel';
 import { PushChannel } from '../channels/push.channel';
 import { WebhookChannel } from '../channels/webhook.channel';
 import { InAppChannel } from '../channels/in-app.channel';
+import { createTimelineRoutes } from './timeline.routes';
 
 export function createNotificationRoutes(_dataSource: DataSource): Router {
   const router = Router();
@@ -283,6 +284,9 @@ export function createNotificationRoutes(_dataSource: DataSource): Router {
       });
     }
   });
+
+  // Timeline notification routes
+  router.use('/timeline', createTimelineRoutes(_dataSource));
 
   return router;
 }

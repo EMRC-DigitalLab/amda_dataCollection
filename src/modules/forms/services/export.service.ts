@@ -29,6 +29,27 @@ export class ExportService {
     this.ensureExportDirectory();
   }
 
+  /**
+   * Generates a unique worksheet name by checking existing worksheets
+   */
+  private generateUniqueSheetName(workbook: ExcelJS.Workbook, baseSheetName: string): string {
+    let sheetName = baseSheetName;
+    let counter = 1;
+    
+    // Check if sheet name already exists
+    while (workbook.worksheets.some(ws => ws.name === sheetName)) {
+      // If base name is too long, truncate before adding counter
+      const maxLength = 28; // Leave room for counter like " (2)"
+      const truncatedBase = baseSheetName.length > maxLength 
+        ? baseSheetName.substring(0, maxLength)
+        : baseSheetName;
+      sheetName = `${truncatedBase} (${counter})`;
+      counter++;
+    }
+    
+    return sheetName;
+  }
+
   private ensureExportDirectory(): void {
     if (!fs.existsSync(this.exportDir)) {
       fs.mkdirSync(this.exportDir, { recursive: true });
@@ -581,7 +602,7 @@ export class ExportService {
 
     // Status Breakdown
     const statuses = [
-      ...new Set(data.map(item => item['Admin Status'] || item['Status']).filter(Boolean)),
+      ...new Set(data.map(item => item['lastLoginAt'] || item['Status']).filter(Boolean)),
     ];
     summary.push({
       Metric: 'Status Breakdown',
@@ -589,7 +610,7 @@ export class ExportService {
     });
     statuses.forEach(status => {
       const count = data.filter(
-        item => item['Admin Status'] === status || item['Status'] === status
+        item => item['lastLoginAt'] === status || item['Status'] === status
       ).length;
       summary.push({
         Metric: `  ${status}`,
@@ -729,9 +750,9 @@ export class ExportService {
           );
 
           const statusBreakdown = {
-            PENDING: formSubmissions.filter(s => s['Admin Status'] === 'PENDING').length,
-            APPROVED: formSubmissions.filter(s => s['Admin Status'] === 'APPROVED').length,
-            REJECTED: formSubmissions.filter(s => s['Admin Status'] === 'REJECTED').length,
+          PENDING: formSubmissions.filter(s => s['lastLoginAt'] === 'PENDING').length,
+            APPROVED: formSubmissions.filter(s => s['lastLoginAt'] === 'APPROVED').length,
+            REJECTED: formSubmissions.filter(s => s['lastLoginAt'] === 'REJECTED').length,
           };
 
           formMap.set(key, {
@@ -787,9 +808,9 @@ export class ExportService {
               : null,
         },
         statusBreakdown: {
-          pending: data.filter(item => item['Admin Status'] === 'PENDING').length,
-          approved: data.filter(item => item['Admin Status'] === 'APPROVED').length,
-          rejected: data.filter(item => item['Admin Status'] === 'REJECTED').length,
+                   pending: data.filter(item => item['lastLoginAt'] === 'PENDING').length,
+          approved: data.filter(item => item['lastLoginAt'] === 'APPROVED').length,
+          rejected: data.filter(item => item['lastLoginAt'] === 'REJECTED').length,
         },
       },
       members: this.extractMemberData(data),
@@ -1213,13 +1234,16 @@ export class ExportService {
     sheetName: string,
     isSummary = false
   ): ExcelJS.Worksheet {
+    // Generate unique sheet name to avoid duplicates
+    const uniqueSheetName = this.generateUniqueSheetName(workbook, sheetName);
+    
     if (data.length === 0) {
-      const worksheet = workbook.addWorksheet(sheetName);
+      const worksheet = workbook.addWorksheet(uniqueSheetName);
       worksheet.addRow(['No Data', 'No data available']);
       return worksheet;
     }
 
-    const worksheet = workbook.addWorksheet(sheetName, {
+    const worksheet = workbook.addWorksheet(uniqueSheetName, {
       views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }],
     });
 
@@ -1324,6 +1348,8 @@ createIndividualSubmissionSheets = async (workbook: ExcelJS.Workbook, data: any[
       status: FormStatus.PUBLISHED,
     });
 
+    console.log(allForms, "this is all forms")
+
 
     // Group the existing data by form_id
     const submissionsByFormId = new Map<string, any[]>();
@@ -1340,6 +1366,7 @@ createIndividualSubmissionSheets = async (workbook: ExcelJS.Workbook, data: any[
     // Process each form that has submissions - CREATE ONE SHEET PER FORM
     for (const [formId, submissions] of submissionsByFormId) {
       try {
+    console.log(submissions, "Submissins for form Id")
 
         // Find the form structure from allForms
         const form = allForms.find(f => f.id === formId);
@@ -1399,13 +1426,16 @@ private async createGroupedSubmissionsSheet(
   const yearSuffix = formYear ? ` (${formYear})` : '';
   // Sanitize sheet name
   const maxLength = 31;
-  let sheetName = `${form.title}`;
-   if (sheetName.length > maxLength) {
+  let baseSheetName = `${form.title}-${yearSuffix}`;
+   if (baseSheetName.length > maxLength) {
     // Prioritize keeping the year visible
     const titleMaxLength = maxLength - yearSuffix.length - 3;
-    sheetName = `${form.title.substring(0, titleMaxLength)}...${yearSuffix}`;
+    baseSheetName = `${form.title.substring(0, titleMaxLength)}...${yearSuffix}`;
   }
-  sheetName = sheetName.replace(/[:\/?*\[\]]/g, '_');
+  baseSheetName = baseSheetName.replace(/[:\/?*\[\]]/g, '_');
+
+  // Generate unique sheet name to avoid duplicates
+  const sheetName = this.generateUniqueSheetName(workbook, baseSheetName);
 
   const sheet = workbook.addWorksheet(sheetName, {
     views: [{ state: 'frozen', xSplit: 0, ySplit: 7 }],
@@ -1478,7 +1508,7 @@ private async createGroupedSubmissionsSheet(
     { header: 'Submission ID', key: 'Submission ID', width: 15 },
     { header: 'Submitted At', key: 'Submitted At', width: 20 },
     { header: 'Status', key: 'Status', width: 12 },
-    { header: 'Admin Status', key: 'Admin Status', width: 12 },
+    { header: 'lastLoginAt', key: 'lastLoginAt', width: 12 },
     { header: 'Member', key: 'Member Company', width: 20 },
     { header: 'Site', key: 'Site Name', width: 20 },
   ];
@@ -1539,8 +1569,8 @@ private async createGroupedSubmissionsSheet(
 
   // Add ALL submissions data starting from row 7
   let currentRow = 7;
+  console.log(submissions, "this is submissions")
   submissions.forEach((submission, index) => {
-    console.log(submission, "this are submissions")
     this.addSingleSubmissionData(sheet, columnStructure, submission, currentRow);
     
     // Add alternating row colors for data rows
@@ -1571,11 +1601,14 @@ private async createSimplifiedGroupedSubmissionsSheet(
   formData: any,
   submissions: any[]
 ): Promise<void> {
-  let sheetName = `${formData.title}`;
-  if (sheetName.length > 31) {
-    sheetName = sheetName.substring(0, 28) + '...';
+  let baseSheetName = `${formData.title}`;
+  if (baseSheetName.length > 31) {
+    baseSheetName = baseSheetName.substring(0, 28) + '...';
   }
-  sheetName = sheetName.replace(/[:\/?*\[\]]/g, '_');
+  baseSheetName = baseSheetName.replace(/[:\/?*\[\]]/g, '_');
+
+  // Generate unique sheet name to avoid duplicates
+  const sheetName = this.generateUniqueSheetName(workbook, baseSheetName);
 
   const sheet = workbook.addWorksheet(sheetName);
   sheet.properties.defaultRowHeight = 20;
@@ -2379,7 +2412,7 @@ private async createSimplifiedGroupedSubmissionsSheet(
         }
       } else if (col.key === 'id' && (!value || value === 'undefined')) {
         value = submission.id || 'N/A';
-      } else if (col.key === 'admin_status') {
+      } else if (col.key === 'lastLoginAt') {
         value = submission.status || 'N/A';
       } else if (col.key === 'member_company') {
         value = submission.member_company || 'N/A';

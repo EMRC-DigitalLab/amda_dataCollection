@@ -474,6 +474,7 @@ export class MemberService implements IMemberService {
       for (const form of allForms) {
         if (form.tableCreated && form.tableName) {
           try {
+            console.log(memberId, "this is memberId")
             // Get submissions for this member
             const submissions = await this.formRepository.getFormSubmissions(
               form.id,

@@ -17,9 +17,12 @@ interface CertificateData {
   completionRate?: number;
   signatoryName?: string;
   signatoryTitle?: string;
-  siteName?: string;
+  organizationName?: string;
   memberId: string;
-  siteId?: string;
+  overallCompletionRate?: number;
+  totalSitesCount?: number;
+  completedFormsCount?: number;
+  totalFormsCount?: number;
 }
 
 export class CertificateService {
@@ -37,7 +40,6 @@ export class CertificateService {
       badgeType: data.badgeType,
       completionDate: new Date(data.completionDate),
       memberId: data.memberId,
-      siteId: data.siteId,
       overallCompletionRate: data.overallCompletionRate,
       totalSitesCount: data.totalSitesCount,
       completedFormsCount: data.completedFormsCount,
@@ -60,12 +62,11 @@ export class CertificateService {
       badgeType: certificate.badgeType || 'Financial Data',
       completionDate: certificate.completionDate.toISOString().split('T')[0],
       certificateId: certificate.certificateId,
-      siteName: certificate.site?.name,
+      organizationName: certificate.member?.companyName,
       formType: undefined,
-      completionRate: certificate.overallCompletionRate, // USE THIS
+      completionRate: certificate.overallCompletionRate,
       signatoryName: undefined,
       signatoryTitle: undefined,
-      // ADD THESE
       overallCompletionRate: certificate.overallCompletionRate,
       totalSitesCount: certificate.totalSitesCount,
       completedFormsCount: certificate.completedFormsCount,
@@ -196,9 +197,9 @@ export class CertificateService {
       pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
       // Green corners (standard size)
-      pdf.setFillColor(34, 197, 94);
-      pdf.triangle(pageWidth - 150, 0, pageWidth, 0, pageWidth, 150, 'F');
-      pdf.triangle(0, pageHeight - 150, 0, pageHeight, 150, pageHeight, 'F');
+      // pdf.setFillColor(34, 197, 94);
+      // pdf.triangle(pageWidth - 150, 0, pageWidth, 0, pageWidth, 150, 'F');
+      // pdf.triangle(0, pageHeight - 150, 0, pageHeight, 150, pageHeight, 'F');
 
       // Standard white content area
       pdf.setFillColor(255, 255, 255);
@@ -281,14 +282,8 @@ export class CertificateService {
     // ============= RECIPIENT SECTION =============
     const recipientYStart = isPerfectCompletion ? 260 : 250;
 
-    if (data.siteName) {
-      addText(data.siteName, pageWidth / 2, recipientYStart, {
-        fontSize: 36,
-        fontType: 'title',
-        style: 'semi-bold',
-        color: isPerfectCompletion ? '#b45309' : '#059669',
-        align: 'center',
-      });
+    if (data.organizationName) {
+     
 
       addText('Presented to', pageWidth / 2, recipientYStart + 35, {
         fontSize: 16,
@@ -297,13 +292,21 @@ export class CertificateService {
         align: 'center',
       });
 
-      addText(data.recipientName, pageWidth / 2, recipientYStart + 65, {
-        fontSize: 24,
-        fontType: 'normal',
+       addText(data.organizationName, pageWidth / 2, recipientYStart, {
+        fontSize: 36,
+        fontType: 'title',
         style: 'semi-bold',
-        color: '#1f2937',
+        color: isPerfectCompletion ? '#b45309' : '#059669',
         align: 'center',
       });
+
+      // addText(data.recipientName, pageWidth / 2, recipientYStart + 65, {
+      //   fontSize: 24,
+      //   fontType: 'normal',
+      //   style: 'semi-bold',
+      //   color: '#1f2937',
+      //   align: 'center',
+      // });
 
       // Underline - gold for 100%, gray for others
       const nameWidth =
@@ -353,7 +356,7 @@ export class CertificateService {
     }
 
     // ============= DESCRIPTION SECTION =============
-    const descriptionYStart = data.siteName
+    const descriptionYStart = data.organizationName
       ? isPerfectCompletion
         ? 370
         : 360
@@ -388,7 +391,7 @@ export class CertificateService {
 
     // ============= BADGE SECTION =============
     const badgeX = pageWidth / 2;
-    const badgeY = isPerfectCompletion ? 460 : data.siteName ? 420 : 440;
+    const badgeY = isPerfectCompletion ? 460 : data.organizationName ? 420 : 440;
 
     if (badgeBase64) {
       try {
@@ -470,9 +473,9 @@ export class CertificateService {
     // ============= QR CODE =============
     if (qrCodeDataUrl) {
       try {
-        pdf.addImage(qrCodeDataUrl, 'PNG', pageWidth - 140, 60, 80, 80);
+        pdf.addImage(qrCodeDataUrl, 'PNG', 60, 60, 80, 80);
 
-        addText('Scan to Verify', pageWidth - 100, 150, {
+        addText('Scan to Verify', 100, 150, {
           fontSize: 8,
           fontType: 'body',
           color: '#6b7280',
@@ -493,14 +496,14 @@ export class CertificateService {
     addText(`Completion Date: ${footerCompletedDate}`, 60, pageHeight - 30, {
       fontSize: 9,
       fontType: 'body',
-      color: '#9ca3af',
+      color: '#292929ff',
     });
 
     if (data.certificateId) {
       addText(`Certificate ID: ${data.certificateId}`, 60, pageHeight - 15, {
         fontSize: 9,
         fontType: 'body',
-        color: '#9ca3af',
+        color: '#000',
       });
     }
 
@@ -680,9 +683,6 @@ export class CertificateService {
     return await this.certificateRepository.findByMemberId(memberId);
   }
 
-  async getCertificatesBySite(siteId: string): Promise<Certificate[]> {
-    return await this.certificateRepository.findBySiteId(siteId);
-  }
 
   async getAllCertificates(): Promise<Certificate[]> {
     return await this.certificateRepository.findAll();

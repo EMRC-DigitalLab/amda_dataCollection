@@ -58,8 +58,7 @@ export class ExportRepository implements IExportRepository {
         let query = `
           SELECT 
             s.id, s.form_id, s.submitted_by, s."minigrid_siteId",
-            s.submitted_at, s.status, s.admin_status, s.admin_comment,
-            s.reviewed_by, s.reviewed_at, s.created_at, s.updated_at,
+s.submitted_at, s.status, s.lastLoginAt, s.admin_comment,            s.reviewed_by, s.reviewed_at, s.created_at, s.updated_at,
             ${dynamicColumns.map(col => `s."${col}"`).join(', ')},
             $1::text as form_title,
             $2::text as form_slug,
@@ -348,7 +347,6 @@ export class ExportRepository implements IExportRepository {
       'country',
       'submitted_at',
       'status',
-      'admin_status',
       'admin_comment',
       'reviewed_by',
       'reviewed_at',
