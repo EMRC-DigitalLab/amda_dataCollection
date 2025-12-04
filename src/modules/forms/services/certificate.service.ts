@@ -200,9 +200,9 @@ export class CertificateService {
       pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
       // Green corners (standard size)
-      pdf.setFillColor(34, 197, 94);
-      pdf.triangle(pageWidth - 150, 0, pageWidth, 0, pageWidth, 150, 'F');
-      pdf.triangle(0, pageHeight - 150, 0, pageHeight, 150, pageHeight, 'F');
+      // pdf.setFillColor(34, 197, 94);
+      // pdf.triangle(pageWidth - 150, 0, pageWidth, 0, pageWidth, 150, 'F');
+      // pdf.triangle(0, pageHeight - 150, 0, pageHeight, 150, pageHeight, 'F');
 
       // Standard white content area
       pdf.setFillColor(255, 255, 255);
@@ -499,14 +499,14 @@ export class CertificateService {
     addText(`Completion Date: ${footerCompletedDate}`, 60, pageHeight - 30, {
       fontSize: 9,
       fontType: 'body',
-      color: '#9ca3af',
+      color: '#1f1f1fff',
     });
 
     if (data.certificateId) {
       addText(`Certificate ID: ${data.certificateId}`, 60, pageHeight - 15, {
         fontSize: 9,
         fontType: 'body',
-        color: '#9ca3af',
+        color: '#202020ff',
       });
     }
 
