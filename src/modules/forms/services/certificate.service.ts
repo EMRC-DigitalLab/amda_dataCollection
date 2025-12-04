@@ -28,10 +28,13 @@ interface CertificateData {
 export class CertificateService {
   private certificateRepository: CertificateRepository;
   private baseUrl: string;
+  private assetsPath: string;
 
   constructor(private readonly dataSource: DataSource) {
     this.certificateRepository = new CertificateRepository();
     this.baseUrl = process.env.BASE_URL || 'http://localhost:5173/';
+    // Allow configurable assets path for Docker environments
+    this.assetsPath = process.env.ASSETS_PATH || path.join(__dirname, 'public');
   }
 
   async createCertificate(data: CertificateData): Promise<Certificate> {
@@ -543,28 +546,38 @@ export class CertificateService {
     return pdf;
   }
   private async loadImageAsBase64(imagePath: string): Promise<string | null> {
-    // Primary path: public folder in the same directory as this service file
-    const publicPath = path.join(__dirname, 'public', imagePath);
+    // Try multiple possible paths for better Docker compatibility
+    const possiblePaths = [
+      path.join(this.assetsPath, imagePath), // Configurable path
+      path.join(__dirname, 'public', imagePath), // Compiled location
+      path.join(process.cwd(), 'dist/src/modules/forms/services/public', imagePath), // Docker location
+      path.join(process.cwd(), 'src/modules/forms/services/public', imagePath), // Development location
+    ];
 
-    try {
-      console.log(`Loading image from: ${publicPath}`);
-      const imageBuffer = await fs.readFile(publicPath);
-      const base64 = imageBuffer.toString('base64');
-      const ext = path.extname(imagePath).toLowerCase();
-      const mimeType =
-        ext === '.png'
-          ? 'image/png'
-          : ext === '.jpg' || ext === '.jpeg'
-            ? 'image/jpeg'
-            : ext === '.gif'
-              ? 'image/gif'
-              : 'image/png';
-      console.log(`Successfully loaded image from: ${publicPath}`);
-      return `data:${mimeType};base64,${base64}`;
-    } catch (error) {
-      console.warn(`Could not load image from: ${publicPath}`, error);
-      return null;
+    for (const publicPath of possiblePaths) {
+      try {
+        console.log(`Attempting to load image from: ${publicPath}`);
+        const imageBuffer = await fs.readFile(publicPath);
+        const base64 = imageBuffer.toString('base64');
+        const ext = path.extname(imagePath).toLowerCase();
+        const mimeType =
+          ext === '.png'
+            ? 'image/png'
+            : ext === '.jpg' || ext === '.jpeg'
+              ? 'image/jpeg'
+              : ext === '.gif'
+                ? 'image/gif'
+                : 'image/png';
+        console.log(`Successfully loaded image from: ${publicPath}`);
+        return `data:${mimeType};base64,${base64}`;
+      } catch (error) {
+        console.warn(`Could not load image from: ${publicPath}`, error.message);
+        continue; // Try next path
+      }
     }
+
+    console.error(`Failed to load image ${imagePath} from any path`);
+    return null;
   }
 
   private async loadFontsFromPublic(pdf: jsPDF): Promise<boolean> {
@@ -607,19 +620,29 @@ export class CertificateService {
   }
 
   private async loadFontFromFile(fontFilename: string): Promise<string | null> {
-    // Load fonts from public/fonts folder in the same directory as this service file
-    const fontPath = path.join(__dirname, 'public', 'fonts', fontFilename);
+    // Try multiple possible paths for better Docker compatibility
+    const possiblePaths = [
+      path.join(this.assetsPath, 'fonts', fontFilename), // Configurable path
+      path.join(__dirname, 'public', 'fonts', fontFilename), // Compiled location
+      path.join(process.cwd(), 'dist/src/modules/forms/services/public/fonts', fontFilename), // Docker location
+      path.join(process.cwd(), 'src/modules/forms/services/public/fonts', fontFilename), // Development location
+    ];
 
-    try {
-      console.log(`Loading font from: ${fontPath}`);
-      const fontBuffer = await fs.readFile(fontPath);
-      const base64 = fontBuffer.toString('base64');
-      console.log(`Successfully loaded font: ${fontFilename}`);
-      return base64;
-    } catch (error) {
-      console.warn(`Could not load font: ${fontFilename} from ${fontPath}`, error);
-      return null;
+    for (const fontPath of possiblePaths) {
+      try {
+        console.log(`Attempting to load font from: ${fontPath}`);
+        const fontBuffer = await fs.readFile(fontPath);
+        const base64 = fontBuffer.toString('base64');
+        console.log(`Successfully loaded font: ${fontFilename} from ${fontPath}`);
+        return base64;
+      } catch (error) {
+        console.warn(`Could not load font: ${fontFilename} from ${fontPath}`, error.message);
+        continue; // Try next path
+      }
     }
+
+    console.error(`Failed to load font ${fontFilename} from any path`);
+    return null;
   }
 
   private drawColoredCircles(pdf: jsPDF, logoX: number, logoY: number): void {
