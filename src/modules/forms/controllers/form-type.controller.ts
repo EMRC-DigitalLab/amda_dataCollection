@@ -120,6 +120,21 @@ export class FormTypeController {
     }
   };
 
+  forceDelete = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const result = await this.formTypeService.forceDelete(id);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: `Form type and ${result.deletedForms} forms with ${result.deletedSubmissions} submissions deleted successfully`,
+      });
+    } catch (error) {
+      ResponseHelper.error(res, error.message, 400);
+    }
+  };
+
   bulkUpdateSortOrder = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const updates = req.body;

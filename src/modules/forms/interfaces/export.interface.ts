@@ -39,7 +39,7 @@ export enum ExportFormat {
   CSV = 'csv',
   XLSX = 'xlsx',
   JSON = 'json',
-  // PDF = 'pdf',
+  PDF = 'pdf',
 }
 
 export interface ExportFilters {

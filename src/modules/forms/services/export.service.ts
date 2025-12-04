@@ -29,6 +29,27 @@ export class ExportService {
     this.ensureExportDirectory();
   }
 
+  /**
+   * Generates a unique worksheet name by checking existing worksheets
+   */
+  private generateUniqueSheetName(workbook: ExcelJS.Workbook, baseSheetName: string): string {
+    let sheetName = baseSheetName;
+    let counter = 1;
+    
+    // Check if sheet name already exists
+    while (workbook.worksheets.some(ws => ws.name === sheetName)) {
+      // If base name is too long, truncate before adding counter
+      const maxLength = 28; // Leave room for counter like " (2)"
+      const truncatedBase = baseSheetName.length > maxLength 
+        ? baseSheetName.substring(0, maxLength)
+        : baseSheetName;
+      sheetName = `${truncatedBase} (${counter})`;
+      counter++;
+    }
+    
+    return sheetName;
+  }
+
   private ensureExportDirectory(): void {
     if (!fs.existsSync(this.exportDir)) {
       fs.mkdirSync(this.exportDir, { recursive: true });
@@ -67,8 +88,7 @@ export class ExportService {
 
     if (filters.submissionStatus) {
       filteredData = filteredData.filter(
-        item =>
-          item.status === filters.submissionStatus || item.admin_status === filters.submissionStatus
+        item => item.status === filters.submissionStatus
       );
     }
 
@@ -124,7 +144,6 @@ export class ExportService {
     cleanItem['Form Type'] = item.form_type_name;
     cleanItem['Form Year'] = item.form_year;
     cleanItem['Status'] = item.status;
-    cleanItem['Admin Status'] = item.admin_status;
     cleanItem['Admin Comment'] = item.admin_comment || '';
     cleanItem['Submitted At'] = item.submitted_at;
     cleanItem['Created At'] = item.created_at;
@@ -145,7 +164,6 @@ export class ExportService {
       'country',
       'submitted_at',
       'status',
-      'admin_status',
       'admin_comment',
       'reviewed_by',
       'reviewed_at',
@@ -584,7 +602,7 @@ export class ExportService {
 
     // Status Breakdown
     const statuses = [
-      ...new Set(data.map(item => item['Admin Status'] || item['Status']).filter(Boolean)),
+      ...new Set(data.map(item => item['lastLoginAt'] || item['Status']).filter(Boolean)),
     ];
     summary.push({
       Metric: 'Status Breakdown',
@@ -592,7 +610,7 @@ export class ExportService {
     });
     statuses.forEach(status => {
       const count = data.filter(
-        item => item['Admin Status'] === status || item['Status'] === status
+        item => item['lastLoginAt'] === status || item['Status'] === status
       ).length;
       summary.push({
         Metric: `  ${status}`,
@@ -732,9 +750,9 @@ export class ExportService {
           );
 
           const statusBreakdown = {
-            PENDING: formSubmissions.filter(s => s['Admin Status'] === 'PENDING').length,
-            APPROVED: formSubmissions.filter(s => s['Admin Status'] === 'APPROVED').length,
-            REJECTED: formSubmissions.filter(s => s['Admin Status'] === 'REJECTED').length,
+          PENDING: formSubmissions.filter(s => s['lastLoginAt'] === 'PENDING').length,
+            APPROVED: formSubmissions.filter(s => s['lastLoginAt'] === 'APPROVED').length,
+            REJECTED: formSubmissions.filter(s => s['lastLoginAt'] === 'REJECTED').length,
           };
 
           formMap.set(key, {
@@ -790,9 +808,9 @@ export class ExportService {
               : null,
         },
         statusBreakdown: {
-          pending: data.filter(item => item['Admin Status'] === 'PENDING').length,
-          approved: data.filter(item => item['Admin Status'] === 'APPROVED').length,
-          rejected: data.filter(item => item['Admin Status'] === 'REJECTED').length,
+                   pending: data.filter(item => item['lastLoginAt'] === 'PENDING').length,
+          approved: data.filter(item => item['lastLoginAt'] === 'APPROVED').length,
+          rejected: data.filter(item => item['lastLoginAt'] === 'REJECTED').length,
         },
       },
       members: this.extractMemberData(data),
@@ -887,9 +905,9 @@ export class ExportService {
     const formTypes = [...new Set(data.map(item => item['Form Type']).filter(Boolean))];
     
     const statusBreakdown = {
-      pending: data.filter(item => item['Admin Status'] === 'PENDING').length,
-      approved: data.filter(item => item['Admin Status'] === 'APPROVED').length,
-      rejected: data.filter(item => item['Admin Status'] === 'REJECTED').length,
+      submitted: data.filter(item => item['Status'] === 'SUBMITTED').length,
+      approved: data.filter(item => item['Status'] === 'APPROVED').length,
+      rejected: data.filter(item => item['Status'] === 'REJECTED').length,
     };
 
     // Summary box
@@ -913,7 +931,7 @@ export class ExportService {
 
     // Right column - Status breakdown
     doc.text(`Status Breakdown:`, 280, summaryY);
-    doc.text(`• Pending: ${statusBreakdown.pending}`, 290, summaryY + 15);
+    doc.text(`• Submitted: ${statusBreakdown.submitted}`, 290, summaryY + 15);
     doc.text(`• Approved: ${statusBreakdown.approved}`, 290, summaryY + 30);
     doc.text(`• Rejected: ${statusBreakdown.rejected}`, 290, summaryY + 45);
 
@@ -947,8 +965,8 @@ export class ExportService {
     doc.y += 25;
 
     // Table headers
-    const headers = ['Form Title', 'Member', 'Status', 'Admin Status', 'Submitted Date'];
-    const columnWidths = [140, 120, 80, 90, 85];
+    const headers = ['Form Title', 'Member', 'Status', 'Submitted Date'];
+    const columnWidths = [140, 120, 90, 125];
     const headerY = doc.y;
 
     // Header background
@@ -1019,7 +1037,6 @@ export class ExportService {
         this.truncateText(item['Form Title'] || '', 20),
         this.truncateText(item['Member Company'] || '', 18),
         item['Status'] || '',
-        item['Admin Status'] || '',
         item['Submitted At'] ? new Date(item['Submitted At']).toLocaleDateString() : ''
       ];
 
@@ -1217,13 +1234,16 @@ export class ExportService {
     sheetName: string,
     isSummary = false
   ): ExcelJS.Worksheet {
+    // Generate unique sheet name to avoid duplicates
+    const uniqueSheetName = this.generateUniqueSheetName(workbook, sheetName);
+    
     if (data.length === 0) {
-      const worksheet = workbook.addWorksheet(sheetName);
+      const worksheet = workbook.addWorksheet(uniqueSheetName);
       worksheet.addRow(['No Data', 'No data available']);
       return worksheet;
     }
 
-    const worksheet = workbook.addWorksheet(sheetName, {
+    const worksheet = workbook.addWorksheet(uniqueSheetName, {
       views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }],
     });
 
@@ -1328,6 +1348,8 @@ createIndividualSubmissionSheets = async (workbook: ExcelJS.Workbook, data: any[
       status: FormStatus.PUBLISHED,
     });
 
+    console.log(allForms, "this is all forms")
+
 
     // Group the existing data by form_id
     const submissionsByFormId = new Map<string, any[]>();
@@ -1344,6 +1366,7 @@ createIndividualSubmissionSheets = async (workbook: ExcelJS.Workbook, data: any[
     // Process each form that has submissions - CREATE ONE SHEET PER FORM
     for (const [formId, submissions] of submissionsByFormId) {
       try {
+    console.log(submissions, "Submissins for form Id")
 
         // Find the form structure from allForms
         const form = allForms.find(f => f.id === formId);
@@ -1403,13 +1426,16 @@ private async createGroupedSubmissionsSheet(
   const yearSuffix = formYear ? ` (${formYear})` : '';
   // Sanitize sheet name
   const maxLength = 31;
-  let sheetName = `${form.title}`;
-   if (sheetName.length > maxLength) {
+  let baseSheetName = `${form.title}-${yearSuffix}`;
+   if (baseSheetName.length > maxLength) {
     // Prioritize keeping the year visible
     const titleMaxLength = maxLength - yearSuffix.length - 3;
-    sheetName = `${form.title.substring(0, titleMaxLength)}...${yearSuffix}`;
+    baseSheetName = `${form.title.substring(0, titleMaxLength)}...${yearSuffix}`;
   }
-  sheetName = sheetName.replace(/[:\/?*\[\]]/g, '_');
+  baseSheetName = baseSheetName.replace(/[:\/?*\[\]]/g, '_');
+
+  // Generate unique sheet name to avoid duplicates
+  const sheetName = this.generateUniqueSheetName(workbook, baseSheetName);
 
   const sheet = workbook.addWorksheet(sheetName, {
     views: [{ state: 'frozen', xSplit: 0, ySplit: 7 }],
@@ -1482,7 +1508,7 @@ private async createGroupedSubmissionsSheet(
     { header: 'Submission ID', key: 'Submission ID', width: 15 },
     { header: 'Submitted At', key: 'Submitted At', width: 20 },
     { header: 'Status', key: 'Status', width: 12 },
-    { header: 'Admin Status', key: 'Admin Status', width: 12 },
+    { header: 'lastLoginAt', key: 'lastLoginAt', width: 12 },
     { header: 'Member', key: 'Member Company', width: 20 },
     { header: 'Site', key: 'Site Name', width: 20 },
   ];
@@ -1543,8 +1569,8 @@ private async createGroupedSubmissionsSheet(
 
   // Add ALL submissions data starting from row 7
   let currentRow = 7;
+  console.log(submissions, "this is submissions")
   submissions.forEach((submission, index) => {
-    console.log(submission, "this are submissions")
     this.addSingleSubmissionData(sheet, columnStructure, submission, currentRow);
     
     // Add alternating row colors for data rows
@@ -1575,11 +1601,14 @@ private async createSimplifiedGroupedSubmissionsSheet(
   formData: any,
   submissions: any[]
 ): Promise<void> {
-  let sheetName = `${formData.title}`;
-  if (sheetName.length > 31) {
-    sheetName = sheetName.substring(0, 28) + '...';
+  let baseSheetName = `${formData.title}`;
+  if (baseSheetName.length > 31) {
+    baseSheetName = baseSheetName.substring(0, 28) + '...';
   }
-  sheetName = sheetName.replace(/[:\/?*\[\]]/g, '_');
+  baseSheetName = baseSheetName.replace(/[:\/?*\[\]]/g, '_');
+
+  // Generate unique sheet name to avoid duplicates
+  const sheetName = this.generateUniqueSheetName(workbook, baseSheetName);
 
   const sheet = workbook.addWorksheet(sheetName);
   sheet.properties.defaultRowHeight = 20;
@@ -1611,7 +1640,6 @@ private async createSimplifiedGroupedSubmissionsSheet(
     'Submission ID', 'id',
     'Submitted At', 'submitted_at',
     'Status', 'status',
-    'Admin Status', 'admin_status',
     'Member Company', 'member_company',
     'Member Email', 'member_email',
     'Site Name', 'site_name',
@@ -1749,7 +1777,7 @@ private async createSimplifiedGroupedSubmissionsSheet(
       submission.submitted_at || submission.created_at
     ).toLocaleDateString();
     sheet.getCell('A2').value =
-      `Submission ID: ${submission.id} | Submitted: ${submittedDate} | Status: ${submission.admin_status || submission.status}`;
+      `Submission ID: ${submission.id} | Submitted: ${submittedDate} | Status: ${submission.status}`;
     sheet.getCell('A2').font = {
       name: 'Calibri',
       italic: true,
@@ -1813,7 +1841,7 @@ private async createSimplifiedGroupedSubmissionsSheet(
     const metadataColumns = [
       { header: 'Submission ID', key: 'id', width: 15 },
       { header: 'Submitted At', key: 'submitted_at', width: 20 },
-      { header: 'Status', key: 'admin_status', width: 12 },
+      { header: 'Status', key: 'status', width: 12 },
       { header: 'Member', key: 'member_company', width: 20 },
       { header: 'Site', key: 'site_name', width: 20 },
     ];
@@ -2384,8 +2412,8 @@ private async createSimplifiedGroupedSubmissionsSheet(
         }
       } else if (col.key === 'id' && (!value || value === 'undefined')) {
         value = submission.id || 'N/A';
-      } else if (col.key === 'admin_status') {
-        value = submission.admin_status || submission.status || 'N/A';
+      } else if (col.key === 'lastLoginAt') {
+        value = submission.status || 'N/A';
       } else if (col.key === 'member_company') {
         value = submission.member_company || 'N/A';
       }
@@ -2453,7 +2481,7 @@ private async createSimplifiedGroupedSubmissionsSheet(
       ['Form Title', formData.title],
       ['Form Type', formData.formType?.name || 'N/A'],
       ['Form Year', formData.year || 'N/A'],
-      ['Status', submission.admin_status || submission.status || 'N/A'],
+      ['Status', submission.status || 'N/A'],
       ['Member Company', submission.member_company || 'N/A'],
       ['Member Email', submission.member_email || 'N/A'],
       ['Site Name', submission.site_name || 'N/A'],
@@ -2515,7 +2543,6 @@ private async createSimplifiedGroupedSubmissionsSheet(
       'country',
       'submitted_at',
       'status',
-      'admin_status',
       'admin_comment',
       'reviewed_by',
       'reviewed_at',
@@ -2679,7 +2706,7 @@ private async createSimplifiedGroupedSubmissionsSheet(
     const metadataColumns = [
       { header: 'Submission ID', key: 'id', width: 15 },
       { header: 'Submitted At', key: 'submitted_at', width: 20 },
-      { header: 'Status', key: 'admin_status', width: 12 },
+      { header: 'Status', key: 'status', width: 12 },
       { header: 'Member', key: 'member_company', width: 20 },
       { header: 'Site', key: 'site_name', width: 20 },
     ];
@@ -2960,7 +2987,7 @@ private async createSimplifiedGroupedSubmissionsSheet(
       submission.submitted_at || submission.created_at
     ).toLocaleDateString();
     sheet.getCell('A2').value =
-      `Submission ID: ${submission.id} | Submitted: ${submittedDate} | Status: ${submission.admin_status || submission.status}`;
+      `Submission ID: ${submission.id} | Submitted: ${submittedDate} | Status: ${submission.status}`;
     sheet.getCell('A2').font = {
       name: 'Calibri',
       italic: true,
@@ -3001,7 +3028,7 @@ private async createSimplifiedGroupedSubmissionsSheet(
       ['Form Title', submission.form_title],
       ['Form Type', submission.form_type_name],
       ['Form Year', submission.form_year],
-      ['Status', submission.admin_status || submission.status],
+      ['Status', submission.status],
       ['Member Company', submission.member_company || 'N/A'],
       ['Member Email', submission.member_email || 'N/A'],
       ['Site Name', submission.site_name || 'N/A'],
@@ -3063,7 +3090,6 @@ private async createSimplifiedGroupedSubmissionsSheet(
       'country',
       'submitted_at',
       'status',
-      'admin_status',
       'admin_comment',
       'reviewed_by',
       'reviewed_at',
@@ -3093,9 +3119,8 @@ private async createSimplifiedGroupedSubmissionsSheet(
       // Format value based on type
       if (typeof value === 'object') {
         displayValue = JSON.stringify(value);
-      } else if (value instanceof Date) {
-        displayValue = value.toLocaleDateString();
-      } else if (typeof value === 'boolean') {
+      } 
+    else if (typeof value === 'boolean') {
         displayValue = value ? 'Yes' : 'No';
       }
 

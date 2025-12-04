@@ -65,6 +65,9 @@ export function createFormTypeRoutes(dataSource: DataSource): Router {
   // Delete form type
   router.delete('/:id', authMiddleware, adminMiddleware, formTypeController.delete);
 
+  // Force delete form type with all forms and submissions
+  router.delete('/:id/force', authMiddleware, adminMiddleware, formTypeController.forceDelete);
+
   // Bulk update sort order
   router.patch(
     '/sort-order/bulk-update',

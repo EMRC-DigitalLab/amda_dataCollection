@@ -75,6 +75,9 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
+
+    console.log(changes, "this are changhes")
+
     try {
       // Update form basic info
       Object.assign(form, {
@@ -90,13 +93,13 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
           changes.requireAllScopesSubmission ?? form.requireAllScopesSubmission,
       });
 
-      if (changes.formTypeId !== undefined) {
-        if (changes.formTypeId === null) {
+      if (changes.formType !== undefined) {
+        if (changes.formType === null) {
           form.formType = null;
           form.formTypeId = null;
         } else {
-          form.formTypeId = changes.formTypeId;
-          form.formType = { id: changes.formTypeId } as FormType;
+          form.formTypeId = changes.formType;
+          form.formType = { id: changes.formType } as FormType;
         }
       }
 
@@ -177,7 +180,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     const query = `
       UPDATE "${tableName}" 
       SET ${setClause}
-      WHERE admin_status = 'PENDING'
+      WHERE status = 'SUBMITTED'
     `;
     
     const values = Object.values(updateData);
@@ -1039,10 +1042,9 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
             onDelete: 'SET NULL',
           },
           { name: 'submitted_at', type: 'TIMESTAMP', nullable: true, default: 'CURRENT_TIMESTAMP' },
-          { name: 'status', type: 'VARCHAR(20)', nullable: true, default: "'SUBMITTED'" },
+          { name: 'status', type: 'VARCHAR(20)', nullable: true, default: "'SUBMITTED'", check: "status IN ('SUBMITTED', 'APPROVED', 'REJECTED')" },
 
           // Admin review fields
-          { name: 'admin_status', type: 'VARCHAR(20)', nullable: true, default: "'PENDING'" },
           { name: 'admin_comment', type: 'TEXT', nullable: true, default: 'NULL' },
           {
             name: 'reviewed_by',
@@ -1171,7 +1173,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
           { name: `idx_${indexPrefix}_minigrid_siteId`, column: 'minigrid_siteId' },
           { name: `idx_${indexPrefix}_submitted_at`, column: 'submitted_at' },
           { name: `idx_${indexPrefix}_status`, column: 'status' },
-          { name: `idx_${indexPrefix}_admin_status`, column: 'admin_status' },
           { name: `idx_${indexPrefix}_reviewed_by`, column: 'reviewed_by' },
         ];
 
@@ -1234,7 +1235,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
 
     const tableName = form.tableName;
     const updates: Record<string, any> = {
-      admin_status: adminStatus,
+      status: adminStatus,
       reviewed_at: new Date(),
     };
 
@@ -1417,7 +1418,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         submitted_by: submittedBy,
         submitted_at: new Date(),
         status: 'SUBMITTED',
-        admin_status: 'PENDING',
       };
 
       // Set scope-specific fields
@@ -1823,7 +1823,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         submitted_by: row.submitted_by,
         submitted_at: row.submitted_at,
         status: row.status,
-        admin_status: row.admin_status,
         admin_comment: row.admin_comment,
         reviewed_by: row.reviewed_by,
         reviewed_at: row.reviewed_at,
@@ -1892,6 +1891,8 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
           : null,
       }));
     }
+
+    console.log(results,"this is results")
 
     // When not populating, still extract the answers properly
     return results.map((row: any) => ({
@@ -2066,9 +2067,9 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
             `
           SELECT 
             COUNT(*) as total,
-            COUNT(*) FILTER (WHERE admin_status = 'PENDING') as pending,
-            COUNT(*) FILTER (WHERE admin_status = 'APPROVED') as approved,
-            COUNT(*) FILTER (WHERE admin_status = 'REJECTED') as rejected,
+            COUNT(*) FILTER (WHERE status = 'SUBMITTED') as pending,
+            COUNT(*) FILTER (WHERE status = 'APPROVED') as approved,
+            COUNT(*) FILTER (WHERE status = 'REJECTED') as rejected,
             MAX(submitted_at) as last_submission
           FROM "${form.tableName}"
           WHERE submitted_at BETWEEN $1 AND $2
@@ -2324,7 +2325,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
           s.submitted_by,
           s.submitted_at,
           s.status,
-          s.admin_status,
           m."companyName" as member_name
         FROM "${form.tableName}" s
         LEFT JOIN members m ON s.submitted_by = m.id
@@ -2344,7 +2344,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
           memberName: sub.member_name || 'Unknown',
           submittedAt: sub.submitted_at,
           status: sub.status,
-          adminStatus: sub.admin_status,
         }));
       } catch (error) {
         console.error(`Error fetching submissions for form ${form.id}:`, error);
@@ -2414,7 +2413,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
           EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - s.submitted_at)) / 3600 as waiting_hours
         FROM "${form.tableName}" s
         LEFT JOIN members m ON s.submitted_by = m.id
-        WHERE s.admin_status = 'PENDING'
+        WHERE s.status = 'SUBMITTED'
         ORDER BY s.submitted_at ASC
         LIMIT $1
       `;
@@ -3153,7 +3152,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     sql += `  "status" VARCHAR(20) DEFAULT 'SUBMITTED',\n`;
 
     // Admin review fields
-    sql += `  "admin_status" VARCHAR(20) DEFAULT 'PENDING' CHECK (admin_status IN ('PENDING', 'APPROVED', 'REJECTED')),\n`;
     sql += `  "admin_comment" TEXT NULL,\n`;
     sql += `  "reviewed_by" UUID REFERENCES users(id) ON DELETE SET NULL,\n`;
     sql += `  "reviewed_at" TIMESTAMP NULL,\n`;
@@ -3167,7 +3165,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       'country',
       'submitted_at',
       'status',
-      'admin_status',
       'admin_comment',
       'reviewed_by',
       'reviewed_at',
@@ -3212,7 +3209,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       `CREATE INDEX "idx_${indexPrefix}_submitted_by" ON "${tableName}"("submitted_by");`,
       `CREATE INDEX "idx_${indexPrefix}_submitted_at" ON "${tableName}"("submitted_at");`,
       `CREATE INDEX "idx_${indexPrefix}_status" ON "${tableName}"("status");`,
-      `CREATE INDEX "idx_${indexPrefix}_admin_status" ON "${tableName}"("admin_status");`,
     ];
 
     if (submissionScope === FormSubmissionScope.SITE_LEVEL) {

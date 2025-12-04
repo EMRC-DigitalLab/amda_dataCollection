@@ -7,30 +7,7 @@ import {
   UpdateDateColumn,
   Index,
 } from 'typeorm';
-
-export enum NotificationStatus {
-  PENDING = 'pending',
-  PROCESSING = 'processing',
-  SENT = 'sent',
-  DELIVERED = 'delivered',
-  FAILED = 'failed',
-  CANCELLED = 'cancelled',
-}
-
-export enum NotificationPriority {
-  LOW = 'low',
-  NORMAL = 'normal',
-  HIGH = 'high',
-  URGENT = 'urgent',
-}
-
-export enum NotificationChannel {
-  EMAIL = 'email',
-  SMS = 'sms',
-  PUSH = 'push',
-  WEBHOOK = 'webhook',
-  IN_APP = 'in_app',
-}
+import { NotificationChannel } from './notification.entity';
 
 @Entity('notification_templates')
 @Index(['type', 'channel'])
@@ -44,7 +21,11 @@ export class NotificationTemplate {
   @Column({ type: 'varchar', length: 255 })
   type!: string;
 
-  @Column({ type: 'enum', enum: NotificationChannel })
+  @Column({ 
+    type: 'enum', 
+    enum: NotificationChannel,
+    enumName: 'notification_channel_enum'
+  })
   channel!: NotificationChannel;
 
   @Column({ type: 'varchar', length: 500 })

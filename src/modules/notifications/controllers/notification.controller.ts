@@ -145,8 +145,7 @@ export class NotificationController {
   async getNotification(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const result = await this.notificationService.getNotifications({ page: 1, limit: 1 });
-      const notification = result.notifications.find(n => n.id === id);
+      const notification = await this.notificationService.getNotificationById(id);
 
       if (!notification) {
         res.status(404).json({

@@ -276,7 +276,7 @@ export class FormService {
       status: status.toUpperCase(),
       reviewed_by: reviewerId,
       reviewed_at: new Date(),
-      review_reason: reason,
+      admin_comment: reason,
     };
 
     const result = await this.repo.updateSubmission(formId, submissionId, updateData);
@@ -948,7 +948,7 @@ export class FormService {
           COUNT(*) FILTER (WHERE submitted_at >= $1) as today_count,
           COUNT(*) FILTER (WHERE submitted_at >= $2) as week_count,
           COUNT(*) FILTER (WHERE submitted_at >= $3) as month_count,
-          COUNT(*) FILTER (WHERE admin_status = 'PENDING') as pending_count,
+          COUNT(*) FILTER (WHERE lastLoginAt = 'PENDING') as pending_count,
           AVG(EXTRACT(EPOCH FROM (reviewed_at - submitted_at)) / 3600) FILTER (WHERE reviewed_at IS NOT NULL) as avg_review_hours,
           COUNT(DISTINCT submitted_by) FILTER (WHERE submitted_at >= $2) as active_members
         FROM "${form.tableName}"
@@ -1692,7 +1692,7 @@ export class FormService {
       status: status.toUpperCase(),
       reviewed_by: reviewerId,
       reviewed_at: new Date(),
-      review_reason: reason,
+      admin_comment: reason,
     };
 
     return this.repo.updateSubmission(formId, submissionId, updateData);
@@ -1709,36 +1709,20 @@ export class FormService {
       throw new Error('Form has no submission table');
     }
 
-    // Get all submissions that are not already approved
-    const submissions = await this.repo.getFormSubmissions(formId, {
-      page: 1,
-      limit: 10000, // Get all submissions
-      status: 'PENDING' // Only pending submissions
-    });
-
-    let approvedCount = 0;
-    let skippedCount = 0;
-    const errors: string[] = [];
-
     const updateData = {
       status: 'APPROVED',
       reviewed_by: reviewerId,
       reviewed_at: new Date(),
-      review_reason: reason || 'Bulk approval by admin',
+      admin_comment: reason || 'Bulk approval by admin',
     };
 
     // Update all pending submissions to approved in bulk
-    try {
-      const result = await this.repo.bulkUpdateSubmissionStatus(form.tableName, updateData);
-      approvedCount = result.affected || 0;
-    } catch (error) {
-      errors.push(`Failed to bulk update submissions: ${error.message}`);
-    }
-
+    const result = await this.repo.bulkUpdateSubmissionStatus(form.tableName, updateData);
+    
     return {
-      approvedCount,
-      skippedCount,
-      errors
+      approvedCount: result.affected || 0,
+      skippedCount: 0,
+      errors: []
     };
   }
 

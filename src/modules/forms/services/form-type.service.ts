@@ -1,5 +1,6 @@
 import { DataSource } from 'typeorm';
 import { FormType, FormTypeStatus } from '../../../database/entities/form-type.entity';
+import { FormRepository } from '../../../database/repositories/forms/form.repository';
 import {
   FormTypeCreateData,
   FormTypeQuery,
@@ -10,9 +11,11 @@ import { FormTypeRepository } from './../../../database/repositories/forms/form-
 
 export class FormTypeService {
   private formTypeRepository: FormTypeRepository;
+  private formRepository: FormRepository;
 
   constructor(private readonly dataSource: DataSource) {
     this.formTypeRepository = new FormTypeRepository(dataSource);
+    this.formRepository = new FormRepository(dataSource);
   }
 
   async create(data: FormTypeCreateData): Promise<FormType> {
@@ -106,6 +109,71 @@ export class FormTypeService {
     }
 
     await this.formTypeRepository.delete(formType);
+  }
+
+  async forceDelete(id: string): Promise<{ deletedForms: number; deletedSubmissions: number; formTypeDeleted: boolean }> {
+    const formType = await this.formTypeRepository.findById(id);
+
+    if (!formType) {
+      throw new Error(`Form type with ID ${id} not found`);
+    }
+
+    let deletedForms = 0;
+    let totalDeletedSubmissions = 0;
+
+    // If form type has forms, delete all of them with their submissions
+    if (formType.forms && formType.forms.length > 0) {
+      for (const form of formType.forms) {
+        try {
+          // Get the form to check if it has a submission table
+          const fullForm = await this.formRepository.findFormById(form.id);
+          let submissionCount = 0;
+
+          // If form has a submission table, count and delete submissions first
+          if (fullForm?.tableCreated && fullForm?.tableName) {
+            try {
+              submissionCount = await this.getSubmissionCount(fullForm.tableName);
+              if (submissionCount > 0) {
+                await this.formRepository.deleteAllSubmissions(fullForm.tableName);
+                totalDeletedSubmissions += submissionCount;
+              }
+            } catch (error:any) {
+              console.warn(`Warning: Could not delete submissions for form ${form.id}: ${error.message}`);
+            }
+          }
+
+          // Delete the form itself (this will drop the table too)
+          await this.formRepository.deleteForm(form.id);
+          deletedForms++;
+        } catch (error:any) {
+          console.warn(`Warning: Could not delete form ${form.id}: ${error.message}`);
+          // Continue with other forms even if one fails
+        }
+      }
+    }
+
+    // Delete the form type itself
+    await this.formTypeRepository.delete(formType);
+
+    return {
+      deletedForms,
+      deletedSubmissions: totalDeletedSubmissions,
+      formTypeDeleted: true
+    };
+  }
+
+  private async getSubmissionCount(tableName: string): Promise<number> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+
+    try {
+      const result = await queryRunner.query(`SELECT COUNT(*) as count FROM "${tableName}"`);
+      return parseInt(result[0].count, 10) || 0;
+    } catch (error) {
+      return 0; // Table might not exist
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async getActiveFormTypes(year?: number): Promise<FormType[]> {

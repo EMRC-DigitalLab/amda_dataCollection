@@ -18,36 +18,28 @@ export class CertificateRepository {
   async findById(id: string): Promise<Certificate | null> {
     return await this.repository.findOne({
       where: { id },
-      relations: ['member', 'site'],
+      relations: ['member'],
     });
   }
 
   async findByCertificateId(certificateId: string): Promise<Certificate | null> {
     return await this.repository.findOne({
       where: { certificateId },
-      relations: ['member', 'site'],
+      relations: ['member'],
     });
   }
 
   async findByMemberId(memberId: string): Promise<Certificate[]> {
     return await this.repository.find({
       where: { memberId },
-      relations: ['member', 'site'],
-      order: { createdAt: 'DESC' },
-    });
-  }
-
-  async findBySiteId(siteId: string): Promise<Certificate[]> {
-    return await this.repository.find({
-      where: { siteId },
-      relations: ['member', 'site'],
+      relations: ['member'],
       order: { createdAt: 'DESC' },
     });
   }
 
   async findAll(): Promise<Certificate[]> {
     return await this.repository.find({
-      relations: ['member', 'site'],
+      relations: ['member'],
       order: { createdAt: 'DESC' },
     });
   }
