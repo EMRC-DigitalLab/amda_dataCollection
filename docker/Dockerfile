@@ -32,6 +32,7 @@ RUN addgroup -g 1001 -S nodejs \
 # Prevent husky (prepare) from running in container installs
 ENV HUSKY=0
 ENV NODE_ENV=production
+ENV ASSETS_PATH=/app/dist/src/modules/forms/services/public
 
 # Copy manifests
 COPY package*.json ./
@@ -42,13 +43,17 @@ RUN npm ci --omit=dev && npm cache clean --force
 # Copy built artifacts from builder
 COPY --from=builder /app/dist ./dist
 
+# Copy public assets (images and fonts) for certificate generation
+COPY src/modules/forms/services/public ./dist/src/modules/forms/services/public
+
 # 1. Copy tsconfig.json so tsconfig-paths can resolve @ aliases
 COPY tsconfig.json /app/tsconfig.json
 ENV NODE_PATH=/app/dist
 
 # App dirs & permissions
 RUN mkdir -p logs uploads \
- && chown -R amda:nodejs /app
+ && chown -R amda:nodejs /app \
+ && chmod -R 755 /app/dist/src/modules/forms/services/public
 
 USER amda
 
