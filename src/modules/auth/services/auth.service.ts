@@ -60,7 +60,6 @@ export class AuthService {
       member = await this.memberRepository.findByEmail(email);
     }
 
-    console.log(member, 'this is member');
 
     // If still no user/member found, throw error
     if (!user && !member) {
@@ -97,7 +96,6 @@ export class AuthService {
       // Update last login
       await this.userRepository.updateLastLogin(user.id);
     } else if (member) {
-      console.log(member);
       // Member login
       passwordMatch = await bcrypt.compare(password, member.password);
 

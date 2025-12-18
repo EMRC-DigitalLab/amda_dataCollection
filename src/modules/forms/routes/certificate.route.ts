@@ -22,7 +22,6 @@ export function createCertificateRoutes(dataSource: DataSource): Router {
   // Get certificates by member
   router.get('/member/:memberId', certificateController.getCertificatesByMember);
 
-
   // Download certificate PDF
   router.get('/download/:certificateId', certificateController.downloadCertificatePDF);
 

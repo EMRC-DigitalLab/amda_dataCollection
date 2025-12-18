@@ -75,8 +75,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
-
-    console.log(changes, "this are changhes")
+    console.log(changes, 'this are changhes');
 
     try {
       // Update form basic info
@@ -165,35 +164,36 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     }
   }
 
- async bulkUpdateSubmissionStatus(tableName: string, updateData: any): Promise<{ affected: number }> {
-  const queryRunner = this.dataSource.createQueryRunner();
-  await queryRunner.connect();
+  async bulkUpdateSubmissionStatus(
+    tableName: string,
+    updateData: any
+  ): Promise<{ affected: number }> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
 
-  try {
-    // Build the SET clause dynamically
-    const keys = Object.keys(updateData);
-    const setClause = keys
-      .map((key, index) => `"${key}" = $${index + 1}`)
-      .join(', ');
+    try {
+      // Build the SET clause dynamically
+      const keys = Object.keys(updateData);
+      const setClause = keys.map((key, index) => `"${key}" = $${index + 1}`).join(', ');
 
-    // Only update PENDING submissions
-    const query = `
+      // Only update PENDING submissions
+      const query = `
       UPDATE "${tableName}" 
       SET ${setClause}
       WHERE status = 'SUBMITTED'
     `;
-    
-    const values = Object.values(updateData);
-    const result = await queryRunner.query(query, values);
-    
-    // PostgreSQL returns an array where result[1] is the row count
-    return { affected: result[1] || 0 };
-  } catch (error) {
-    throw new Error(`Failed to bulk update submission status: ${error.message}`);
-  } finally {
-    await queryRunner.release();
+
+      const values = Object.values(updateData);
+      const result = await queryRunner.query(query, values);
+
+      // PostgreSQL returns an array where result[1] is the row count
+      return { affected: result[1] || 0 };
+    } catch (error) {
+      throw new Error(`Failed to bulk update submission status: ${error.message}`);
+    } finally {
+      await queryRunner.release();
+    }
   }
-}
 
   async findFormById(id: string): Promise<Form | null> {
     return this.findOne({
@@ -787,7 +787,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
   //   const placeholders = submissionIds.map((_, index) => `${index + 3}`).join(', ');
 
   //   let sql = `
-  //     UPDATE "${tableName}" 
+  //     UPDATE "${tableName}"
   //     SET "status" = $1, "updated_at" = CURRENT_TIMESTAMP
   //   `;
   //   const params = [status];
@@ -1042,7 +1042,13 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
             onDelete: 'SET NULL',
           },
           { name: 'submitted_at', type: 'TIMESTAMP', nullable: true, default: 'CURRENT_TIMESTAMP' },
-          { name: 'status', type: 'VARCHAR(20)', nullable: true, default: "'SUBMITTED'", check: "status IN ('SUBMITTED', 'APPROVED', 'REJECTED')" },
+          {
+            name: 'status',
+            type: 'VARCHAR(20)',
+            nullable: true,
+            default: "'SUBMITTED'",
+            check: "status IN ('SUBMITTED', 'APPROVED', 'REJECTED')",
+          },
 
           // Admin review fields
           { name: 'admin_comment', type: 'TEXT', nullable: true, default: 'NULL' },
@@ -1892,7 +1898,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       }));
     }
 
-    console.log(results,"this is results")
+    console.log(results, 'this is results');
 
     // When not populating, still extract the answers properly
     return results.map((row: any) => ({

@@ -21,7 +21,7 @@ export class FinanceAnalyticsController {
         dateTo: req.query.dateTo as string,
         country: req.query.country as string,
         membershipTier: req.query.membershipTier as string,
-        paymentStatus: req.query.paymentStatus as string
+        paymentStatus: req.query.paymentStatus as string,
       };
 
       const analytics = await this.financeAnalyticsService.getFinanceAnalytics(filters);
@@ -57,8 +57,8 @@ export class FinanceAnalyticsController {
           overview: {
             totalRevenue: analytics.overview.totalRevenue,
             monthlyRecurringRevenue: analytics.overview.monthlyRecurringRevenue,
-            growthRate: analytics.overview.revenueGrowthRate
-          }
+            growthRate: analytics.overview.revenueGrowthRate,
+          },
         },
       });
     } catch (error) {
@@ -87,8 +87,8 @@ export class FinanceAnalyticsController {
           summary: {
             totalRevenue: analytics.overview.totalRevenue,
             pendingPayments: analytics.overview.totalPendingPayments,
-            completionRate: analytics.overview.paymentCompletionRate
-          }
+            completionRate: analytics.overview.paymentCompletionRate,
+          },
         },
       });
     } catch (error) {
@@ -117,8 +117,8 @@ export class FinanceAnalyticsController {
           summary: {
             totalMembershipFees: analytics.overview.totalMembershipFees,
             monthlyRecurringRevenue: analytics.overview.monthlyRecurringRevenue,
-            averageRevenuePerMember: analytics.overview.averageRevenuePerMember
-          }
+            averageRevenuePerMember: analytics.overview.averageRevenuePerMember,
+          },
         },
       });
     } catch (error) {
@@ -147,8 +147,8 @@ export class FinanceAnalyticsController {
           summary: {
             totalCountries: analytics.geographicRevenue.length,
             topRevenueCountry: analytics.geographicRevenue[0]?.country || 'N/A',
-            totalRevenue: analytics.overview.totalRevenue
-          }
+            totalRevenue: analytics.overview.totalRevenue,
+          },
         },
       });
     } catch (error) {
@@ -177,8 +177,9 @@ export class FinanceAnalyticsController {
           summary: {
             totalOutstanding: analytics.overview.totalPendingPayments,
             totalRecords: analytics.outstandingPayments.length,
-            criticalCount: analytics.outstandingPayments.filter(p => p.status === 'Critical').length
-          }
+            criticalCount: analytics.outstandingPayments.filter(p => p.status === 'Critical')
+              .length,
+          },
         },
       });
     } catch (error) {
@@ -205,10 +206,15 @@ export class FinanceAnalyticsController {
         data: {
           forecast: analytics.revenueForecast,
           summary: {
-            totalProjectedRevenue: analytics.revenueForecast.reduce((sum, f) => sum + f.projectedRevenue, 0),
-            averageConfidence: analytics.revenueForecast.reduce((sum, f) => sum + f.confidenceLevel, 0) / analytics.revenueForecast.length,
-            forecastPeriod: `${analytics.revenueForecast.length} months`
-          }
+            totalProjectedRevenue: analytics.revenueForecast.reduce(
+              (sum, f) => sum + f.projectedRevenue,
+              0
+            ),
+            averageConfidence:
+              analytics.revenueForecast.reduce((sum, f) => sum + f.confidenceLevel, 0) /
+              analytics.revenueForecast.length,
+            forecastPeriod: `${analytics.revenueForecast.length} months`,
+          },
         },
       });
     } catch (error) {
@@ -227,7 +233,7 @@ export class FinanceAnalyticsController {
    */
   async exportFinanceData(req: Request, res: Response): Promise<void> {
     try {
-      const format = req.query.format as string || 'json';
+      const format = (req.query.format as string) || 'json';
       const analytics = await this.financeAnalyticsService.getFinanceAnalytics();
 
       const timestamp = new Date().toISOString().split('T')[0];
@@ -235,19 +241,19 @@ export class FinanceAnalyticsController {
 
       if (format === 'csv') {
         const csvData = this.convertToCSV(analytics);
-        
+
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
         res.send(csvData);
       } else {
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}.json"`);
-        
+
         res.status(200).json({
           success: true,
           message: 'Finance analytics data exported successfully',
           exportedAt: new Date().toISOString(),
-          data: analytics
+          data: analytics,
         });
       }
     } catch (error) {
@@ -270,7 +276,7 @@ export class FinanceAnalyticsController {
         success: true,
         message: 'Finance analytics service is healthy',
         timestamp: new Date().toISOString(),
-        version: '1.0.0'
+        version: '1.0.0',
       });
     } catch (error) {
       console.error('Error in health check:', error);
@@ -287,7 +293,7 @@ export class FinanceAnalyticsController {
    */
   private convertToCSV(data: any): string {
     const headers = ['Metric', 'Value', 'Category', 'Period'];
-    
+
     const rows = [
       ['Total Revenue', data.overview.totalRevenue, 'Overview', 'Annual'],
       ['Monthly Recurring Revenue', data.overview.monthlyRecurringRevenue, 'Overview', 'Monthly'],
@@ -299,22 +305,12 @@ export class FinanceAnalyticsController {
 
     // Add revenue breakdown
     data.revenueBreakdown?.forEach((item: any) => {
-      rows.push([
-        item.category,
-        item.amount,
-        'Revenue Breakdown',
-        'Annual'
-      ]);
+      rows.push([item.category, item.amount, 'Revenue Breakdown', 'Annual']);
     });
 
     // Add payment trends
     data.paymentTrends?.forEach((trend: any) => {
-      rows.push([
-        'Revenue',
-        trend.revenue,
-        'Payment Trends',
-        trend.month
-      ]);
+      rows.push(['Revenue', trend.revenue, 'Payment Trends', trend.month]);
     });
 
     const csvContent = [headers, ...rows]

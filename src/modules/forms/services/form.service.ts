@@ -93,7 +93,7 @@ export class FormService {
 
     return {
       deletedSubmissions,
-      formDeleted: true
+      formDeleted: true,
     };
   }
 
@@ -1704,7 +1704,7 @@ export class FormService {
     reason?: string
   ): Promise<{ approvedCount: number; skippedCount: number; errors: string[] }> {
     const form = await this.findById(formId);
-    
+
     if (!form.tableName) {
       throw new Error('Form has no submission table');
     }
@@ -1718,11 +1718,11 @@ export class FormService {
 
     // Update all pending submissions to approved in bulk
     const result = await this.repo.bulkUpdateSubmissionStatus(form.tableName, updateData);
-    
+
     return {
       approvedCount: result.affected || 0,
       skippedCount: 0,
-      errors: []
+      errors: [],
     };
   }
 

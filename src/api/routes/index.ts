@@ -3,9 +3,9 @@
 import { AppDataSource } from '@/config/database';
 import { createAuthRoutes } from '@/modules/auth/routes/auth.routes';
 import { Router } from 'express';
-import { createSiteRoutes } from '../../modules/analytics/routes/site.route';
 import { createConnectionsRoutes } from '../../modules/analytics/routes/connections.route';
 import { createFinanceRoutes } from '../../modules/analytics/routes/finance.route';
+import { createSiteRoutes } from '../../modules/analytics/routes/site.route';
 import { createMemberRoutes } from '../../modules/auth/routes/member.route';
 import { createCertificateRoutes } from '../../modules/forms/routes/certificate.route';
 import { createCompletionRoutes } from '../../modules/forms/routes/completion.route';
@@ -35,6 +35,8 @@ export function createApiRouter(): Router {
     { path: '/certificates', factory: createCertificateRoutes },
     { path: '/exports', factory: createExportRoutes },
   ];
+
+
 
   for (const { path, factory } of modules) {
     router.use(path, factory(AppDataSource));

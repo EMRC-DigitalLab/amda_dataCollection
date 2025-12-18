@@ -21,10 +21,10 @@ export class NotificationTemplate {
   @Column({ type: 'varchar', length: 255 })
   type!: string;
 
-  @Column({ 
-    type: 'enum', 
+  @Column({
+    type: 'enum',
     enum: NotificationChannel,
-    enumName: 'notification_channel_enum'
+    enumName: 'notification_channel_enum',
   })
   channel!: NotificationChannel;
 

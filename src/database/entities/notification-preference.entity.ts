@@ -22,10 +22,10 @@ export class NotificationPreference {
   @Column({ type: 'varchar', length: 255 })
   type!: string; // e.g., 'payment_reminder', 'marketing'
 
-  @Column({ 
-    type: 'enum', 
+  @Column({
+    type: 'enum',
     enum: NotificationChannel,
-    enumName: 'notification_channel_enum'
+    enumName: 'notification_channel_enum',
   })
   channel!: NotificationChannel;
 

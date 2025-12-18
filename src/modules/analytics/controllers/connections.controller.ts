@@ -22,7 +22,7 @@ export class ConnectionsAnalyticsController {
         country: req.query.country as string,
         organizationType: req.query.organizationType as string,
         membershipTier: req.query.membershipTier as string,
-        includeInactive: req.query.includeInactive === 'true'
+        includeInactive: req.query.includeInactive === 'true',
       };
 
       const analytics = await this.connectionsAnalyticsService.getConnectionsAnalytics(filters);
@@ -58,8 +58,8 @@ export class ConnectionsAnalyticsController {
           overview: {
             totalMembers: analytics.overview.totalMembers,
             growthRate: analytics.overview.growthRate,
-            newMembersThisMonth: analytics.overview.newMembersThisMonth
-          }
+            newMembersThisMonth: analytics.overview.newMembersThisMonth,
+          },
         },
       });
     } catch (error) {
@@ -88,8 +88,8 @@ export class ConnectionsAnalyticsController {
           summary: {
             totalCountries: analytics.geographicDistribution.length,
             topCountry: analytics.geographicDistribution[0]?.country || 'N/A',
-            totalMembers: analytics.overview.totalMembers
-          }
+            totalMembers: analytics.overview.totalMembers,
+          },
         },
       });
     } catch (error) {
@@ -118,8 +118,10 @@ export class ConnectionsAnalyticsController {
           topOrganizations: analytics.topOrganizations,
           summary: {
             totalOrganizations: analytics.overview.totalOrganizations,
-            averageMembers: analytics.organizationTypes.reduce((sum, org) => sum + org.averageMembers, 0) / analytics.organizationTypes.length || 0
-          }
+            averageMembers:
+              analytics.organizationTypes.reduce((sum, org) => sum + org.averageMembers, 0) /
+                analytics.organizationTypes.length || 0,
+          },
         },
       });
     } catch (error) {
@@ -146,7 +148,7 @@ export class ConnectionsAnalyticsController {
         data: {
           activeConnections: analytics.activeConnections,
           membershipTiers: analytics.membershipTiers,
-          networkGrowth: analytics.networkGrowth
+          networkGrowth: analytics.networkGrowth,
         },
       });
     } catch (error) {
@@ -165,7 +167,7 @@ export class ConnectionsAnalyticsController {
    */
   async exportConnectionsData(req: Request, res: Response): Promise<void> {
     try {
-      const format = req.query.format as string || 'json';
+      const format = (req.query.format as string) || 'json';
       const analytics = await this.connectionsAnalyticsService.getConnectionsAnalytics();
 
       const timestamp = new Date().toISOString().split('T')[0];
@@ -174,19 +176,19 @@ export class ConnectionsAnalyticsController {
       if (format === 'csv') {
         // Convert to CSV format
         const csvData = this.convertToCSV(analytics);
-        
+
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
         res.send(csvData);
       } else {
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}.json"`);
-        
+
         res.status(200).json({
           success: true,
           message: 'Analytics data exported successfully',
           exportedAt: new Date().toISOString(),
-          data: analytics
+          data: analytics,
         });
       }
     } catch (error) {
@@ -209,7 +211,7 @@ export class ConnectionsAnalyticsController {
         success: true,
         message: 'Connections analytics service is healthy',
         timestamp: new Date().toISOString(),
-        version: '1.0.0'
+        version: '1.0.0',
       });
     } catch (error) {
       console.error('Error in health check:', error);
@@ -226,7 +228,7 @@ export class ConnectionsAnalyticsController {
    */
   private convertToCSV(data: any): string {
     const headers = ['Metric', 'Value', 'Category', 'Period'];
-    
+
     const rows = [
       ['Total Members', data.overview.totalMembers, 'Overview', 'Current'],
       ['Total Organizations', data.overview.totalOrganizations, 'Overview', 'Current'],
@@ -238,22 +240,12 @@ export class ConnectionsAnalyticsController {
 
     // Add membership trends
     data.membershipTrends?.forEach((trend: any) => {
-      rows.push([
-        'New Members',
-        trend.newMembers,
-        'Membership Trends',
-        trend.month
-      ]);
+      rows.push(['New Members', trend.newMembers, 'Membership Trends', trend.month]);
     });
 
     // Add geographic data
     data.geographicDistribution?.forEach((geo: any) => {
-      rows.push([
-        `Members in ${geo.country}`,
-        geo.memberCount,
-        'Geographic',
-        'Current'
-      ]);
+      rows.push([`Members in ${geo.country}`, geo.memberCount, 'Geographic', 'Current']);
     });
 
     const csvContent = [headers, ...rows]

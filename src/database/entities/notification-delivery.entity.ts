@@ -36,11 +36,11 @@ export class NotificationDelivery {
   @JoinColumn({ name: 'notificationId' })
   notification!: Notification;
 
-  @Column({ 
-    type: 'enum', 
-    enum: DeliveryStatus, 
+  @Column({
+    type: 'enum',
+    enum: DeliveryStatus,
     enumName: 'delivery_status_enum',
-    default: DeliveryStatus.PENDING 
+    default: DeliveryStatus.PENDING,
   })
   status!: DeliveryStatus;
 
