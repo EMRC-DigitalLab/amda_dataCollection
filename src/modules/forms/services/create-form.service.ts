@@ -220,7 +220,7 @@ export class FormSettingsService {
     const queryRunner = this.dataSource.createQueryRunner();
 
     try {
-      await queryRunner.connect();P
+      await queryRunner.connect();
 
       // Prepare data for insertion
       const insertData: Record<string, any> = {
