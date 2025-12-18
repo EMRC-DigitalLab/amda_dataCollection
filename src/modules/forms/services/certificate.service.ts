@@ -286,8 +286,6 @@ export class CertificateService {
     const recipientYStart = isPerfectCompletion ? 260 : 250;
 
     if (data.organizationName) {
-     
-
       addText('Presented to', pageWidth / 2, recipientYStart + 35, {
         fontSize: 16,
         fontType: 'body',
@@ -295,7 +293,7 @@ export class CertificateService {
         align: 'center',
       });
 
-       addText(data.organizationName, pageWidth / 2, recipientYStart, {
+      addText(data.organizationName, pageWidth / 2, recipientYStart, {
         fontSize: 36,
         fontType: 'title',
         style: 'semi-bold',
@@ -705,7 +703,6 @@ export class CertificateService {
   async getCertificatesByMember(memberId: string): Promise<Certificate[]> {
     return await this.certificateRepository.findByMemberId(memberId);
   }
-
 
   async getAllCertificates(): Promise<Certificate[]> {
     return await this.certificateRepository.findAll();

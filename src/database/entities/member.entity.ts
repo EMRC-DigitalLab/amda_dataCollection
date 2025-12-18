@@ -2,16 +2,16 @@
 
 import * as bcrypt from 'bcryptjs';
 import {
-    BeforeInsert,
-    BeforeUpdate,
-    Column,
-    CreateDateColumn,
-    Entity,
-    Index,
-    OneToMany,
-    PrimaryGeneratedColumn,
-    UpdateDateColumn,
-    ValueTransformer,
+  BeforeInsert,
+  BeforeUpdate,
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+  ValueTransformer,
 } from 'typeorm';
 import { MinigridSite } from './minigrid-site.entity';
 

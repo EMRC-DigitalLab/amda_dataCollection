@@ -49,26 +49,26 @@ export class Notification {
   @Column({ type: 'varchar', length: 255 })
   type!: string; // e.g., 'payment_reminder', 'welcome_email'
 
-  @Column({ 
-    type: 'enum', 
+  @Column({
+    type: 'enum',
     enum: NotificationChannel,
-    enumName: 'notification_channel_enum'
+    enumName: 'notification_channel_enum',
   })
   channel!: NotificationChannel;
 
-  @Column({ 
-    type: 'enum', 
-    enum: NotificationStatus, 
+  @Column({
+    type: 'enum',
+    enum: NotificationStatus,
     enumName: 'notification_status_enum',
-    default: NotificationStatus.PENDING 
+    default: NotificationStatus.PENDING,
   })
   status!: NotificationStatus;
 
-  @Column({ 
-    type: 'enum', 
-    enum: NotificationPriority, 
+  @Column({
+    type: 'enum',
+    enum: NotificationPriority,
     enumName: 'notification_priority_enum',
-    default: NotificationPriority.NORMAL 
+    default: NotificationPriority.NORMAL,
   })
   priority!: NotificationPriority;
 

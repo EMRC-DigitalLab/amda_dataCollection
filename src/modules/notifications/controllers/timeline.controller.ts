@@ -34,7 +34,7 @@ export class TimelineController {
         dateFrom,
         dateTo,
         limit = '50',
-        offset = '0'
+        offset = '0',
       } = req.query as Record<string, string>;
 
       const filters = {
@@ -44,7 +44,7 @@ export class TimelineController {
         dateFrom: dateFrom ? new Date(dateFrom) : undefined,
         dateTo: dateTo ? new Date(dateTo) : undefined,
         limit: parseInt(limit),
-        offset: parseInt(offset)
+        offset: parseInt(offset),
       };
 
       const events = await this.timelineService.getTimelineEvents(filters);
@@ -57,8 +57,8 @@ export class TimelineController {
           pagination: {
             limit: parseInt(limit),
             offset: parseInt(offset),
-            total: events.length
-          }
+            total: events.length,
+          },
         },
       });
     } catch (error) {

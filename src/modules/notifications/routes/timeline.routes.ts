@@ -23,10 +23,7 @@ export function createTimelineRoutes(dataSource: DataSource): Router {
    * @query   offset (optional) - Number of events to skip (default 0)
    * @access  Authenticated users
    */
-  router.get(
-    '/',
-    timelineController.getTimelineEvents.bind(timelineController)
-  );
+  router.get('/', timelineController.getTimelineEvents.bind(timelineController));
 
   // Admin-only notification routes
   /**

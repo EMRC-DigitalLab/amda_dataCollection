@@ -112,7 +112,6 @@ export class CertificateController {
     }
   };
 
-
   getAllCertificates = async (req: Request, res: Response): Promise<void> => {
     try {
       const certificates = await this.service.getAllCertificates();

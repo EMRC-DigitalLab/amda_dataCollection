@@ -15,7 +15,7 @@ export function createConnectionsRoutes(dataSource: DataSource): Router {
    * @route   GET /api/analytics/connections/overview
    * @desc    Get comprehensive connections analytics data
    * @query   dateFrom (optional) - Start date filter
-   * @query   dateTo (optional) - End date filter  
+   * @query   dateTo (optional) - End date filter
    * @query   country (optional) - Country filter
    * @query   organizationType (optional) - Organization type filter
    * @query   membershipTier (optional) - Membership tier filter

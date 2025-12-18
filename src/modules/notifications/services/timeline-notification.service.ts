@@ -10,7 +10,16 @@ import { NotificationService } from './notification.service';
 
 export interface TimelineEvent {
   id: string;
-  type: 'form_created' | 'form_updated' | 'form_deleted' | 'question_added' | 'question_updated' | 'question_deleted' | 'category_added' | 'category_updated' | 'category_deleted';
+  type:
+    | 'form_created'
+    | 'form_updated'
+    | 'form_deleted'
+    | 'question_added'
+    | 'question_updated'
+    | 'question_deleted'
+    | 'category_added'
+    | 'category_updated'
+    | 'category_deleted';
   title: string;
   description: string;
   formId?: string;
@@ -51,11 +60,11 @@ export class TimelineNotificationService {
 
   // Form Events
   async notifyFormCreated(formId: string, adminId: string, changes: any = {}): Promise<void> {
-    const form = await this.formRepository.findOne({ 
+    const form = await this.formRepository.findOne({
       where: { id: formId },
-      relations: ['admin', 'formType']
+      relations: ['admin', 'formType'],
     });
-    
+
     if (!form) return;
 
     const admin = await this.userRepository.findOne({ where: { id: adminId } });
@@ -74,8 +83,8 @@ export class TimelineNotificationService {
       metadata: {
         formType: form.formType?.name,
         formSlug: form.slug,
-        changes
-      }
+        changes,
+      },
     };
 
     await this.createTimelineNotification(event);
@@ -83,18 +92,18 @@ export class TimelineNotificationService {
   }
 
   async notifyFormUpdated(formId: string, adminId: string, changes: any = {}): Promise<void> {
-    const form = await this.formRepository.findOne({ 
+    const form = await this.formRepository.findOne({
       where: { id: formId },
-      relations: ['admin', 'formType']
+      relations: ['admin', 'formType'],
     });
-    
+
     if (!form) return;
 
     const admin = await this.userRepository.findOne({ where: { id: adminId } });
     if (!admin) return;
 
     const changesList = Object.keys(changes).join(', ');
-    
+
     const event: TimelineEvent = {
       id: this.generateEventId(),
       type: 'form_updated',
@@ -109,8 +118,8 @@ export class TimelineNotificationService {
         formType: form.formType?.name,
         formSlug: form.slug,
         changes,
-        changesList
-      }
+        changesList,
+      },
     };
 
     await this.createTimelineNotification(event);
@@ -130,7 +139,7 @@ export class TimelineNotificationService {
       adminId: admin.id,
       adminName: `${admin.firstName} ${admin.lastName}`,
       timestamp: new Date(),
-      metadata
+      metadata,
     };
 
     await this.createTimelineNotification(event);
@@ -139,11 +148,11 @@ export class TimelineNotificationService {
 
   // Question Events
   async notifyQuestionAdded(questionId: string, adminId: string, changes: any = {}): Promise<void> {
-    const question = await this.questionRepository.findOne({ 
+    const question = await this.questionRepository.findOne({
       where: { id: questionId },
-      relations: ['form', 'category']
+      relations: ['form', 'category'],
     });
-    
+
     if (!question) return;
 
     const admin = await this.userRepository.findOne({ where: { id: adminId } });
@@ -166,20 +175,24 @@ export class TimelineNotificationService {
       metadata: {
         questionType: question.questionType,
         isRequired: question.isRequired,
-        changes
-      }
+        changes,
+      },
     };
 
     await this.createTimelineNotification(event);
     await this.sendNotificationToAllUsers(event);
   }
 
-  async notifyQuestionUpdated(questionId: string, adminId: string, changes: any = {}): Promise<void> {
-    const question = await this.questionRepository.findOne({ 
+  async notifyQuestionUpdated(
+    questionId: string,
+    adminId: string,
+    changes: any = {}
+  ): Promise<void> {
+    const question = await this.questionRepository.findOne({
       where: { id: questionId },
-      relations: ['form', 'category']
+      relations: ['form', 'category'],
     });
-    
+
     if (!question) return;
 
     const admin = await this.userRepository.findOne({ where: { id: adminId } });
@@ -205,15 +218,20 @@ export class TimelineNotificationService {
         questionType: question.questionType,
         isRequired: question.isRequired,
         changes,
-        changesList
-      }
+        changesList,
+      },
     };
 
     await this.createTimelineNotification(event);
     await this.sendNotificationToAllUsers(event);
   }
 
-  async notifyQuestionDeleted(questionText: string, formTitle: string, adminId: string, metadata: any = {}): Promise<void> {
+  async notifyQuestionDeleted(
+    questionText: string,
+    formTitle: string,
+    adminId: string,
+    metadata: any = {}
+  ): Promise<void> {
     const admin = await this.userRepository.findOne({ where: { id: adminId } });
     if (!admin) return;
 
@@ -227,7 +245,7 @@ export class TimelineNotificationService {
       adminId: admin.id,
       adminName: `${admin.firstName} ${admin.lastName}`,
       timestamp: new Date(),
-      metadata
+      metadata,
     };
 
     await this.createTimelineNotification(event);
@@ -236,11 +254,11 @@ export class TimelineNotificationService {
 
   // Category Events
   async notifyCategoryAdded(categoryId: string, adminId: string, changes: any = {}): Promise<void> {
-    const category = await this.categoryRepository.findOne({ 
+    const category = await this.categoryRepository.findOne({
       where: { id: categoryId },
-      relations: ['form']
+      relations: ['form'],
     });
-    
+
     if (!category) return;
 
     const admin = await this.userRepository.findOne({ where: { id: adminId } });
@@ -261,20 +279,24 @@ export class TimelineNotificationService {
       metadata: {
         description: category.description,
         sortOrder: category.sortOrder,
-        changes
-      }
+        changes,
+      },
     };
 
     await this.createTimelineNotification(event);
     await this.sendNotificationToAllUsers(event);
   }
 
-  async notifyCategoryUpdated(categoryId: string, adminId: string, changes: any = {}): Promise<void> {
-    const category = await this.categoryRepository.findOne({ 
+  async notifyCategoryUpdated(
+    categoryId: string,
+    adminId: string,
+    changes: any = {}
+  ): Promise<void> {
+    const category = await this.categoryRepository.findOne({
       where: { id: categoryId },
-      relations: ['form']
+      relations: ['form'],
     });
-    
+
     if (!category) return;
 
     const admin = await this.userRepository.findOne({ where: { id: adminId } });
@@ -298,15 +320,20 @@ export class TimelineNotificationService {
         description: category.description,
         sortOrder: category.sortOrder,
         changes,
-        changesList
-      }
+        changesList,
+      },
     };
 
     await this.createTimelineNotification(event);
     await this.sendNotificationToAllUsers(event);
   }
 
-  async notifyCategoryDeleted(categoryName: string, formTitle: string, adminId: string, metadata: any = {}): Promise<void> {
+  async notifyCategoryDeleted(
+    categoryName: string,
+    formTitle: string,
+    adminId: string,
+    metadata: any = {}
+  ): Promise<void> {
     const admin = await this.userRepository.findOne({ where: { id: adminId } });
     if (!admin) return;
 
@@ -320,7 +347,7 @@ export class TimelineNotificationService {
       adminId: admin.id,
       adminName: `${admin.firstName} ${admin.lastName}`,
       timestamp: new Date(),
-      metadata
+      metadata,
     };
 
     await this.createTimelineNotification(event);
@@ -328,27 +355,30 @@ export class TimelineNotificationService {
   }
 
   // Timeline Management
-  async getTimelineEvents(filters: {
-    formId?: string;
-    adminId?: string;
-    type?: string;
-    dateFrom?: Date;
-    dateTo?: Date;
-    limit?: number;
-    offset?: number;
-  } = {}): Promise<TimelineEvent[]> {
+  async getTimelineEvents(
+    filters: {
+      formId?: string;
+      adminId?: string;
+      type?: string;
+      dateFrom?: Date;
+      dateTo?: Date;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<TimelineEvent[]> {
     // This would typically be stored in a dedicated timeline table
     // For now, we'll fetch from notifications with timeline metadata
-    
+
     const { limit = 50, offset = 0 } = filters;
-    
+
     // Mock timeline events - in a real implementation, you'd query a timeline table
     const events: TimelineEvent[] = [
       {
         id: '1',
         type: 'form_updated',
         title: 'Form Updated',
-        description: 'BAM 2024 Data Collection Template has been updated. Changes: title, description',
+        description:
+          'BAM 2024 Data Collection Template has been updated. Changes: title, description',
         formId: 'form-1',
         formTitle: 'BAM 2024 Data Collection Template',
         adminId: 'admin-1',
@@ -356,14 +386,15 @@ export class TimelineNotificationService {
         timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
         metadata: {
           changes: { title: 'Updated title', description: 'Updated description' },
-          changesList: 'title, description'
-        }
+          changesList: 'title, description',
+        },
       },
       {
         id: '2',
         type: 'question_added',
         title: 'New Question Added',
-        description: 'A new question "What is your organization\'s annual revenue?" has been added to form "BAM 2024 Data Collection Template"',
+        description:
+          'A new question "What is your organization\'s annual revenue?" has been added to form "BAM 2024 Data Collection Template"',
         formId: 'form-1',
         formTitle: 'BAM 2024 Data Collection Template',
         questionId: 'question-1',
@@ -373,14 +404,15 @@ export class TimelineNotificationService {
         timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
         metadata: {
           questionType: 'MULTIPLE_CHOICE',
-          isRequired: true
-        }
+          isRequired: true,
+        },
       },
       {
         id: '3',
         type: 'category_updated',
         title: 'Category Updated',
-        description: 'Category "Financial Information" in form "BAM 2024 Data Collection Template" has been updated. Changes: description',
+        description:
+          'Category "Financial Information" in form "BAM 2024 Data Collection Template" has been updated. Changes: description',
         formId: 'form-1',
         formTitle: 'BAM 2024 Data Collection Template',
         categoryId: 'category-1',
@@ -391,9 +423,9 @@ export class TimelineNotificationService {
         metadata: {
           description: 'Updated category description',
           changes: { description: 'Updated category description' },
-          changesList: 'description'
-        }
-      }
+          changesList: 'description',
+        },
+      },
     ];
 
     return events.slice(offset, offset + limit);
@@ -403,7 +435,7 @@ export class TimelineNotificationService {
   private async createTimelineNotification(event: TimelineEvent): Promise<void> {
     // Store timeline event in database - you might want a dedicated timeline table
     // For now, we'll use the notification metadata to store timeline events
-    
+
     await this.notificationService.createNotification({
       title: event.title,
       message: event.description,
@@ -414,19 +446,20 @@ export class TimelineNotificationService {
         timelineEvent: event,
         eventType: event.type,
         formId: event.formId,
-        formTitle: event.formTitle
-      }
+        formTitle: event.formTitle,
+      },
     });
   }
 
   private async sendNotificationToAllUsers(event: TimelineEvent): Promise<void> {
     // Get all active users to notify them of form changes
-    const users = await this.userRepository.createQueryBuilder('user')
+    const users = await this.userRepository
+      .createQueryBuilder('user')
       .where('user.isActive = :active', { active: true })
       .select(['user.id', 'user.email', 'user.firstName', 'user.lastName'])
       .getMany();
 
-    const notificationPromises = users.map(user => 
+    const notificationPromises = users.map(user =>
       this.notificationService.createNotification({
         userId: user.id,
         title: event.title,
@@ -439,8 +472,8 @@ export class TimelineNotificationService {
         metadata: {
           timelineEvent: event,
           eventType: event.type,
-          formId: event.formId
-        }
+          formId: event.formId,
+        },
       })
     );
 
@@ -451,22 +484,22 @@ export class TimelineNotificationService {
     switch (event.type) {
       case 'form_created':
         return `A new form "${event.formTitle}" has been created by ${event.adminName}. You can now access and fill out this form.`;
-      
+
       case 'form_updated':
         return `The form "${event.formTitle}" has been updated by ${event.adminName}. Please review the changes and update your submission if necessary.`;
-      
+
       case 'question_added':
         return `A new question has been added to the form "${event.formTitle}" by ${event.adminName}. Please complete the new question.`;
-      
+
       case 'question_updated':
         return `A question in form "${event.formTitle}" has been updated by ${event.adminName}. Please review and update your answer if needed.`;
-      
+
       case 'category_added':
         return `A new section "${event.categoryName}" has been added to form "${event.formTitle}" by ${event.adminName}.`;
-      
+
       case 'category_updated':
         return `The section "${event.categoryName}" in form "${event.formTitle}" has been updated by ${event.adminName}.`;
-      
+
       default:
         return `Form "${event.formTitle}" has been modified by ${event.adminName}. Please check for any required updates.`;
     }
@@ -514,7 +547,7 @@ export class TimelineNotificationService {
       eventDescription: event.description,
       timestamp: event.timestamp.toISOString(),
       dashboardUrl: `${process.env.FRONTEND_URL}/dashboard/forms`,
-      formUrl: event.formId ? `${process.env.FRONTEND_URL}/dashboard/forms/${event.formId}` : null
+      formUrl: event.formId ? `${process.env.FRONTEND_URL}/dashboard/forms/${event.formId}` : null,
     };
   }
 

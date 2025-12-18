@@ -111,7 +111,9 @@ export class FormTypeService {
     await this.formTypeRepository.delete(formType);
   }
 
-  async forceDelete(id: string): Promise<{ deletedForms: number; deletedSubmissions: number; formTypeDeleted: boolean }> {
+  async forceDelete(
+    id: string
+  ): Promise<{ deletedForms: number; deletedSubmissions: number; formTypeDeleted: boolean }> {
     const formType = await this.formTypeRepository.findById(id);
 
     if (!formType) {
@@ -137,15 +139,17 @@ export class FormTypeService {
                 await this.formRepository.deleteAllSubmissions(fullForm.tableName);
                 totalDeletedSubmissions += submissionCount;
               }
-            } catch (error:any) {
-              console.warn(`Warning: Could not delete submissions for form ${form.id}: ${error.message}`);
+            } catch (error: any) {
+              console.warn(
+                `Warning: Could not delete submissions for form ${form.id}: ${error.message}`
+              );
             }
           }
 
           // Delete the form itself (this will drop the table too)
           await this.formRepository.deleteForm(form.id);
           deletedForms++;
-        } catch (error:any) {
+        } catch (error: any) {
           console.warn(`Warning: Could not delete form ${form.id}: ${error.message}`);
           // Continue with other forms even if one fails
         }
@@ -158,7 +162,7 @@ export class FormTypeService {
     return {
       deletedForms,
       deletedSubmissions: totalDeletedSubmissions,
-      formTypeDeleted: true
+      formTypeDeleted: true,
     };
   }
 

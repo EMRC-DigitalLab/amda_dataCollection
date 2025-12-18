@@ -29,27 +29,6 @@ export class ExportService {
     this.ensureExportDirectory();
   }
 
-  /**
-   * Generates a unique worksheet name by checking existing worksheets
-   */
-  private generateUniqueSheetName(workbook: ExcelJS.Workbook, baseSheetName: string): string {
-    let sheetName = baseSheetName;
-    let counter = 1;
-    
-    // Check if sheet name already exists
-    while (workbook.worksheets.some(ws => ws.name === sheetName)) {
-      // If base name is too long, truncate before adding counter
-      const maxLength = 28; // Leave room for counter like " (2)"
-      const truncatedBase = baseSheetName.length > maxLength 
-        ? baseSheetName.substring(0, maxLength)
-        : baseSheetName;
-      sheetName = `${truncatedBase} (${counter})`;
-      counter++;
-    }
-    
-    return sheetName;
-  }
-
   private ensureExportDirectory(): void {
     if (!fs.existsSync(this.exportDir)) {
       fs.mkdirSync(this.exportDir, { recursive: true });
@@ -1234,16 +1213,13 @@ export class ExportService {
     sheetName: string,
     isSummary = false
   ): ExcelJS.Worksheet {
-    // Generate unique sheet name to avoid duplicates
-    const uniqueSheetName = this.generateUniqueSheetName(workbook, sheetName);
-    
     if (data.length === 0) {
-      const worksheet = workbook.addWorksheet(uniqueSheetName);
+      const worksheet = workbook.addWorksheet(sheetName);
       worksheet.addRow(['No Data', 'No data available']);
       return worksheet;
     }
 
-    const worksheet = workbook.addWorksheet(uniqueSheetName, {
+    const worksheet = workbook.addWorksheet(sheetName, {
       views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }],
     });
 
@@ -1348,8 +1324,6 @@ createIndividualSubmissionSheets = async (workbook: ExcelJS.Workbook, data: any[
       status: FormStatus.PUBLISHED,
     });
 
-    console.log(allForms, "this is all forms")
-
 
     // Group the existing data by form_id
     const submissionsByFormId = new Map<string, any[]>();
@@ -1366,7 +1340,6 @@ createIndividualSubmissionSheets = async (workbook: ExcelJS.Workbook, data: any[
     // Process each form that has submissions - CREATE ONE SHEET PER FORM
     for (const [formId, submissions] of submissionsByFormId) {
       try {
-    console.log(submissions, "Submissins for form Id")
 
         // Find the form structure from allForms
         const form = allForms.find(f => f.id === formId);
@@ -1422,20 +1395,20 @@ private async createGroupedSubmissionsSheet(
 ): Promise<void> {
 
 
+
+  console.log(form,'THis is form')
+
   const formYear = form.year || submissions[0]?.form_year || '';
   const yearSuffix = formYear ? ` (${formYear})` : '';
   // Sanitize sheet name
   const maxLength = 31;
-  let baseSheetName = `${form.title}-${yearSuffix}`;
-   if (baseSheetName.length > maxLength) {
+  let sheetName = `${form.title}-${form?.formType?.name}`;
+   if (sheetName.length > maxLength) {
     // Prioritize keeping the year visible
     const titleMaxLength = maxLength - yearSuffix.length - 3;
-    baseSheetName = `${form.title.substring(0, titleMaxLength)}...${yearSuffix}`;
+    sheetName = `${form.title.substring(0, titleMaxLength)}...${yearSuffix}`;
   }
-  baseSheetName = baseSheetName.replace(/[:\/?*\[\]]/g, '_');
-
-  // Generate unique sheet name to avoid duplicates
-  const sheetName = this.generateUniqueSheetName(workbook, baseSheetName);
+  sheetName = sheetName.replace(/[:\/?*\[\]]/g, '_');
 
   const sheet = workbook.addWorksheet(sheetName, {
     views: [{ state: 'frozen', xSplit: 0, ySplit: 7 }],
@@ -1601,14 +1574,11 @@ private async createSimplifiedGroupedSubmissionsSheet(
   formData: any,
   submissions: any[]
 ): Promise<void> {
-  let baseSheetName = `${formData.title}`;
-  if (baseSheetName.length > 31) {
-    baseSheetName = baseSheetName.substring(0, 28) + '...';
+  let sheetName = `${formData.title}`;
+  if (sheetName.length > 31) {
+    sheetName = sheetName.substring(0, 28) + '...';
   }
-  baseSheetName = baseSheetName.replace(/[:\/?*\[\]]/g, '_');
-
-  // Generate unique sheet name to avoid duplicates
-  const sheetName = this.generateUniqueSheetName(workbook, baseSheetName);
+  sheetName = sheetName.replace(/[:\/?*\[\]]/g, '_');
 
   const sheet = workbook.addWorksheet(sheetName);
   sheet.properties.defaultRowHeight = 20;

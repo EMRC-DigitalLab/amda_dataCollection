@@ -92,7 +92,7 @@ export class FinanceAnalyticsService {
       paymentTrends,
       geographicRevenue,
       outstandingPayments,
-      revenueForecast
+      revenueForecast,
     ] = await Promise.all([
       this.getOverview(),
       this.getRevenueBreakdown(),
@@ -100,7 +100,7 @@ export class FinanceAnalyticsService {
       this.getPaymentTrends(),
       this.getGeographicRevenue(),
       this.getOutstandingPayments(),
-      this.getRevenueForecast()
+      this.getRevenueForecast(),
     ]);
 
     return {
@@ -110,13 +110,14 @@ export class FinanceAnalyticsService {
       paymentTrends,
       geographicRevenue,
       outstandingPayments,
-      revenueForecast
+      revenueForecast,
     };
   }
 
   private async getOverview(): Promise<FinanceOverview> {
     // Get member counts by tier for revenue calculation
-    const memberTiers = await this.memberRepository.createQueryBuilder('member')
+    const memberTiers = await this.memberRepository
+      .createQueryBuilder('member')
       .select('member.membershipType', 'tier')
       .addSelect('COUNT(member.id)', 'count')
       .where('member.membershipStatus = :status', { status: 'ACTIVE' })
@@ -125,9 +126,9 @@ export class FinanceAnalyticsService {
 
     // Monthly fees by tier
     const tierFees = {
-      'FULL': 100,
-      'ASSOCIATE': 50,
-      'AFFILIATE': 25
+      FULL: 100,
+      ASSOCIATE: 50,
+      AFFILIATE: 25,
     };
 
     let monthlyRecurringRevenue = 0;
@@ -137,7 +138,7 @@ export class FinanceAnalyticsService {
       const memberCount = parseInt(tier.count);
       const monthlyFee = tierFees[tier.tier] || 30;
       const monthlyRevenue = memberCount * monthlyFee;
-      
+
       monthlyRecurringRevenue += monthlyRevenue;
       totalMembershipFees += monthlyRevenue * 12; // Annual
     });
@@ -145,9 +146,9 @@ export class FinanceAnalyticsService {
     // Mock additional revenue sources
     const totalCertificationFees = 15000; // Mock certification fees
     const otherRevenue = 5000; // Mock other revenue
-    
+
     const totalRevenue = totalMembershipFees + totalCertificationFees + otherRevenue;
-    
+
     const totalMembers = memberTiers.reduce((sum, tier) => sum + parseInt(tier.count), 0);
     const averageRevenuePerMember = totalMembers > 0 ? totalRevenue / totalMembers : 0;
 
@@ -164,7 +165,7 @@ export class FinanceAnalyticsService {
       revenueGrowthRate,
       paymentCompletionRate,
       totalMembershipFees,
-      totalCertificationFees
+      totalCertificationFees,
     };
   }
 
@@ -177,45 +178,46 @@ export class FinanceAnalyticsService {
         category: 'Membership Fees',
         amount: overview.totalMembershipFees,
         percentage: Number(((overview.totalMembershipFees / totalRevenue) * 100).toFixed(1)),
-        growth: 8.5
+        growth: 8.5,
       },
       {
         category: 'Certification Fees',
         amount: overview.totalCertificationFees,
         percentage: Number(((overview.totalCertificationFees / totalRevenue) * 100).toFixed(1)),
-        growth: 22.3
+        growth: 22.3,
       },
       {
         category: 'Event & Training',
         amount: 12000,
         percentage: Number(((12000 / totalRevenue) * 100).toFixed(1)),
-        growth: 15.8
+        growth: 15.8,
       },
       {
         category: 'Consultation Services',
         amount: 8000,
         percentage: Number(((8000 / totalRevenue) * 100).toFixed(1)),
-        growth: -2.1
+        growth: -2.1,
       },
       {
         category: 'Other Revenue',
         amount: 5000,
         percentage: Number(((5000 / totalRevenue) * 100).toFixed(1)),
-        growth: 5.2
-      }
+        growth: 5.2,
+      },
     ];
   }
 
   private async getMembershipRevenue(): Promise<MembershipRevenueData[]> {
-    const memberTiers = await this.memberRepository.createQueryBuilder('member')
+    const memberTiers = await this.memberRepository
+      .createQueryBuilder('member')
       .select('member.membershipType', 'tier')
       .addSelect('COUNT(member.id)', 'count')
       .where('member.membershipStatus = :status', { status: 'ACTIVE' })
       .groupBy('member.membershipType')
       .getRawMany();
 
-    const tierFees = { 'FULL': 100, 'ASSOCIATE': 50, 'AFFILIATE': 25 };
-    const tierRetention = { 'FULL': 96, 'ASSOCIATE': 92, 'AFFILIATE': 85 };
+    const tierFees = { FULL: 100, ASSOCIATE: 50, AFFILIATE: 25 };
+    const tierRetention = { FULL: 96, ASSOCIATE: 92, AFFILIATE: 85 };
 
     return memberTiers.map(tier => {
       const memberCount = parseInt(tier.count);
@@ -229,7 +231,7 @@ export class FinanceAnalyticsService {
         monthlyFee,
         totalMonthlyRevenue,
         annualRevenue,
-        retention: tierRetention[tier.tier] || 88
+        retention: tierRetention[tier.tier] || 88,
       };
     });
   }
@@ -242,12 +244,12 @@ export class FinanceAnalyticsService {
       const date = new Date();
       date.setMonth(date.getMonth() - i);
       const month = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-      
+
       // Mock trend data with some realistic patterns
       const baseRevenue = 8000;
-      const seasonalFactor = 1 + (Math.sin((date.getMonth() / 12) * Math.PI * 2) * 0.2);
-      const growthFactor = 1 + ((months - 1 - i) * 0.02); // 2% monthly growth
-      
+      const seasonalFactor = 1 + Math.sin((date.getMonth() / 12) * Math.PI * 2) * 0.2;
+      const growthFactor = 1 + (months - 1 - i) * 0.02; // 2% monthly growth
+
       const revenue = Math.round(baseRevenue * seasonalFactor * growthFactor);
       const membershipFees = Math.round(revenue * 0.75);
       const certificationFees = Math.round(revenue * 0.15);
@@ -260,7 +262,7 @@ export class FinanceAnalyticsService {
         membershipFees,
         certificationFees,
         otherFees,
-        pendingPayments
+        pendingPayments,
       });
     }
 
@@ -268,7 +270,8 @@ export class FinanceAnalyticsService {
   }
 
   private async getGeographicRevenue(): Promise<GeographicRevenueData[]> {
-    const result = await this.memberRepository.createQueryBuilder('member')
+    const result = await this.memberRepository
+      .createQueryBuilder('member')
       .select('member.country', 'country')
       .addSelect('COUNT(member.id)', 'memberCount')
       .where('member.membershipStatus = :status', { status: 'ACTIVE' })
@@ -278,7 +281,7 @@ export class FinanceAnalyticsService {
       .orderBy('"memberCount"', 'DESC')
       .getRawMany();
 
-    const tierFees = { 'FULL': 100, 'ASSOCIATE': 50, 'AFFILIATE': 25 };
+    const tierFees = { FULL: 100, ASSOCIATE: 50, AFFILIATE: 25 };
     const averageFee = 65; // Average across all tiers
 
     let totalRevenue = 0;
@@ -286,20 +289,20 @@ export class FinanceAnalyticsService {
       const memberCount = parseInt(item.memberCount);
       const revenue = memberCount * averageFee * 12; // Annual revenue
       totalRevenue += revenue;
-      
+
       return {
         country: item.country,
         revenue,
         memberCount,
         averageRevenuePerMember: revenue / memberCount,
-        percentage: 0 // Will be calculated after total is known
+        percentage: 0, // Will be calculated after total is known
       };
     });
 
     // Calculate percentages
     return geoRevenue.map(item => ({
       ...item,
-      percentage: Number(((item.revenue / totalRevenue) * 100).toFixed(1))
+      percentage: Number(((item.revenue / totalRevenue) * 100).toFixed(1)),
     }));
   }
 
@@ -313,7 +316,7 @@ export class FinanceAnalyticsService {
         dueDate: '2024-11-15',
         daysOverdue: 18,
         paymentType: 'Membership Fee',
-        status: 'Overdue'
+        status: 'Overdue',
       },
       {
         memberName: 'Jane Smith',
@@ -322,7 +325,7 @@ export class FinanceAnalyticsService {
         dueDate: '2024-11-30',
         daysOverdue: 3,
         paymentType: 'Certification Fee',
-        status: 'Overdue'
+        status: 'Overdue',
       },
       {
         memberName: 'Michael Johnson',
@@ -331,7 +334,7 @@ export class FinanceAnalyticsService {
         dueDate: '2024-12-05',
         daysOverdue: 0,
         paymentType: 'Membership Fee',
-        status: 'Due Soon'
+        status: 'Due Soon',
       },
       {
         memberName: 'Sarah Wilson',
@@ -340,8 +343,8 @@ export class FinanceAnalyticsService {
         dueDate: '2024-10-20',
         daysOverdue: 44,
         paymentType: 'Training Fee',
-        status: 'Critical'
-      }
+        status: 'Critical',
+      },
     ];
 
     return mockPayments;
@@ -355,21 +358,21 @@ export class FinanceAnalyticsService {
       const date = new Date();
       date.setMonth(date.getMonth() + i);
       const month = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-      
+
       const baseRevenue = 10000;
-      const growthFactor = 1 + (i * 0.03); // 3% monthly projected growth
+      const growthFactor = 1 + i * 0.03; // 3% monthly projected growth
       const projectedRevenue = Math.round(baseRevenue * growthFactor);
-      
+
       const confirmedRevenue = Math.round(projectedRevenue * 0.7); // 70% confirmed
       const potentialRevenue = Math.round(projectedRevenue * 0.3); // 30% potential
-      const confidenceLevel = Math.max(95 - (i * 5), 70); // Decreasing confidence
+      const confidenceLevel = Math.max(95 - i * 5, 70); // Decreasing confidence
 
       forecast.push({
         month,
         projectedRevenue,
         confirmedRevenue,
         potentialRevenue,
-        confidenceLevel
+        confidenceLevel,
       });
     }
 

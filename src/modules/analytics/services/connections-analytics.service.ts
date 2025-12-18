@@ -100,7 +100,7 @@ export class ConnectionsAnalyticsService {
       membershipTiers,
       networkGrowth,
       activeConnections,
-      topMembers
+      topMembers,
     ] = await Promise.all([
       this.getOverview(),
       this.getMembershipTrends(),
@@ -108,7 +108,7 @@ export class ConnectionsAnalyticsService {
       this.getMembershipTiers(),
       this.getNetworkGrowth(),
       this.getActiveConnections(),
-      this.getTopMembers()
+      this.getTopMembers(),
     ]);
 
     return {
@@ -118,20 +118,21 @@ export class ConnectionsAnalyticsService {
       membershipTiers,
       networkGrowth,
       activeConnections,
-      topMembers
+      topMembers,
     };
   }
 
   private async getOverview(): Promise<ConnectionsOverview> {
-    const totalMembers = await this.memberRepository.createQueryBuilder('member')
+    const totalMembers = await this.memberRepository
+      .createQueryBuilder('member')
       .where('member.membershipStatus = :status', { status: 'ACTIVE' })
       .getCount();
 
-    const totalSites = await this.siteRepository.createQueryBuilder('site')
-      .getCount();
+    const totalSites = await this.siteRepository.createQueryBuilder('site').getCount();
 
     // Calculate total connections from minigrid sites
-    const connectionsResult = await this.siteRepository.createQueryBuilder('site')
+    const connectionsResult = await this.siteRepository
+      .createQueryBuilder('site')
       .select(
         `SUM(
           CASE 
@@ -150,14 +151,16 @@ export class ConnectionsAnalyticsService {
     // Active members this month (those with recent activity)
     const thisMonth = new Date();
     thisMonth.setDate(1);
-    
-    const activeThisMonth = await this.memberRepository.createQueryBuilder('member')
+
+    const activeThisMonth = await this.memberRepository
+      .createQueryBuilder('member')
       .where('member.membershipStatus = :status', { status: 'ACTIVE' })
       .andWhere('member.lastLoginAt >= :thisMonth', { thisMonth })
       .getCount();
 
     // New members this month
-    const newMembersThisMonth = await this.memberRepository.createQueryBuilder('member')
+    const newMembersThisMonth = await this.memberRepository
+      .createQueryBuilder('member')
       .where('member.createdAt >= :thisMonth', { thisMonth })
       .getCount();
 
@@ -165,13 +168,13 @@ export class ConnectionsAnalyticsService {
     const lastMonth = new Date(thisMonth);
     lastMonth.setMonth(lastMonth.getMonth() - 1);
 
-    const membersLastMonth = await this.memberRepository.createQueryBuilder('member')
+    const membersLastMonth = await this.memberRepository
+      .createQueryBuilder('member')
       .where('member.createdAt < :thisMonth', { thisMonth })
       .getCount();
 
-    const growthRate = membersLastMonth > 0 
-      ? ((totalMembers - membersLastMonth) / membersLastMonth) * 100 
-      : 0;
+    const growthRate =
+      membersLastMonth > 0 ? ((totalMembers - membersLastMonth) / membersLastMonth) * 100 : 0;
 
     return {
       totalMembers,
@@ -180,8 +183,11 @@ export class ConnectionsAnalyticsService {
       activeThisMonth,
       newMembersThisMonth,
       growthRate: Number(growthRate.toFixed(2)),
-      averageConnectionsPerMember: totalMembers > 0 ? Number((totalConnections / totalMembers).toFixed(2)) : 0,
-      networkDensity: Number(((totalConnections / (totalMembers * totalSites || 1)) * 100).toFixed(2))
+      averageConnectionsPerMember:
+        totalMembers > 0 ? Number((totalConnections / totalMembers).toFixed(2)) : 0,
+      networkDensity: Number(
+        ((totalConnections / (totalMembers * totalSites || 1)) * 100).toFixed(2)
+      ),
     };
   }
 
@@ -194,23 +200,26 @@ export class ConnectionsAnalyticsService {
       date.setMonth(date.getMonth() - i);
       const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
       const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-      
-      const newMembers = await this.memberRepository.createQueryBuilder('member')
+
+      const newMembers = await this.memberRepository
+        .createQueryBuilder('member')
         .where('member.createdAt BETWEEN :start AND :end', {
           start: startOfMonth,
-          end: endOfMonth
+          end: endOfMonth,
         })
         .getCount();
 
-      const totalMembers = await this.memberRepository.createQueryBuilder('member')
+      const totalMembers = await this.memberRepository
+        .createQueryBuilder('member')
         .where('member.createdAt <= :end', { end: endOfMonth })
         .getCount();
 
-      const churnedMembers = await this.memberRepository.createQueryBuilder('member')
+      const churnedMembers = await this.memberRepository
+        .createQueryBuilder('member')
         .where('member.membershipStatus = :status', { status: 'INACTIVE' })
         .andWhere('member.updatedAt BETWEEN :start AND :end', {
           start: startOfMonth,
-          end: endOfMonth
+          end: endOfMonth,
         })
         .getCount();
 
@@ -219,7 +228,7 @@ export class ConnectionsAnalyticsService {
         newMembers,
         totalMembers,
         churnedMembers,
-        netGrowth: newMembers - churnedMembers
+        netGrowth: newMembers - churnedMembers,
       });
     }
 
@@ -228,7 +237,8 @@ export class ConnectionsAnalyticsService {
 
   private async getGeographicDistribution(): Promise<GeographicData[]> {
     // Get geographic distribution from member countries
-    const memberResult = await this.memberRepository.createQueryBuilder('member')
+    const memberResult = await this.memberRepository
+      .createQueryBuilder('member')
       .select('member.country', 'country')
       .addSelect('COUNT(member.id)', 'memberCount')
       .where('member.membershipStatus = :status', { status: 'ACTIVE' })
@@ -239,7 +249,8 @@ export class ConnectionsAnalyticsService {
       .getRawMany();
 
     // Get site distribution by country
-    const siteResult = await this.siteRepository.createQueryBuilder('site')
+    const siteResult = await this.siteRepository
+      .createQueryBuilder('site')
       .select('site.country', 'country')
       .addSelect('COUNT(site.id)', 'siteCount')
       .where('site.country IS NOT NULL')
@@ -249,13 +260,13 @@ export class ConnectionsAnalyticsService {
 
     // Combine member and site data
     const countryMap = new Map();
-    
+
     // Add member data
     memberResult.forEach(item => {
       countryMap.set(item.country, {
         country: item.country,
         memberCount: parseInt(item.memberCount),
-        siteCount: 0
+        siteCount: 0,
       });
     });
 
@@ -264,7 +275,7 @@ export class ConnectionsAnalyticsService {
       const existing = countryMap.get(item.country) || {
         country: item.country,
         memberCount: 0,
-        siteCount: 0
+        siteCount: 0,
       };
       existing.siteCount = parseInt(item.siteCount);
       countryMap.set(item.country, existing);
@@ -277,13 +288,15 @@ export class ConnectionsAnalyticsService {
       country: item.country,
       memberCount: item.memberCount,
       siteCount: item.siteCount,
-      percentage: totalMembers > 0 ? Number(((item.memberCount / totalMembers) * 100).toFixed(2)) : 0,
-      growthRate: Math.floor(Math.random() * 20) - 5 // Mock growth rate
+      percentage:
+        totalMembers > 0 ? Number(((item.memberCount / totalMembers) * 100).toFixed(2)) : 0,
+      growthRate: Math.floor(Math.random() * 20) - 5, // Mock growth rate
     }));
   }
 
   private async getMembershipTiers(): Promise<MembershipTierData[]> {
-    const result = await this.memberRepository.createQueryBuilder('member')
+    const result = await this.memberRepository
+      .createQueryBuilder('member')
       .select('member.membershipType', 'tier')
       .addSelect('COUNT(member.id)', 'count')
       .where('member.membershipStatus = :status', { status: 'ACTIVE' })
@@ -293,16 +306,16 @@ export class ConnectionsAnalyticsService {
       .getRawMany();
 
     const totalMembers = result.reduce((sum, item) => sum + parseInt(item.count), 0);
-    
-    const tierRevenue = { 'FULL': 1000, 'ASSOCIATE': 500, 'STUDENT_MEMBER': 250, 'CORPORATE_MEMBER': 1500 };
-    const tierRetention = { 'FULL': 95, 'ASSOCIATE': 88, 'STUDENT_MEMBER': 75, 'CORPORATE_MEMBER': 97 };
+
+    const tierRevenue = { FULL: 1000, ASSOCIATE: 500, STUDENT_MEMBER: 250, CORPORATE_MEMBER: 1500 };
+    const tierRetention = { FULL: 95, ASSOCIATE: 88, STUDENT_MEMBER: 75, CORPORATE_MEMBER: 97 };
 
     return result.map(item => ({
       tier: item.tier,
       count: parseInt(item.count),
       percentage: Number(((parseInt(item.count) / totalMembers) * 100).toFixed(2)),
       revenue: (tierRevenue[item.tier] || 300) * parseInt(item.count),
-      retention: tierRetention[item.tier] || 80
+      retention: tierRetention[item.tier] || 80,
     }));
   }
 
@@ -312,12 +325,12 @@ export class ConnectionsAnalyticsService {
       const date = new Date();
       date.setMonth(date.getMonth() - i);
       const period = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-      
+
       periods.push({
         period,
         connections: Math.floor(Math.random() * 100) + 50 + (11 - i) * 5,
         strength: Math.floor(Math.random() * 30) + 70,
-        density: Math.floor(Math.random() * 20) + 40
+        density: Math.floor(Math.random() * 20) + 40,
       });
     }
 
@@ -330,15 +343,18 @@ export class ConnectionsAnalyticsService {
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const dailyActiveUsers = await this.userRepository.createQueryBuilder('user')
+    const dailyActiveUsers = await this.userRepository
+      .createQueryBuilder('user')
       .where('user.lastLoginAt >= :date', { date: oneDayAgo })
       .getCount();
 
-    const weeklyActiveUsers = await this.userRepository.createQueryBuilder('user')
+    const weeklyActiveUsers = await this.userRepository
+      .createQueryBuilder('user')
       .where('user.lastLoginAt >= :date', { date: oneWeekAgo })
       .getCount();
 
-    const monthlyActiveUsers = await this.userRepository.createQueryBuilder('user')
+    const monthlyActiveUsers = await this.userRepository
+      .createQueryBuilder('user')
       .where('user.lastLoginAt >= :date', { date: oneMonthAgo })
       .getCount();
 
@@ -346,7 +362,7 @@ export class ConnectionsAnalyticsService {
       { activity: 'Form Submissions', count: 1250, uniqueUsers: 340, averageTime: 25 },
       { activity: 'Site Management', count: 890, uniqueUsers: 220, averageTime: 15 },
       { activity: 'Data Export', count: 450, uniqueUsers: 180, averageTime: 8 },
-      { activity: 'Certificate Downloads', count: 320, uniqueUsers: 150, averageTime: 3 }
+      { activity: 'Certificate Downloads', count: 320, uniqueUsers: 150, averageTime: 3 },
     ];
 
     return {
@@ -354,12 +370,13 @@ export class ConnectionsAnalyticsService {
       weeklyActiveUsers,
       monthlyActiveUsers,
       averageSessionDuration: 42,
-      topEngagementActivities
+      topEngagementActivities,
     };
   }
 
   private async getTopMembers(): Promise<TopMemberData[]> {
-    const result = await this.memberRepository.createQueryBuilder('member')
+    const result = await this.memberRepository
+      .createQueryBuilder('member')
       .leftJoin('member.sites', 'sites')
       .select('member.id', 'id')
       .addSelect('member.companyName', 'companyName')
@@ -378,7 +395,7 @@ export class ConnectionsAnalyticsService {
       totalSites: parseInt(item.totalSites) || 0,
       completionRate: Math.floor(Math.random() * 40) + 60,
       revenue: Math.floor(Math.random() * 50000) + 10000,
-      joinedDate: new Date(item.joinedDate).toISOString()
+      joinedDate: new Date(item.joinedDate).toISOString(),
     }));
   }
 }
