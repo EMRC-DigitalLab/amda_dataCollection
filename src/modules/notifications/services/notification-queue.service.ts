@@ -1,15 +1,20 @@
 // src/modules/notifications/services/notification-queue.service.ts
-import Queue, { Job } from 'bull';
 import { Notification, NotificationPriority } from '@/database/entities/notification.entity';
 import { logger } from '@/shared/utils/logger';
+import Queue, { Job } from 'bull';
+
+import { config } from '@/config';
 
 export class NotificationQueueService {
   private notificationQueue: Queue.Queue;
 
   constructor() {
     this.notificationQueue = new Queue('notification processing', {
-      redis: process.env.REDIS_URL || 'redis://amda-redis-dev:6379',
-      // redis: 'redis://amda-redis-dev:6379',
+      redis: {
+        host: config.redis.host,
+        port: config.redis.port,
+        password: config.redis.password,
+      },
       defaultJobOptions: {
         removeOnComplete: 100,
         removeOnFail: 50,
@@ -90,6 +95,32 @@ export class NotificationQueueService {
     return jobs;
   }
 
+  /**
+   * Schedule periodic admin summary notification
+   * Run daily at 9:00 AM
+   */
+  async schedulePeriodicAdminNotification(): Promise<Job> {
+    // Remove existing repeatable jobs to avoid duplicates on restart
+    const repeatableJobs = await this.notificationQueue.getRepeatableJobs();
+    for (const job of repeatableJobs) {
+      if (job.name === 'process-admin-notification') {
+        await this.notificationQueue.removeRepeatableByKey(job.key);
+      }
+    }
+
+    const job = await this.notificationQueue.add(
+      'process-admin-notification',
+      {},
+      {
+        repeat: { cron: '0 9 * * *' }, // Daily at 9:00 AM
+        attempts: 1,
+      }
+    );
+
+    logger.info(`Periodic admin notification scheduled: ${job.id}`);
+    return job;
+  }
+
   private setupProcessors(): void {
     this.notificationQueue.process('process-notification', async (job: Job) => {
       const { notificationId } = job.data;
@@ -145,6 +176,39 @@ export class NotificationQueueService {
       );
 
       await notificationService.processNotification(notificationId);
+    });
+
+    this.notificationQueue.process('process-admin-notification', async (job: Job) => {
+      logger.info(`Processing admin notification job: ${job.id}`);
+
+      // Import services dynamically to avoid circular dependency
+      const { NotificationService } = await import('./notification.service');
+      const { TemplateService } = await import('./template.service');
+      const { NotificationChannelFactory } = await import('./channel-factory.service');
+      const { EmailChannel } = await import('../channels/email.channel');
+      const { SmsChannel } = await import('../channels/sms.channel');
+      const { PushChannel } = await import('../channels/push.channel');
+      const { WebhookChannel } = await import('../channels/webhook.channel');
+      const { InAppChannel } = await import('../channels/in-app.channel');
+
+      // Create channel instances - simplified instantiation for this processor
+      const templateService = new TemplateService();
+      const channelFactory = new NotificationChannelFactory(
+        new EmailChannel(),
+        new SmsChannel(),
+        new PushChannel(),
+        new WebhookChannel(),
+        new InAppChannel()
+      );
+
+      // Create NotificationService
+      const notificationService = new NotificationService(
+        templateService,
+        channelFactory,
+        this
+      );
+
+      await notificationService.sendAdminSummaryNotification();
     });
 
     // Event listeners

@@ -1,0 +1,11 @@
+{
+  "name": "admin_periodic_summary",
+  "type": "admin_periodic_summary",
+  "channel": "email",
+  "subject": "Daily System Summary",
+  "content": "{{content}}",
+  "htmlContent": "<!DOCTYPE html><html><head><style>body{font-family:'Segoe UI',San-Serif;color:#333;line-height:1.6}.container{max-width:600px;margin:0 auto;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}.header{background:#10b981;color:#fff;padding:20px;text-align:center}.content{padding:20px;white-space:pre-wrap}.footer{background:#f9fafb;padding:15px;text-align:center;font-size:0.75rem;color:#6b7280}</style></head><body><div class=\"container\"><div class=\"header\"><h2>Daily System Summary</h2></div><div class=\"content\"><p>{{content}}</p></div><div class=\"footer\"><p>AMDA Data Collection Platform © 2026</p></div></div></body></html>",
+  "defaultData": {},
+  "variables": ["content"],
+  "isActive": true
+}

@@ -1,13 +1,13 @@
 // src/modules/notifications/channels/email.channel.ts
-import nodemailer from 'nodemailer';
 import { config } from '@/config';
+import { NotificationChannel } from '@/database/entities/notification.entity';
+import { logger } from '@/shared/utils/logger';
+import nodemailer from 'nodemailer';
 import {
   INotificationChannel,
   NotificationRequest,
   NotificationResult,
 } from '../interfaces/notification.interface';
-import { NotificationChannel } from '@/database/entities/notification.entity';
-import { logger } from '@/shared/utils/logger';
 
 export class EmailChannel implements INotificationChannel {
   private transporter: nodemailer.Transporter;
@@ -18,8 +18,8 @@ export class EmailChannel implements INotificationChannel {
       port: config.email.port,
       secure: config.email.secure, // true for 465, false for other ports
       auth: {
-        user: config.email.user,
-        pass: config.email.password,
+         user: "emrctechteam@gmail.com",
+            pass: "opbt usvu waos huzg",
       },
     });
   }

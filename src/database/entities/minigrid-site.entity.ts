@@ -9,6 +9,16 @@ import {
 } from 'typeorm';
 import { Member } from './member.entity';
 
+
+export enum MinigridSiteStatus {
+  OPERATIONAL = 'Operational',
+  UNDER_CONSTRUCTION = 'Under Construction',
+  PLANNED = 'Planned',
+  MAINTENANCE = 'Maintenance',
+  DECOMMISSIONED = 'Decommissioned',
+}
+
+
 @Entity('minigrid_sites')
 export class MinigridSite {
   @PrimaryGeneratedColumn('uuid')
@@ -82,12 +92,13 @@ export class MinigridSite {
   })
   commissioningDate!: Date;
 
-  @Column({
-    type: 'enum',
-    enum: ['Operational', 'Under Construction', 'Planned', 'Maintenance', 'Decommissioned'],
-    default: 'Planned',
+ @Column({
+    type: 'varchar',
+    enum: MinigridSiteStatus,
+    default: MinigridSiteStatus.PLANNED,
   })
-  status!: 'Operational' | 'Under Construction' | 'Planned' | 'Maintenance' | 'Decommissioned';
+  status!: MinigridSiteStatus;
+
 
   @Column({
     type: 'varchar',

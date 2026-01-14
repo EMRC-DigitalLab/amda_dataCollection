@@ -40,7 +40,7 @@ if (isProduction) {
 import { createApiRouter } from '@/api/routes';
 import { getSwaggerInfo, swaggerSpec } from '@/api/swagger/schemas/swagger.config';
 import { config } from '@/config';
-import { connectDatabase } from '@/config/database';
+import { AppDataSource, connectDatabase } from '@/config/database';
 import { errorHandler, notFoundHandler } from '@/shared/middleware/error.middleware';
 import { generalRateLimit } from '@/shared/middleware/rate-limit.middleware';
 // import { WebSocketService } from '@/shared/websocket/websocket.service';
@@ -279,9 +279,18 @@ class Application {
 
       if (config.environment === 'development' && config.database.autoGenerateMigrations) {
         // await AppDataSource.synchronize();
-        // logger.info('Database synchronized with entities');
-      } else if (config.database.runMigrationsOnStartup) {
         // await AppDataSource.runMigrations();
+
+        // Seed templates in dev mode to ensure new templates are loaded
+        const { TemplateService } = await import(
+          '@/modules/notifications/services/template.service'
+        );
+        const templateService = new TemplateService();
+        await templateService.seedTemplatesFromFiles();
+        
+        logger.info('Database synchronized with entities & Templates seeded');
+      } else if (config.database.runMigrationsOnStartup) {
+        await AppDataSource.runMigrations();
         // logger.info('Database migrations completed');
 
         const { TemplateService } = await import(

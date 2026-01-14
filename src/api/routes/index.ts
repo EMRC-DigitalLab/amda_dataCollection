@@ -34,6 +34,8 @@ export function createApiRouter(): Router {
     { path: '/notifications', factory: createNotificationRoutes },
     { path: '/certificates', factory: createCertificateRoutes },
     { path: '/exports', factory: createExportRoutes },
+    // Alias for frontend double prefix issue
+    { path: '/api/notifications', factory: createNotificationRoutes },
   ];
 
 
