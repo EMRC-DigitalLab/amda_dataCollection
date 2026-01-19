@@ -5,6 +5,7 @@ import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { redisClient } from '../../../config';
 import { IFormRepository } from '../../../modules/forms/interfaces/form.interface';
 import { CreateCategoryDto, CreateFormDto, UpdateFormDto } from '../../../shared/types/form.types';
+import { cacheService } from '../../../shared/utils/cache';
 import { Category } from '../../entities/category.entity';
 import { FormType, FormTypeStatus } from '../../entities/form-type.entity';
 import { Form, FormStatus, FormSubmissionScope } from '../../entities/form.entity';
@@ -114,6 +115,13 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       }
 
       await queryRunner.commitTransaction();
+
+      // Invalidate cache
+      await cacheService.del(`form:${id}`);
+      if (form.slug) {
+        await cacheService.del(`form:slug:${form.slug}`);
+      }
+
       return (await this.findFormById(id)) as Form;
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -140,6 +148,12 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       // Delete form (cascade will handle categories and questions)
       const result = await queryRunner.manager.delete(Form, id);
       if (result.affected === 0) throw new Error('Form not found');
+
+      // Invalidate cache
+      await cacheService.del(`form:${id}`);
+      if (form.slug) {
+        await cacheService.del(`form:slug:${form.slug}`);
+      }
 
       await queryRunner.commitTransaction();
     } catch (error) {
@@ -196,35 +210,43 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
   }
 
   async findFormById(id: string): Promise<Form | null> {
-    return this.findOne({
-      where: { id },
-      relations: {
-        categories: {
-          questions: true,
+    const cacheKey = `form:${id}`;
+    return cacheService.getOrSet(cacheKey, async () => {
+      return this.findOne({
+        where: { id },
+        relations: {
+          categories: {
+            questions: true,
+          },
+          admin: true,
+          parent: true,
+          formType: true,
+          settings: true,
         },
-        admin: true,
-        parent: true,
-        formType: true,
-      },
-      order: {
-        categories: { sortOrder: 'ASC' },
-      },
-    });
+        order: {
+          categories: { sortOrder: 'ASC' },
+        },
+      });
+    }, { ttl: 3600 });
   }
 
   async findFormBySlug(slug: string): Promise<Form | null> {
-    return this.findOne({
-      where: { slug },
-      relations: {
-        categories: {
-          questions: true,
+    const cacheKey = `form:slug:${slug}`;
+    return cacheService.getOrSet(cacheKey, async () => {
+      return this.findOne({
+        where: { slug },
+        relations: {
+          categories: {
+            questions: true,
+          },
+          admin: true,
+          settings: true,
         },
-        admin: true,
-      },
-      order: {
-        categories: { sortOrder: 'ASC' },
-      },
-    });
+        order: {
+          categories: { sortOrder: 'ASC' },
+        },
+      });
+    }, { ttl: 3600 });
   }
 
   async findByAdminId(adminId: string): Promise<Form[]> {
@@ -663,6 +685,10 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       }
 
       await queryRunner.commitTransaction();
+
+      // Invalidate cache
+      await cacheService.del(`form:${formId}`);
+      
       return (await this.findFormById(formId)) as Form;
     } catch (error) {
       await queryRunner.rollbackTransaction();

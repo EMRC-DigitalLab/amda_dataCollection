@@ -8,15 +8,14 @@ import { FormRepository } from '../../../database/repositories/forms/form.reposi
 import { AuthenticatedRequest } from '../../../shared/middleware/auth.middleware';
 import { AppError } from '../../../shared/middleware/error.middleware';
 import { AuditLogService } from '../../../shared/utils/form-audit';
-import { CacheService } from '../../../shared/utils/forms-cache';
 import { NotificationService } from '../../../shared/utils/forms-notification';
 import { Logger } from '../../../shared/utils/forms-settings.logger';
 import { ResponseHelper } from '../../../shared/utils/response';
 import {
-  CreateFormSettingsDto,
-  NotificationSettingsDto,
-  QueryFormSettingsDto,
-  UpdateFormSettingsDto,
+    CreateFormSettingsDto,
+    NotificationSettingsDto,
+    QueryFormSettingsDto,
+    UpdateFormSettingsDto,
 } from '../dtos/form-settings.dto';
 import { FormSettingsService } from '../services/form-settings.service';
 
@@ -29,8 +28,7 @@ export class FormSettingsController {
       new FormSettingsRepository(dataSource),
       new FormRepository(dataSource),
       new NotificationService(),
-      new AuditLogService(),
-      new CacheService()
+      new AuditLogService()
     );
     this.logger = new Logger('FormSettingsController');
   }

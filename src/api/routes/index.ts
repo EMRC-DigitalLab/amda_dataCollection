@@ -7,6 +7,7 @@ import { createConnectionsRoutes } from '../../modules/analytics/routes/connecti
 import { createFinanceRoutes } from '../../modules/analytics/routes/finance.route';
 import { createSiteRoutes } from '../../modules/analytics/routes/site.route';
 import { createMemberRoutes } from '../../modules/auth/routes/member.route';
+import { createAuditLogRoutes } from '../../modules/forms/routes/audit-log.routes';
 import { createCertificateRoutes } from '../../modules/forms/routes/certificate.route';
 import { createCompletionRoutes } from '../../modules/forms/routes/completion.route';
 import { createExportRoutes } from '../../modules/forms/routes/export.route';
@@ -34,6 +35,7 @@ export function createApiRouter(): Router {
     { path: '/notifications', factory: createNotificationRoutes },
     { path: '/certificates', factory: createCertificateRoutes },
     { path: '/exports', factory: createExportRoutes },
+    { path: '/audit-logs', factory: createAuditLogRoutes },
     // Alias for frontend double prefix issue
     { path: '/api/notifications', factory: createNotificationRoutes },
   ];

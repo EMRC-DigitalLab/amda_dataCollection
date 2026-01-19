@@ -5,11 +5,49 @@ import { User, UserRole } from '@/database/entities/user.entity';
 import { logger } from '@/shared/utils/logger';
 import { NotificationHelper } from '@/shared/utils/notification-helper';
 import { WebSocketService } from '@/shared/websocket/websocket.service';
+import { In } from 'typeorm'; // ADDED
 
 export class FormNotificationService {
   constructor(private webSocketService?: WebSocketService) {}
 
-  // Helper to get all admins
+  // Helper to get notification recipients
+  private async getNotificationRecipients(form: Form): Promise<User[]> {
+    const settings = form.settings?.[0];
+
+    // 1. Check if notifications are disabled
+    if (settings && settings.notifyOnSubmission === false) {
+      console.log(`[DEBUG] Notifications disabled for form: ${form.id}`);
+      return [];
+    }
+
+    // 2. Check for specific email recipients
+    if (settings) {
+      const emailRecipients = settings.getNotificationEmails();
+      if (emailRecipients.length > 0) {
+        const userRepo = AppDataSource.getRepository(User);
+        const users = await userRepo.findBy({ email: In(emailRecipients) });
+        if (users.length > 0) {
+          return users;
+        }
+        console.warn(`[DEBUG] No users found for configured emails: ${emailRecipients.join(', ')}`);
+      }
+    }
+
+    // 3. Fallback: Notify Form Admin
+    if (form.admin) {
+      return [form.admin];
+    } else if (form.adminId) {
+       // Fetch admin if not loaded
+       const userRepo = AppDataSource.getRepository(User);
+       const admin = await userRepo.findOneBy({ id: form.adminId });
+       if (admin) return [admin];
+    }
+
+    // 4. Ultimate Fallback: All Admins (Old behavior, safeguard)
+    return this.getAdminUsers();
+  }
+
+  // Helper to get all admins (Keep as fallback)
   private async getAdminUsers(): Promise<User[]> {
     const userRepo = AppDataSource.getRepository(User);
     const users = await userRepo.find();
@@ -19,16 +57,16 @@ export class FormNotificationService {
   // ... (onFormPublished remains same)
 
   /**
-   * Notify when new form submission is received
+   * Notify when new form submission is received or updated
    */
-  async onFormSubmissionReceived(form: Form, submission: any, submittedBy?: string): Promise<void> {
-    console.log(`[DEBUG] onFormSubmissionReceived triggered for form: ${form.id}`);
+  async onFormSubmissionReceived(form: Form, submission: any, submittedBy?: string, isUpdate = false): Promise<void> {
+    console.log(`[DEBUG] onFormSubmissionReceived triggered for form: ${form.id} (Update: ${isUpdate})`);
     try {
-      const adminUsers = await this.getAdminUsers();
-      console.log(`[DEBUG] Found ${adminUsers.length} admin users to notify.`);
+      const adminUsers = await this.getNotificationRecipients(form);
+      console.log(`[DEBUG] Found ${adminUsers.length} recipients to notify.`);
 
       if (adminUsers.length === 0) {
-         console.warn('[DEBUG] No admin users found. Notification will not be sent.');
+         console.warn('[DEBUG] No recipients found. Notification will not be sent.');
          return;
       }
 
@@ -42,8 +80,10 @@ export class FormNotificationService {
             await this.webSocketService.sendNotificationToUser(admin.id, {
               id: 'submission-received-' + Date.now(),
               type: 'form_submission',
-              subject: 'New Form Submission',
-              content: `New submission received for form "${form.title}"`,
+              subject: isUpdate ? 'Form Submission Updated' : 'New Form Submission',
+              content: isUpdate 
+                ? `Submission updated for form "${form.title}"`
+                : `New submission received for form "${form.title}"`,
               priority: 'normal',
               createdAt: new Date(),
               metadata: {
@@ -61,6 +101,8 @@ export class FormNotificationService {
             admin.id,
             'form_submission_received',
             {
+              isUpdate,
+              title: isUpdate ? 'Form Submission Updated' : 'New Form Submission',
               formTitle: form.title,
               formId: form.id,
               submissionId: submission.id,
@@ -76,7 +118,7 @@ export class FormNotificationService {
         })
       );
 
-      logger.info(`Form submission notification sent to ${adminUsers.length} admins for form: ${form.title}`);
+       logger.info(`Form submission notification sent to ${adminUsers.length} recipients for form: ${form.title}`);
     } catch (error) {
       logger.error('Error sending form submission notification:', error);
     }
@@ -95,7 +137,7 @@ export class FormNotificationService {
     reviewedBy?: string
   ): Promise<void> {
     try {
-      const adminUsers = await this.getAdminUsers();
+      const adminUsers = await this.getNotificationRecipients(form);
       const submitterId = submission.submitted_by;
 
       // Notify Submitters (Existing Logic)

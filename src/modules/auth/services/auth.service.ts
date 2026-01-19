@@ -6,12 +6,13 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { DataSource } from 'typeorm';
+import { AuditLogSeverity } from '../../../database/entities/audit-log.entity';
 import { Member } from '../../../database/entities/member.entity';
 import { User, UserRole, UserStatus } from '../../../database/entities/user.entity';
 import { MemberRepository } from '../../../database/repositories/auth/member.repository';
 import { UserRepository } from '../../../database/repositories/auth/user.repository';
 import { VerificationResult } from '../../../shared/types/auth.types';
-
+import { AuditLogService } from '../../../shared/utils/form-audit'; // Import AuditLogService
 import { logger } from '../../../shared/utils/logger';
 import { LoginDto } from '../dtos/login.dto';
 import {
@@ -26,121 +27,146 @@ import {
 export class AuthService {
   private userRepository: UserRepository;
   private memberRepository: MemberRepository;
+  private auditLogService: AuditLogService;
 
   constructor(private dataSource: DataSource) {
     this.userRepository = new UserRepository(dataSource);
     this.memberRepository = new MemberRepository(dataSource);
+    this.auditLogService = new AuditLogService(dataSource);
   }
 
   /**
    * Login for both admin and member
    */
   async login(loginDto: LoginDto): Promise<LoginResponse> {
-    const { email, password } = loginDto;
+    try {
+      const { email, password } = loginDto;
 
-    // First, try to find admin/user by email
-    let user: User | null = null;
-    let member: Member | null = null;
-    let isAdmin = false;
+      // First, try to find admin/user by email
+      let user: User | null = null;
+      let member: Member | null = null;
+      let isAdmin = false;
 
-    // Check if it's an email format (contains @)
-    if (email.includes('@')) {
-      // Try admin/user login
-      user = await this.userRepository.findByEmailForAuth(email);
-      if (user) {
-        isAdmin = true;
+      // Check if it's an email format (contains @)
+      if (email.includes('@')) {
+        // Try admin/user login
+        user = await this.userRepository.findByEmailForAuth(email);
+        if (user) {
+          isAdmin = true;
+        }
+      } else {
+        // Try member login with memberId
+        member = await this.memberRepository.findByMemberId(email);
       }
-    } else {
-      // Try member login with memberId
-      member = await this.memberRepository.findByMemberId(email);
-    }
 
-    // If no user found by email, try to find member by email
-    if (!user && !member && email.includes('@')) {
-      member = await this.memberRepository.findByEmail(email);
-    }
+      // If no user found by email, try to find member by email
+      if (!user && !member && email.includes('@')) {
+        member = await this.memberRepository.findByEmail(email);
+      }
 
 
-    // If still no user/member found, throw error
-    if (!user && !member) {
-      throw new Error('Invalid credentials');
-    }
-
-    let passwordMatch = false;
-    let loginUser: any = null;
-
-    if (isAdmin && user) {
-      // Admin login
-      passwordMatch = await bcrypt.compare(password, user.password);
-
-      if (!passwordMatch) {
+      // If still no user/member found, throw error
+      if (!user && !member) {
         throw new Error('Invalid credentials');
       }
 
-      if (user.status !== UserStatus.ACTIVE) {
-        throw new Error('Account is disabled');
+      let passwordMatch = false;
+      let loginUser: any = null;
+
+      if (isAdmin && user) {
+        // Admin login
+        passwordMatch = await bcrypt.compare(password, user.password);
+
+        if (!passwordMatch) {
+          throw new Error('Invalid credentials');
+        }
+
+        if (user.status !== UserStatus.ACTIVE) {
+          throw new Error('Account is disabled');
+        }
+
+        loginUser = {
+          id: user.id,
+          email: user.email,
+          role: 'admin',
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phoneNumber: user.phoneNumber,
+          avatar: user.avatar,
+          status: user.status,
+          isFirstLogin: user.isFirstLogin,
+        };
+
+        // Update last login
+        await this.userRepository.updateLastLogin(user.id);
+      } else if (member) {
+        // Member login
+        passwordMatch = await bcrypt.compare(password, member.password);
+
+        if (!passwordMatch) {
+          throw new Error('Invalid credentials');
+        }
+
+        loginUser = {
+          ...member,
+          role: 'member',
+        };
+
+        // Update last login for member
+        await this.memberRepository.updateLastLogin(member.id);
       }
 
-      loginUser = {
-        id: user.id,
-        email: user.email,
-        role: 'admin',
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phoneNumber: user.phoneNumber,
-        avatar: user.avatar,
-        status: user.status,
-        isFirstLogin: user.isFirstLogin,
+      // Generate tokensss
+      const accessTokenPayload = {
+        userId: loginUser.id,
+        email: loginUser.primaryContactEmail ? loginUser.primaryContactEmail : loginUser.email,
+        role: loginUser.memberId ? 'member' : 'admin',
+        memberId: loginUser?.memberId ? loginUser?.memberId : null,
       };
 
-      // Update last login
-      await this.userRepository.updateLastLogin(user.id);
-    } else if (member) {
-      // Member login
-      passwordMatch = await bcrypt.compare(password, member.password);
-
-      if (!passwordMatch) {
-        throw new Error('Invalid credentials');
-      }
-
-      loginUser = {
-        ...member,
-        role: 'member',
+      const refreshTokenPayload = {
+        userId: loginUser.id,
+        email: loginUser.primaryContactEmail ? loginUser.primaryContactEmail : loginUser.email,
+        role: loginUser.memberId ? 'member' : 'admin',
+        memberId: loginUser?.memberId ? loginUser?.memberId : null,
+        type: 'refresh',
       };
 
-      // Update last login for member
-      await this.memberRepository.updateLastLogin(member.id);
+      const accessToken = jwt.sign(accessTokenPayload, config.jwt.secret, {
+        expiresIn: config.jwt.expiresIn,
+      });
+
+      const refreshToken = jwt.sign(refreshTokenPayload, config.jwt.refreshSecret, {
+        expiresIn: config.jwt.refreshExpiresIn,
+      });
+
+      // Log successful login
+      await this.auditLogService.logLogin(
+        loginUser.id,
+        true,
+        undefined, // IP address would need to be passed from controller
+        undefined  // User agent would need to be passed from controller
+      );
+
+      return {
+        accessToken,
+        refreshToken,
+        user: loginUser,
+      };
+    } catch (error) {
+      // Log failed login (if we identified a user/member)
+      const email = loginDto.email;
+      // We might not have the ID if user wasn't found, so we log with email in details
+      await this.auditLogService.log({
+        action: 'LOGIN',
+        resourceType: 'Auth',
+        severity: AuditLogSeverity.WARNING,
+        isSuccess: false,
+        errorMessage: error.message,
+        details: { email },
+      });
+      throw error;
     }
-
-    // Generate tokensss
-    const accessTokenPayload = {
-      userId: loginUser.id,
-      email: loginUser.primaryContactEmail ? loginUser.primaryContactEmail : loginUser.email,
-      role: loginUser.memberId ? 'member' : 'admin',
-      memberId: loginUser?.memberId ? loginUser?.memberId : null,
-    };
-
-    const refreshTokenPayload = {
-      userId: loginUser.id,
-      email: loginUser.primaryContactEmail ? loginUser.primaryContactEmail : loginUser.email,
-      role: loginUser.memberId ? 'member' : 'admin',
-      memberId: loginUser?.memberId ? loginUser?.memberId : null,
-      type: 'refresh',
-    };
-
-    const accessToken = jwt.sign(accessTokenPayload, config.jwt.secret, {
-      expiresIn: config.jwt.expiresIn,
-    });
-
-    const refreshToken = jwt.sign(refreshTokenPayload, config.jwt.refreshSecret, {
-      expiresIn: config.jwt.refreshExpiresIn,
-    });
-
-    return {
-      accessToken,
-      refreshToken,
-      user: loginUser,
-    };
   }
 
   /**

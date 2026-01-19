@@ -7,11 +7,11 @@ import { Category } from '../../../database/entities/category.entity';
 import { Form, FormStatus } from '../../../database/entities/form.entity';
 import { Question } from '../../../database/entities/question.entity';
 import {
-  CreateCategoryDto,
-  CreateFormDto,
-  FormQueryDto,
-  FormSubmissionDto,
-  UpdateFormDto,
+    CreateCategoryDto,
+    CreateFormDto,
+    FormQueryDto,
+    FormSubmissionDto,
+    UpdateFormDto,
 } from '../../../shared/types/form.types';
 import { FormNotificationService } from './form-notification.service'; // ADD THIS
 
@@ -241,7 +241,7 @@ export class FormService {
     // ADD SUBMISSION RECEIVED NOTIFICATION
     if (this.formNotificationService) {
       try {
-        await this.formNotificationService.onFormSubmissionReceived(form, result, dto.submittedBy);
+        await this.formNotificationService.onFormSubmissionReceived(form, result, dto.submittedBy, result.isUpdate);
       } catch (error) {
         console.error('Error sending submission notification:', error);
         // Don't fail the submission if notification fails
@@ -472,7 +472,23 @@ export class FormService {
     console.log(updatedSubmission);
 
     // Update submission through repository
-    return this.repo.updateSubmission(formId, submissionId, updatedSubmission);
+    const result = await this.repo.updateSubmission(formId, submissionId, updatedSubmission);
+
+    // ADD SUBMISSION UPDATED NOTIFICATION
+    if (this.formNotificationService) {
+      try {
+        await this.formNotificationService.onFormSubmissionReceived(
+          form,
+          { ...submission, ...result },
+          userId,
+          true
+        );
+      } catch (error) {
+        console.error('Error sending submission update notification:', error);
+      }
+    }
+
+    return result;
   }
 
   async getMemberSubmissionsOverview(memberId: string): Promise<{
