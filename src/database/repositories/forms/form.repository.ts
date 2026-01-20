@@ -5,6 +5,7 @@ import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { redisClient } from '../../../config';
 import { IFormRepository } from '../../../modules/forms/interfaces/form.interface';
 import { CreateCategoryDto, CreateFormDto, UpdateFormDto } from '../../../shared/types/form.types';
+import { cacheService } from '../../../shared/utils/cache';
 import { Category } from '../../entities/category.entity';
 import { FormType, FormTypeStatus } from '../../entities/form-type.entity';
 import { Form, FormStatus, FormSubmissionScope } from '../../entities/form.entity';
@@ -114,6 +115,13 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       }
 
       await queryRunner.commitTransaction();
+
+      // Invalidate cache
+      await cacheService.del(`form:${id}`);
+      if (form.slug) {
+        await cacheService.del(`form:slug:${form.slug}`);
+      }
+
       return (await this.findFormById(id)) as Form;
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -140,6 +148,12 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       // Delete form (cascade will handle categories and questions)
       const result = await queryRunner.manager.delete(Form, id);
       if (result.affected === 0) throw new Error('Form not found');
+
+      // Invalidate cache
+      await cacheService.del(`form:${id}`);
+      if (form.slug) {
+        await cacheService.del(`form:slug:${form.slug}`);
+      }
 
       await queryRunner.commitTransaction();
     } catch (error) {
@@ -196,35 +210,43 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
   }
 
   async findFormById(id: string): Promise<Form | null> {
-    return this.findOne({
-      where: { id },
-      relations: {
-        categories: {
-          questions: true,
+    const cacheKey = `form:${id}`;
+    return cacheService.getOrSet(cacheKey, async () => {
+      return this.findOne({
+        where: { id },
+        relations: {
+          categories: {
+            questions: true,
+          },
+          admin: true,
+          parent: true,
+          formType: true,
+          settings: true,
         },
-        admin: true,
-        parent: true,
-        formType: true,
-      },
-      order: {
-        categories: { sortOrder: 'ASC' },
-      },
-    });
+        order: {
+          categories: { sortOrder: 'ASC' },
+        },
+      });
+    }, { ttl: 3600 });
   }
 
   async findFormBySlug(slug: string): Promise<Form | null> {
-    return this.findOne({
-      where: { slug },
-      relations: {
-        categories: {
-          questions: true,
+    const cacheKey = `form:slug:${slug}`;
+    return cacheService.getOrSet(cacheKey, async () => {
+      return this.findOne({
+        where: { slug },
+        relations: {
+          categories: {
+            questions: true,
+          },
+          admin: true,
+          settings: true,
         },
-        admin: true,
-      },
-      order: {
-        categories: { sortOrder: 'ASC' },
-      },
-    });
+        order: {
+          categories: { sortOrder: 'ASC' },
+        },
+      });
+    }, { ttl: 3600 });
   }
 
   async findByAdminId(adminId: string): Promise<Form[]> {
@@ -663,6 +685,10 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       }
 
       await queryRunner.commitTransaction();
+
+      // Invalidate cache
+      await cacheService.del(`form:${formId}`);
+      
       return (await this.findFormById(formId)) as Form;
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -718,7 +744,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     let idx = 1;
 
     for (const [key, value] of Object.entries(updates)) {
-      console.log(key, value, 'this is conso ine');
       if (key === 'id' || key === 'form_id' || key === 'submitted_at') continue;
 
       const col = key;
@@ -1588,7 +1613,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
   ): Promise<{ valid: boolean; error?: string; existingSubmissionId?: string }> {
     const scope = form.submissionScope;
 
-    console.log(submissionData, 'this is submission Data');
 
     // SITE_LEVEL validation
     if (scope === FormSubmissionScope.SITE_LEVEL) {
@@ -1898,7 +1922,6 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       }));
     }
 
-    console.log(results, 'this is results');
 
     // When not populating, still extract the answers properly
     return results.map((row: any) => ({
@@ -2694,8 +2717,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       formTypeId: string;
     }>
   > {
-    console.log('\n=== GET QUESTION SUGGESTIONS START ===');
-    console.log('Input:', { currentFormId, questionSlug, memberId, yearsBack });
+   
 
     // STEP 1: Get current form with formType
     const currentForm = await this.createQueryBuilder('form')
@@ -2707,13 +2729,13 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       .addOrderBy('questions.sortOrder', 'ASC')
       .getOne();
 
-    console.log('Current Form Loaded:', {
-      id: currentForm?.id,
-      title: currentForm?.title,
-      formTypeName: currentForm?.formType?.name,
-      formTypeSlug: currentForm?.formType?.slug,
-      categoriesCount: currentForm?.categories?.length || 0,
-    });
+    // console.log('Current Form Loaded:', {
+    //   id: currentForm?.id,
+    //   title: currentForm?.title,
+    //   formTypeName: currentForm?.formType?.name,
+    //   formTypeSlug: currentForm?.formType?.slug,
+    //   categoriesCount: currentForm?.categories?.length || 0,
+    // });
 
     if (!currentForm || !currentForm.formType) {
       console.log('❌ No current form or formType found');
@@ -2736,11 +2758,11 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       .trim()
       .toLowerCase();
 
-    console.log('FormType Pattern Extraction:', {
-      original: formTypeName,
-      baseName: baseFormTypeName,
-      slug: formTypeSlug,
-    });
+    // console.log('FormType Pattern Extraction:', {
+    //   original: formTypeName,
+    //   baseName: baseFormTypeName,
+    //   slug: formTypeSlug,
+    // });
 
     // STEP 3: Find the question in current form
     let currentQuestion: any = null;
@@ -2767,11 +2789,11 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
     const cutoffDate = new Date();
     cutoffDate.setFullYear(cutoffDate.getFullYear() - yearsBack);
 
-    console.log('Searching for related forms:', {
-      basePattern: baseFormTypeName,
-      cutoffDate: cutoffDate.toISOString(),
-      excludingFormId: currentFormId,
-    });
+    // console.log('Searching for related forms:', {
+    //   basePattern: baseFormTypeName,
+    //   cutoffDate: cutoffDate.toISOString(),
+    //   excludingFormId: currentFormId,
+    // });
 
     // STEP 5: Find ALL FormTypes that match the base pattern
     // This is the KEY CHANGE - we match by name pattern, not exact formTypeId
@@ -2785,14 +2807,14 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
 
     const matchingFormTypeIds = allFormTypes.map(ft => ft.id);
 
-    console.log('Matching FormTypes Found:', {
-      count: allFormTypes.length,
-      formTypes: allFormTypes.map(ft => ({
-        id: ft.id,
-        name: ft.name,
-        slug: ft.slug,
-      })),
-    });
+    // console.log('Matching FormTypes Found:', {
+    //   count: allFormTypes.length,
+    //   formTypes: allFormTypes.map(ft => ({
+    //     id: ft.id,
+    //     name: ft.name,
+    //     slug: ft.slug,
+    //   })),
+    // });
 
     if (matchingFormTypeIds.length === 0) {
       console.log('❌ No matching form types found');
@@ -2816,7 +2838,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       .addOrderBy('questions.sortOrder', 'ASC')
       .getMany();
 
-    console.log(`Found ${relatedForms.length} related forms`);
+    // console.log(`Found ${relatedForms.length} related forms`);
 
     // Debug: Show what we loaded
     if (relatedForms.length > 0) {
@@ -2824,14 +2846,14 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         const questionsCount =
           form.categories?.reduce((sum, cat) => sum + (cat.questions?.length || 0), 0) || 0;
 
-        console.log(`  Form ${idx + 1}:`, {
-          id: form.id,
-          title: form.title,
-          formTypeName: form.formType?.name,
-          tableName: form.tableName,
-          categories: form.categories?.length || 0,
-          questions: questionsCount,
-        });
+        // console.log(`  Form ${idx + 1}:`, {
+        //   id: form.id,
+        //   title: form.title,
+        //   formTypeName: form.formType?.name,
+        //   tableName: form.tableName,
+        //   categories: form.categories?.length || 0,
+        //   questions: questionsCount,
+        // });
       });
     }
 
@@ -2864,10 +2886,10 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         const found = category.questions.find(q => q.slug === questionSlug);
         if (found) {
           matchingQuestion = found;
-          console.log(`  ✓ Found matching question in ${form.title}:`, {
-            slug: found.slug,
-            kpi: found.kpi,
-          });
+          // console.log(`  ✓ Found matching question in ${form.title}:`, {
+          //   slug: found.slug,
+          //   kpi: found.kpi,
+          // });
           break;
         }
       }
@@ -2890,7 +2912,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
         LIMIT 1
       `;
 
-        console.log(`  → Querying table: ${form.tableName}`);
+        // console.log(`  → Querying table: ${form.tableName}`);
         const result = await this.dataSource.query(submissionQuery, [memberId]);
 
         if (result.length > 0) {
@@ -2906,13 +2928,13 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
               yearFromFormTitle ||
               new Date(form.createdAt).getFullYear().toString();
 
-            console.log(`  ✓ Found submission with answer:`, {
-              form: form.title,
-              formType: form.formType?.name,
-              year: formYear,
-              answer: answerValue,
-              submittedAt: result[0].submitted_at,
-            });
+            // console.log(`  ✓ Found submission with answer:`, {
+            //   form: form.title,
+            //   formType: form.formType?.name,
+            //   year: formYear,
+            //   answer: answerValue,
+            //   submittedAt: result[0].submitted_at,
+            // });
 
             suggestions.push({
               formTitle: form.title,
@@ -2939,12 +2961,12 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       return yearB - yearA;
     });
 
-    console.log(`\n=== SUGGESTIONS SUMMARY ===`);
-    console.log(`Total suggestions found: ${suggestions.length}`);
-    suggestions.forEach((s, idx) => {
-      console.log(`  ${idx + 1}. ${s.formTitle} (${s.formYear})`);
-    });
-    console.log('=== END ===\n');
+    // console.log(`\n=== SUGGESTIONS SUMMARY ===`);
+    // console.log(`Total suggestions found: ${suggestions.length}`);
+    // suggestions.forEach((s, idx) => {
+    //   console.log(`  ${idx + 1}. ${s.formTitle} (${s.formYear})`);
+    // });
+    // console.log('=== END ===\n');
 
     return suggestions;
   }

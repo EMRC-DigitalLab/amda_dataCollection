@@ -1,19 +1,19 @@
 // src/modules/notifications/routes/notification.routes.ts
+import { NotificationChannel, NotificationPriority } from '@/database/entities/notification.entity';
+import { adminMiddleware } from '@/shared/middleware/admin.middleware';
+import { authMiddleware } from '@/shared/middleware/auth.middleware';
 import { Router } from 'express';
 import { DataSource } from 'typeorm';
-import { authMiddleware } from '@/shared/middleware/auth.middleware';
-import { adminMiddleware } from '@/shared/middleware/admin.middleware';
-import { NotificationController } from '../controllers/notification.controller';
-import { NotificationService } from '../services/notification.service';
-import { NotificationChannel, NotificationPriority } from '@/database/entities/notification.entity';
-import { NotificationQueueService } from '../services/notification-queue.service';
-import { TemplateService } from '../services/template.service';
-import { NotificationChannelFactory } from '../services/channel-factory.service';
 import { EmailChannel } from '../channels/email.channel';
-import { SmsChannel } from '../channels/sms.channel';
-import { PushChannel } from '../channels/push.channel';
-import { WebhookChannel } from '../channels/webhook.channel';
 import { InAppChannel } from '../channels/in-app.channel';
+import { PushChannel } from '../channels/push.channel';
+import { SmsChannel } from '../channels/sms.channel';
+import { WebhookChannel } from '../channels/webhook.channel';
+import { NotificationController } from '../controllers/notification.controller';
+import { NotificationChannelFactory } from '../services/channel-factory.service';
+import { NotificationQueueService } from '../services/notification-queue.service';
+import { NotificationService } from '../services/notification.service';
+import { TemplateService } from '../services/template.service';
 import { createTimelineRoutes } from './timeline.routes';
 
 export function createNotificationRoutes(_dataSource: DataSource): Router {
@@ -22,6 +22,11 @@ export function createNotificationRoutes(_dataSource: DataSource): Router {
   // Initialize services
   const templateService = new TemplateService();
   const queueService = new NotificationQueueService();
+
+  // Schedule periodic admin notification (Daily)
+  queueService.schedulePeriodicAdminNotification().catch(err => {
+    console.error('Failed to schedule periodic admin notification:', err);
+  });
 
   // Initialize channels
   const emailChannel = new EmailChannel();
@@ -276,6 +281,22 @@ export function createNotificationRoutes(_dataSource: DataSource): Router {
         success: true,
         message: 'Queue statistics retrieved',
         stats: stats,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  // Manual trigger for admin summary (TEST ONLY)
+  router.post('/test/admin-summary', async (req, res) => {
+    try {
+      await notificationService.sendAdminSummaryNotification();
+      res.json({
+        success: true,
+        message: 'Admin summary notification triggered manually',
       });
     } catch (error: any) {
       res.status(500).json({

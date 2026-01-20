@@ -1,0 +1,10 @@
+{
+  "name": "form_submission_received",
+  "type": "form_submission_received",
+  "channel": "in_app",
+  "subject": "New Submission: {{formTitle}}",
+  "content": "A new submission has been received for {{formTitle}}.",
+  "defaultData": {},
+  "variables": ["formTitle", "submitterName", "reviewUrl"],
+  "isActive": true
+}

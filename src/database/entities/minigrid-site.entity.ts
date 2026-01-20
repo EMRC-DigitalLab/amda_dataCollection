@@ -1,4 +1,5 @@
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
@@ -8,6 +9,16 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Member } from './member.entity';
+
+
+export enum MinigridSiteStatus {
+  OPERATIONAL = 'Operational',
+  UNDER_CONSTRUCTION = 'Under Construction',
+  PLANNED = 'Planned',
+  MAINTENANCE = 'Maintenance',
+  DECOMMISSIONED = 'Decommissioned',
+}
+
 
 @Entity('minigrid_sites')
 export class MinigridSite {
@@ -20,7 +31,6 @@ export class MinigridSite {
     length: 90,
     unique: true,
     nullable: false,
-    default: () => `CONCAT('MGS-', SUBSTRING(MD5(RANDOM()::TEXT), 1, 6))`,
   })
   siteId!: string;
 
@@ -84,10 +94,11 @@ export class MinigridSite {
 
   @Column({
     type: 'enum',
-    enum: ['Operational', 'Under Construction', 'Planned', 'Maintenance', 'Decommissioned'],
-    default: 'Planned',
+    enum: MinigridSiteStatus,
+    default: MinigridSiteStatus.PLANNED,
   })
-  status!: 'Operational' | 'Under Construction' | 'Planned' | 'Maintenance' | 'Decommissioned';
+  status!: MinigridSiteStatus;
+
 
   @Column({
     type: 'varchar',
@@ -163,7 +174,6 @@ export class MinigridSite {
   // Year Added - Automatically set to current year when site is created
   @Column({
     type: 'int',
-    default: () => 'EXTRACT(YEAR FROM CURRENT_DATE)',
     nullable: false,
   })
   yearAdded!: number;
@@ -195,4 +205,19 @@ export class MinigridSite {
     type: 'timestamp',
   })
   updatedAt!: Date;
+
+  // Hook to set defaults before insert
+  @BeforeInsert()
+  setDefaults() {
+    // Generate siteId if not provided
+    if (!this.siteId) {
+      const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+      this.siteId = `MGS-${randomPart}`;
+    }
+    
+    // Set yearAdded to current year if not provided
+    if (!this.yearAdded) {
+      this.yearAdded = new Date().getFullYear();
+    }
+  }
 }

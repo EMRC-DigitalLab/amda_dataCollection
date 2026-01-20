@@ -1,86 +1,170 @@
-// services/audit-log.service.ts
-
+import { AppDataSource } from '@/config';
+import { AuditLog, AuditLogSeverity } from '@/database/entities/audit-log.entity';
+import { DataSource, Repository } from 'typeorm';
 import { Logger } from './forms-settings.logger';
 
 export interface AuditLogEntry {
   action: string;
   resourceType: string;
-  resourceId: string;
-  adminId: string;
+  resourceId?: string;
+  userId?: string;
+  memberId?: string;
   details?: any;
   ipAddress?: string;
   userAgent?: string;
-  timestamp?: Date;
+  severity?: AuditLogSeverity;
+  isSuccess?: boolean;
+  errorMessage?: string;
 }
 
 export class AuditLogService {
   private logger: Logger;
-  private auditLogs: AuditLogEntry[] = []; // In-memory storage for demo
+  private repository: Repository<AuditLog>;
 
-  constructor() {
+  constructor(dataSource?: DataSource) {
     this.logger = new Logger('AuditLogService');
+    const source = dataSource || AppDataSource;
+    this.repository = source.getRepository(AuditLog);
   }
 
   /**
    * Log an audit event
    */
-  async log(entry: Omit<AuditLogEntry, 'timestamp'>): Promise<void> {
+  async log(entry: AuditLogEntry): Promise<void> {
     try {
-      const auditEntry: AuditLogEntry = {
-        ...entry,
-        timestamp: new Date(),
-      };
 
-      // Store in memory (in production, store in database)
-      this.auditLogs.push(auditEntry);
-
-      // Also log to console/file
-      this.logger.info(`AUDIT: ${entry.action}`, {
+      const logEntry = this.repository.create({
+        action: entry.action,
         resourceType: entry.resourceType,
         resourceId: entry.resourceId,
-        adminId: entry.adminId,
+        userId: entry.userId,
+        memberId: entry.memberId,
         details: entry.details,
+        ipAddress: entry.ipAddress,
+        userAgent: entry.userAgent,
+        severity: entry.severity || AuditLogSeverity.INFO,
+        isSuccess: entry.isSuccess ?? true,
+        errorMessage: entry.errorMessage,
       });
 
-      // In production, you would save to database:
-      // await this.auditLogRepository.save(auditEntry);
+
+      await this.repository.save(logEntry);
+
+      // Also log to console for immediate visibility
+      this.logger.info(`AUDIT: ${entry.action}`, {
+        userId: entry.userId,
+        memberId: entry.memberId,
+        resource: `${entry.resourceType}:${entry.resourceId}`,
+        success: entry.isSuccess,
+      });
     } catch (error) {
-      this.logger.error('Failed to log audit event', error, { entry });
-      // Don't throw error for audit logging failures
+      // Fallback logging if DB fails
+      this.logger.error('Failed to log audit event to DB', error, { entry });
     }
   }
 
   /**
-   * Get audit logs for a resource
+   * Helper to log login events
+   */
+  async logLogin(
+    id: string,
+    userType: 'admin' | 'member',
+    isSuccess: boolean,
+    ipAddress?: string,
+    userAgent?: string,
+    error?: string
+  ) {
+
+    const entry: AuditLogEntry = {
+      action: 'LOGIN',
+      resourceType: 'Auth',
+      ipAddress,
+      userAgent,
+      isSuccess,
+      errorMessage: error,
+      severity: isSuccess ? AuditLogSeverity.INFO : AuditLogSeverity.WARNING,
+      details: { timestamp: new Date() },
+    };
+
+    if (userType === 'admin') {
+      entry.userId = id;
+    } else {
+      entry.memberId = id;
+    }
+
+    await this.log(entry);
+  }
+
+  /**
+   * Helper to log application errors
+   */
+  async logError(error: Error, context: any = {}, userId?: string) {
+    await this.log({
+      action: 'SYSTEM_ERROR',
+      resourceType: 'System',
+      userId,
+      severity: AuditLogSeverity.ERROR,
+      isSuccess: false,
+      errorMessage: error.message,
+      details: {
+        stack: error.stack,
+        context,
+      },
+    });
+  }
+
+  /**
+   * Get audit logs
    */
   async getAuditLogs(
-    resourceType?: string,
-    resourceId?: string,
-    adminId?: string,
-    limit: number = 100
-  ): Promise<AuditLogEntry[]> {
+    filters: {
+      userId?: string;
+      memberId?: string;
+      action?: string;
+      resourceType?: string;
+      startDate?: Date;
+      endDate?: Date;
+      severity?: AuditLogSeverity;
+    },
+    page: number = 1,
+    limit: number = 20
+  ): Promise<{ data: AuditLog[]; total: number; page: number; limit: number }> {
     try {
-      let filteredLogs = this.auditLogs;
+      const query = this.repository.createQueryBuilder('log')
+        .leftJoinAndSelect('log.user', 'user')
+        .leftJoinAndSelect('log.member', 'member')
+        .orderBy('log.createdAt', 'DESC')
+        .skip((page - 1) * limit)
+        .take(limit);
 
-      if (resourceType) {
-        filteredLogs = filteredLogs.filter(log => log.resourceType === resourceType);
+      if (filters.userId) {
+        query.andWhere('log.userId = :userId', { userId: filters.userId });
+      }
+      if (filters.memberId) {
+        query.andWhere('log.memberId = :memberId', { memberId: filters.memberId });
+      }
+      if (filters.action) {
+        query.andWhere('log.action = :action', { action: filters.action });
+      }
+      if (filters.resourceType) {
+        query.andWhere('log.resourceType = :resourceType', { resourceType: filters.resourceType });
+      }
+      if (filters.severity) {
+        query.andWhere('log.severity = :severity', { severity: filters.severity });
+      }
+      if (filters.startDate) {
+        query.andWhere('log.createdAt >= :startDate', { startDate: filters.startDate });
+      }
+      if (filters.endDate) {
+        query.andWhere('log.createdAt <= :endDate', { endDate: filters.endDate });
       }
 
-      if (resourceId) {
-        filteredLogs = filteredLogs.filter(log => log.resourceId === resourceId);
-      }
+      const [data, total] = await query.getManyAndCount();
 
-      if (adminId) {
-        filteredLogs = filteredLogs.filter(log => log.adminId === adminId);
-      }
-
-      // Sort by timestamp descending and limit
-      return filteredLogs
-        .sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0))
-        .slice(0, limit);
+      return { data, total, page, limit };
     } catch (error) {
       this.logger.error('Failed to get audit logs', error);
-      return [];
+      throw error;
     }
   }
 
@@ -95,25 +179,28 @@ export class AuditLogService {
   }> {
     try {
       const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-      const recentLogs = this.auditLogs.filter(log => log.timestamp && log.timestamp > cutoffDate);
+      const recentLogs = await this.repository.createQueryBuilder('log')
+        .where('log.createdAt > :date', { date: cutoffDate })
+        .getMany();
 
       const stats = {
         totalEvents: recentLogs.length,
         eventsByAction: {} as Record<string, number>,
-        eventsByAdmin: {} as Record<string, number>,
+        eventsByAdmin: {} as Record<string, number>, // Kept for compat
+        eventsByUser: {} as Record<string, number>,
         eventsByResource: {} as Record<string, number>,
+        eventsBySeverity: {} as Record<string, number>,
       };
 
       recentLogs.forEach(log => {
-        // Count by action
         stats.eventsByAction[log.action] = (stats.eventsByAction[log.action] || 0) + 1;
-
-        // Count by admin
-        stats.eventsByAdmin[log.adminId] = (stats.eventsByAdmin[log.adminId] || 0) + 1;
-
-        // Count by resource type
-        stats.eventsByResource[log.resourceType] =
-          (stats.eventsByResource[log.resourceType] || 0) + 1;
+        if (log.userId) {
+          stats.eventsByUser[log.userId] = (stats.eventsByUser[log.userId] || 0) + 1;
+        }
+        if (log.resourceType) {
+          stats.eventsByResource[log.resourceType] = (stats.eventsByResource[log.resourceType] || 0) + 1;
+        }
+        stats.eventsBySeverity[log.severity] = (stats.eventsBySeverity[log.severity] || 0) + 1;
       });
 
       return stats;
@@ -134,17 +221,13 @@ export class AuditLogService {
   async cleanup(olderThanDays: number = 365): Promise<number> {
     try {
       const cutoffDate = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000);
-      const initialCount = this.auditLogs.length;
+      const deleted = await this.repository.createQueryBuilder()
+        .delete()
+        .from(AuditLog)
+        .where('createdAt < :date', { date: cutoffDate })
+        .execute();
 
-      this.auditLogs = this.auditLogs.filter(log => !log.timestamp || log.timestamp > cutoffDate);
-
-      const deletedCount = initialCount - this.auditLogs.length;
-
-      if (deletedCount > 0) {
-        this.logger.info(`Cleaned up ${deletedCount} old audit log entries`);
-      }
-
-      return deletedCount;
+      return deleted.affected || 0;
     } catch (error) {
       this.logger.error('Failed to cleanup audit logs', error);
       return 0;

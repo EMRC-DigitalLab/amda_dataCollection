@@ -4,6 +4,7 @@ import moduleAlias from 'module-alias';
 import 'module-alias/register';
 import path from 'path';
 // import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
@@ -40,7 +41,7 @@ if (isProduction) {
 import { createApiRouter } from '@/api/routes';
 import { getSwaggerInfo, swaggerSpec } from '@/api/swagger/schemas/swagger.config';
 import { config } from '@/config';
-import { connectDatabase } from '@/config/database';
+import { AppDataSource, connectDatabase } from '@/config/database';
 import { errorHandler, notFoundHandler } from '@/shared/middleware/error.middleware';
 import { generalRateLimit } from '@/shared/middleware/rate-limit.middleware';
 // import { WebSocketService } from '@/shared/websocket/websocket.service';
@@ -109,6 +110,7 @@ class Application {
     this.app.use(compression());
     this.app.use(express.json({ limit: config.upload.limit }));
     this.app.use(express.urlencoded({ extended: true, limit: config.upload.limit }));
+    this.app.use(cookieParser());
 
     // Logging
     if (config.environment !== 'test') {
@@ -279,9 +281,18 @@ class Application {
 
       if (config.environment === 'development' && config.database.autoGenerateMigrations) {
         // await AppDataSource.synchronize();
-        // logger.info('Database synchronized with entities');
-      } else if (config.database.runMigrationsOnStartup) {
         // await AppDataSource.runMigrations();
+
+        // Seed templates in dev mode to ensure new templates are loaded
+        const { TemplateService } = await import(
+          '@/modules/notifications/services/template.service'
+        );
+        const templateService = new TemplateService();
+        await templateService.seedTemplatesFromFiles();
+        
+        logger.info('Database synchronized with entities & Templates seeded');
+      } else if (config.database.runMigrationsOnStartup) {
+        await AppDataSource.runMigrations();
         // logger.info('Database migrations completed');
 
         const { TemplateService } = await import(
@@ -317,6 +328,11 @@ class Application {
       (global as any).webSocketService = this.webSocketService;
       logger.info(`🔌 WebSocket server initialized`);
       logger.info(`🔌 WebSocket server stored globally for routes`);
+
+      // Initialize Periodic Services
+      const { SubmissionReminderService } = await import('@/modules/notifications/services/submission-reminder.service');
+      new SubmissionReminderService();
+      logger.info(`⏰ Submission Reminder Service initialized`);
     } catch (error) {
       logger.error('❌ Failed to start application:', error);
       process.exit(1);

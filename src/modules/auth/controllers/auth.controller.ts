@@ -22,8 +22,20 @@ export class AuthController {
 
   login = asyncHandler(async (req: Request, res: Response) => {
     try {
-      const result = await this.authService.login(req.body);
-      ResponseHelper.success(res, result, 'Login successful');
+  const { accessToken, refreshToken, user } =
+    await this.authService.login(req.body);      
+
+
+    res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+    path: '/auth/refresh',
+    maxAge: 1000 * 60 * 60 * 24 * 7,
+  });
+    ResponseHelper.success(res, {
+      accessToken, user
+    }, 'Login successful');
     } catch (error: any) {
       ResponseHelper.error(res, error.message, 404);
     }
@@ -83,7 +95,17 @@ export class AuthController {
         return ResponseHelper.error(res, 'Authentication required', 404);
       }
 
-      await this.authService.logout(userId);
+      const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+
+      await this.authService.logout(userId, refreshToken);
+
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        path: '/auth/refresh'
+      });
+
       ResponseHelper.success(res, null, 'Logged out successfully');
     } catch (error: any) {
       ResponseHelper.error(res, error.message, 404);

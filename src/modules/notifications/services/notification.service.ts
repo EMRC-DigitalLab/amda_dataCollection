@@ -1,25 +1,25 @@
 // Fixed src/modules/notifications/services/notification.service.ts
-import { Repository, In } from 'typeorm';
 import { AppDataSource } from '@/config/database';
 import {
   Notification,
-  NotificationStatus,
   NotificationChannel,
   NotificationPriority,
+  NotificationStatus,
 } from '@/database/entities/notification.entity';
+import { User, UserRole } from '@/database/entities/user.entity';
+import { In, Repository } from 'typeorm';
 // import { NotificationTemplate } from '@/database/entities/notification-template.entity';
 import { NotificationPreference } from '@/database/entities/notification-preference.entity';
+import { logger } from '@/shared/utils/logger';
 import {
-  NotificationRequest,
   //   NotificationEvent,
   BulkNotificationEvent,
-  //   INotificationChannel,
+  NotificationRequest,
 } from '../interfaces/notification.interface';
-import { TemplateService } from './template.service';
 import { NotificationChannelFactory } from './channel-factory.service';
 import { NotificationQueueService } from './notification-queue.service';
+import { TemplateService } from './template.service';
 import { WebSocketNotificationService } from './websocket-notification.service';
-import { logger } from '@/shared/utils/logger';
 
 export class NotificationService {
   private notificationRepository: Repository<Notification>;
@@ -52,12 +52,18 @@ export class NotificationService {
         request.channel
       );
 
+
+    console.log(shouldSend, "should send", request)
+
       if (!shouldSend) {
         logger.info(`Notification blocked by user preferences: ${notification.id}`);
         notification.status = NotificationStatus.CANCELLED;
         await this.notificationRepository.save(notification);
         return notification;
       }
+
+
+      console.log('reched heree')
 
       // Queue for immediate or scheduled delivery
       if (request.scheduledAt && request.scheduledAt > new Date()) {
@@ -581,6 +587,18 @@ export class NotificationService {
   }
 
   private async createNotificationRecord(request: NotificationRequest): Promise<Notification> {
+    let templateId = request.templateId;
+
+    // If no templateId and no content provided, try to find default template for this type
+    if (!templateId && !request.content) {
+      const template = await this.templateService.getTemplate(request.type, request.channel);
+      if (template) {
+        templateId = template.id;
+      } else {
+        logger.warn(`No template found for notification type: ${request.type} on channel: ${request.channel}`);
+      }
+    }
+
     const notification = this.notificationRepository.create({
       type: request.type,
       channel: request.channel,
@@ -589,7 +607,7 @@ export class NotificationService {
       recipientPhone: request.recipientPhone,
       subject: request.subject,
       content: request.content,
-      templateId: request.templateId,
+      templateId: templateId,
       templateData: request.templateData,
       metadata: request.metadata,
       priority: request.priority || NotificationPriority.NORMAL,
@@ -624,5 +642,55 @@ export class NotificationService {
 
     await this.queueService.scheduleNotificationRetry(notification);
     logger.info(`Scheduled retry for notification ${notification.id} at ${nextRetryAt}`);
+  }
+
+  /**
+   * Send summary notification to all admins
+   * Periodic task (e.g. daily)
+   */
+  async sendAdminSummaryNotification(): Promise<void> {
+    try {
+      // 1. Fetch all admin users
+      const adminUsers = await AppDataSource.getRepository(User).find({
+        where: { role: UserRole.ADMIN, status: 'active' as any }, // Assuming 'active' status
+      });
+
+      if (adminUsers.length === 0) {
+        logger.info('No admin users found for summary notification.');
+        return;
+      }
+
+      logger.info(`Sending admin summary to ${adminUsers.length} admins.`);
+
+      // 2. Fetch stats for the summary
+      const stats = await this.queueService.getQueueStats();
+      const content = `
+        System Status Summary:
+        - Queue Active: ${stats.active}
+        - Queue Waiting: ${stats.waiting}
+        - Queue Failed: ${stats.failed}
+        
+        System is running smoothly.
+      `;
+
+      // 3. Send notification to each admin in parallel
+      await Promise.all(
+        adminUsers.map((admin) =>
+          this.sendNotification({
+            type: 'admin_periodic_summary',
+            channel: NotificationChannel.EMAIL,
+            recipientId: admin.id,
+            recipientEmail: admin.email,
+            subject: 'Daily System Summary',
+            content: content,
+            priority: NotificationPriority.LOW,
+          })
+        )
+      );
+
+      logger.info(`Admin summary notifications queued for ${adminUsers.length} admins.`);
+    } catch (error) {
+      logger.error('Error sending admin summary notifications:', error);
+    }
   }
 }

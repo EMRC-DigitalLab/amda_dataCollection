@@ -6,13 +6,14 @@ import { DataSource } from 'typeorm';
 import { FormStatus, FormSubmissionScope } from '../../../database/entities/form.entity';
 import { FormRepository } from '../../../database/repositories/forms/form.repository';
 import {
-  CreateCategoryDto,
-  CreateFormDto,
-  FormQueryDto,
-  SubmissionQueryDto,
-  UpdateFormDto,
+    CreateCategoryDto,
+    CreateFormDto,
+    FormQueryDto,
+    SubmissionQueryDto,
+    UpdateFormDto,
 } from '../../../shared/types/form.types';
 import { ResponseHelper } from '../../../shared/utils/response';
+import { FormNotificationService } from '../services/form-notification.service';
 import { FormService } from '../services/form.service';
 
 // Extended Request interface for authenticated requests
@@ -29,7 +30,10 @@ export class FormController {
   private service: FormService;
 
   constructor(private readonly dataSource: DataSource) {
-    this.service = new FormService(new FormRepository(dataSource));
+    // Pass global websocket service if available (it might be undefined at startup, but email notification uses static helper)
+    const webSocketService = (global as any).webSocketService;
+    const notificationService = new FormNotificationService(webSocketService);
+    this.service = new FormService(new FormRepository(dataSource), notificationService);
   }
 
   /* ============================================================================ */

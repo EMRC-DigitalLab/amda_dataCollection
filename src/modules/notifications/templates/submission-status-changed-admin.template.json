@@ -1,0 +1,13 @@
+{
+  "name": "submission_status_changed_admin",
+  "type": "submission_status_changed_admin",
+  "channel": "email",
+  "subject": "Submission Status Updated: {{formTitle}}",
+  "content": "A submission for {{formTitle}} has been updated to {{newStatus}} by {{reviewedBy}}.",
+  "htmlContent": "<!DOCTYPE html><html><head><style>body{font-family:'Segoe UI',San-Serif;color:#333;line-height:1.6}.container{max-width:600px;margin:0 auto;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}.header{background:#4b5563;color:#fff;padding:20px;text-align:center}.content{padding:20px}.field{margin-bottom:12px}.label{font-weight:600;color:#4b5563;font-size:0.875rem}.value{color:#1f2937}.status-badge{display:inline-block;padding:4px 12px;border-radius:12px;font-weight:600;color:#fff;font-size:0.875rem}.button{display:inline-block;background:#4b5563;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;margin-top:20px}.footer{background:#f9fafb;padding:15px;text-align:center;font-size:0.75rem;color:#6b7280}</style></head><body><div class=\"container\"><div class=\"header\"><h2>Status Update</h2></div><div class=\"content\"><p>Hello Admin,</p><p>A submission status has been updated for the form <strong>{{formTitle}}</strong>.</p><div class=\"field\"><div class=\"label\">New Status</div><div class=\"status-badge\" style=\"background-color: {{statusColor}}\">{{newStatus}}</div></div><div class=\"field\"><div class=\"label\">Old Status</div><div class=\"value\">{{oldStatus}}</div></div><div class=\"field\"><div class=\"label\">Updated By</div><div class=\"value\">{{reviewedBy}}</div></div><div class=\"field\"><div class=\"label\">Update Date</div><div class=\"value\">{{reviewedAt}}</div></div><a href=\"{{reviewUrl}}\" class=\"button\">View Submission</a></div><div class=\"footer\"><p>AMDA Data Collection Platform © 2026</p></div></div></body></html>",
+  "defaultData": {
+    "statusColor": "#6b7280"
+  },
+  "variables": ["formTitle", "newStatus", "oldStatus", "reviewedBy", "reviewedAt", "reviewUrl", "statusColor"],
+  "isActive": true
+}

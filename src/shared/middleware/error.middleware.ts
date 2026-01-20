@@ -1,10 +1,12 @@
 // src/shared/middleware/error.middleware.ts
-import { Request, Response, NextFunction } from 'express';
-import { logger } from '../utils/logger';
-import { ResponseHelper } from '../utils/response';
+import { NextFunction, Request, Response } from 'express';
 import { ERROR_MESSAGES } from '../constants/error-messages';
 import { HTTP_STATUS } from '../constants/http-status';
+import { AuditLogService } from '../utils/form-audit';
+import { logger } from '../utils/logger';
+import { ResponseHelper } from '../utils/response';
 
+const auditLogService = new AuditLogService();
 export class AppError extends Error {
   public statusCode: number;
   public isOperational: boolean;
@@ -90,6 +92,23 @@ export const errorHandler = (
     ip: req.ip,
     userAgent: req.get('User-Agent'),
   });
+
+  // Log error to database audit log (Only for system errors)
+  if (statusCode >= 500) {
+    const userId = (req as any).user?.id || (req as any).user?.userId;
+    
+    // We don't await here to avoid delaying the response
+    auditLogService.logError(error instanceof Error ? error : new Error(message), {
+      statusCode,
+      url: req.url,
+      method: req.method,
+      body: req.body,
+      query: req.query,
+      params: req.params,
+    }, userId).catch(err => {
+      logger.error('Failed to write to audit log in error handler', err);
+    });
+  }
 
   // Send error response
   ResponseHelper.error(res, message, statusCode, error.message, code);

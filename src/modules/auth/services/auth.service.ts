@@ -6,12 +6,14 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { DataSource } from 'typeorm';
+import { AuditLogSeverity } from '../../../database/entities/audit-log.entity';
 import { Member } from '../../../database/entities/member.entity';
 import { User, UserRole, UserStatus } from '../../../database/entities/user.entity';
 import { MemberRepository } from '../../../database/repositories/auth/member.repository';
+import { RefreshTokenRepository } from '../../../database/repositories/auth/refresh-token.repository';
 import { UserRepository } from '../../../database/repositories/auth/user.repository';
 import { VerificationResult } from '../../../shared/types/auth.types';
-
+import { AuditLogService } from '../../../shared/utils/form-audit';
 import { logger } from '../../../shared/utils/logger';
 import { LoginDto } from '../dtos/login.dto';
 import {
@@ -22,125 +24,170 @@ import {
   RegisterRequest,
   ResetPasswordRequest,
 } from '../interfaces/auth.interface';
-
 export class AuthService {
   private userRepository: UserRepository;
   private memberRepository: MemberRepository;
+  private auditLogService: AuditLogService;
+  private refreshTokenRepository: RefreshTokenRepository;
 
   constructor(private dataSource: DataSource) {
     this.userRepository = new UserRepository(dataSource);
     this.memberRepository = new MemberRepository(dataSource);
+    this.auditLogService = new AuditLogService(dataSource);
+    this.refreshTokenRepository = new RefreshTokenRepository(dataSource);
   }
 
   /**
-   * Login for both admin and member
+  //  * Login for both admin and member
    */
   async login(loginDto: LoginDto): Promise<LoginResponse> {
-    const { email, password } = loginDto;
+    try {
+      const { email, password } = loginDto;
 
-    // First, try to find admin/user by email
-    let user: User | null = null;
-    let member: Member | null = null;
-    let isAdmin = false;
+      // First, try to find admin/user by email
+      let user: User | null = null;
+      let member: Member | null = null;
+      let isAdmin = false;
 
-    // Check if it's an email format (contains @)
-    if (email.includes('@')) {
-      // Try admin/user login
-      user = await this.userRepository.findByEmailForAuth(email);
-      if (user) {
-        isAdmin = true;
+      // Check if it's an email format (contains @)
+      if (email.includes('@')) {
+        // Try admin/user login
+        user = await this.userRepository.findByEmailForAuth(email);
+        if (user) {
+          isAdmin = true;
+        }
+      } else {
+        // Try member login with memberId
+        member = await this.memberRepository.findByMemberId(email);
       }
-    } else {
-      // Try member login with memberId
-      member = await this.memberRepository.findByMemberId(email);
-    }
 
-    // If no user found by email, try to find member by email
-    if (!user && !member && email.includes('@')) {
-      member = await this.memberRepository.findByEmail(email);
-    }
+      // If no user found by email, try to find member by email
+      if (!user && !member && email.includes('@')) {
+        member = await this.memberRepository.findByEmail(email);
+      }
 
 
-    // If still no user/member found, throw error
-    if (!user && !member) {
-      throw new Error('Invalid credentials');
-    }
-
-    let passwordMatch = false;
-    let loginUser: any = null;
-
-    if (isAdmin && user) {
-      // Admin login
-      passwordMatch = await bcrypt.compare(password, user.password);
-
-      if (!passwordMatch) {
+      // If still no user/member found, throw error
+      if (!user && !member) {
         throw new Error('Invalid credentials');
       }
 
-      if (user.status !== UserStatus.ACTIVE) {
-        throw new Error('Account is disabled');
+      let passwordMatch = false;
+      let loginUser: any = null;
+
+      if (isAdmin && user) {
+        // Admin login
+        passwordMatch = await bcrypt.compare(password, user.password);
+
+        if (!passwordMatch) {
+          // Log failed login
+          await this.auditLogService.logLogin(user.id, 'admin', false, loginDto.ipAddress, loginDto.userAgent, 'Invalid credentials');
+          throw new Error('Invalid credentials');
+        }
+
+        if (user.status !== UserStatus.ACTIVE) {
+          await this.auditLogService.logLogin(user.id, 'admin', false, loginDto.ipAddress, loginDto.userAgent, 'Account disabled');
+          throw new Error('Account is disabled');
+        }
+
+        loginUser = {
+          id: user.id,
+          email: user.email,
+          role: 'admin',
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phoneNumber: user.phoneNumber,
+          avatar: user.avatar,
+          status: user.status,
+          isFirstLogin: user.isFirstLogin,
+        };
+
+        // Update last login
+        await this.userRepository.updateLastLogin(user.id);
+      } else if (member) {
+        // Member login
+        passwordMatch = await bcrypt.compare(password, member.password);
+
+        if (!passwordMatch) {
+          await this.auditLogService.logLogin(member.id, 'member', false, loginDto.ipAddress, loginDto.userAgent, 'Invalid credentials');
+          throw new Error('Invalid credentials');
+        }
+
+        loginUser = {
+          ...member,
+          role: 'member',
+        };
+
+        // Update last login for member
+        await this.memberRepository.updateLastLogin(member.id);
       }
 
-      loginUser = {
-        id: user.id,
-        email: user.email,
-        role: 'admin',
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phoneNumber: user.phoneNumber,
-        avatar: user.avatar,
-        status: user.status,
-        isFirstLogin: user.isFirstLogin,
+      // Generate tokensss
+      const accessTokenPayload = {
+        userId: loginUser.id,
+        email: loginUser.primaryContactEmail ? loginUser.primaryContactEmail : loginUser.email,
+        role: loginUser.memberId ? 'member' : 'admin',
+        memberId: loginUser?.memberId ? loginUser?.memberId : null,
       };
 
-      // Update last login
-      await this.userRepository.updateLastLogin(user.id);
-    } else if (member) {
-      // Member login
-      passwordMatch = await bcrypt.compare(password, member.password);
-
-      if (!passwordMatch) {
-        throw new Error('Invalid credentials');
-      }
-
-      loginUser = {
-        ...member,
-        role: 'member',
+      const refreshTokenPayload = {
+        userId: loginUser.id,
+        email: loginUser.primaryContactEmail ? loginUser.primaryContactEmail : loginUser.email,
+        role: loginUser.memberId ? 'member' : 'admin',
+        memberId: loginUser?.memberId ? loginUser?.memberId : null,
+        type: 'refresh',
       };
 
-      // Update last login for member
-      await this.memberRepository.updateLastLogin(member.id);
+      const accessToken = jwt.sign(accessTokenPayload, config.jwt.secret, {
+        expiresIn: config.jwt.expiresIn,
+      });
+
+      const refreshToken = jwt.sign(refreshTokenPayload, config.jwt.refreshSecret, {
+        expiresIn: config.jwt.refreshExpiresIn,
+      });
+
+      // Store refresh token
+      const decodedRefreshToken = jwt.decode(refreshToken) as any;
+      const expiresAt = new Date(decodedRefreshToken.exp * 1000);
+      const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+      await this.refreshTokenRepository.createRefreshToken({
+        userId: loginUser.id,
+        tokenHash,
+        expiresAt,
+        ipAddress: undefined, // Would need to be passed from controller
+        userAgent: undefined, // Would need to be passed from controller
+      });
+
+
+      // Log successful login
+      await this.auditLogService.logLogin(
+        loginUser.id,
+        loginUser.role as 'admin' | 'member',
+        true,
+        undefined, // IP address would need to be passed from controller
+        undefined  // User agent would need to be passed from controller
+      );
+
+      return {
+        accessToken,
+        refreshToken,
+        user: loginUser,
+      };
+    } catch (error) {
+      // Log failed login (if we identified a user/member)
+      const email = loginDto.email;
+      // We might not have the ID if user wasn't found, so we log with email in details
+      await this.auditLogService.log({
+        action: 'LOGIN',
+        resourceType: 'Auth',
+        severity: AuditLogSeverity.WARNING,
+        isSuccess: false,
+        errorMessage: error.message,
+        details: { email },
+      });
+      throw error;
     }
-
-    // Generate tokensss
-    const accessTokenPayload = {
-      userId: loginUser.id,
-      email: loginUser.primaryContactEmail ? loginUser.primaryContactEmail : loginUser.email,
-      role: loginUser.memberId ? 'member' : 'admin',
-      memberId: loginUser?.memberId ? loginUser?.memberId : null,
-    };
-
-    const refreshTokenPayload = {
-      userId: loginUser.id,
-      email: loginUser.primaryContactEmail ? loginUser.primaryContactEmail : loginUser.email,
-      role: loginUser.memberId ? 'member' : 'admin',
-      memberId: loginUser?.memberId ? loginUser?.memberId : null,
-      type: 'refresh',
-    };
-
-    const accessToken = jwt.sign(accessTokenPayload, config.jwt.secret, {
-      expiresIn: config.jwt.expiresIn,
-    });
-
-    const refreshToken = jwt.sign(refreshTokenPayload, config.jwt.refreshSecret, {
-      expiresIn: config.jwt.refreshExpiresIn,
-    });
-
-    return {
-      accessToken,
-      refreshToken,
-      user: loginUser,
-    };
   }
 
   /**
@@ -276,8 +323,26 @@ export class AuthService {
     const { refreshToken } = refreshTokenData;
 
     try {
-      // Verify refresh token
+      // Verify refresh token signature
       const decoded = jwt.verify(refreshToken, config.jwt.refreshSecret) as any;
+
+      // Check database for token
+      const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+      const storedToken = await this.refreshTokenRepository.findByTokenHash(tokenHash);
+
+      if (!storedToken) {
+        throw new Error('Invalid refresh token');
+      }
+
+      if (storedToken.revokedAt) {
+        // Token Reuse Detection: Revoke all user tokens if a revoked token is used (optional security measure)
+        // await this.refreshTokenRepository.revokeUserTokens(decoded.userId);
+        logger.warn(`Revoked token reuse attempt for user ${decoded.userId}`);
+        throw new Error('Refresh token has been revoked');
+      }
+
+      // Revoke the used token (Rotation)
+      await this.refreshTokenRepository.revokeToken(storedToken.id);
 
       // Get user
       const user = await this.userRepository.findOne({
@@ -289,8 +354,25 @@ export class AuthService {
       }
 
       // Generate new tokens
-      return this.generateTokens(user);
+      const tokens = this.generateTokens(user, decoded.role === 'member');
+
+      // Store new refresh token
+      const decodedNewRefreshToken = jwt.decode(tokens.refreshToken) as any;
+      const newExpiresAt = new Date(decodedNewRefreshToken.exp * 1000);
+      const newTokenHash = crypto.createHash('sha256').update(tokens.refreshToken).digest('hex');
+
+      await this.refreshTokenRepository.createRefreshToken({
+        userId: user.id,
+        tokenHash: newTokenHash,
+        expiresAt: newExpiresAt,
+        // We could pass IP/UA here if available via context
+      });
+
+      return tokens;
     } catch (error) {
+      if (error instanceof Error && error.message.includes('revoked')) {
+        throw error;
+      }
       throw new Error('Invalid or expired refresh token');
     }
   }
@@ -298,7 +380,16 @@ export class AuthService {
   /**
    * Logout
    */
-  async logout(userId: string): Promise<void> {
+  async logout(userId: string, refreshToken?: string): Promise<void> {
+    if (refreshToken) {
+      const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+      const token = await this.refreshTokenRepository.findByTokenHash(tokenHash);
+      
+      if (token) {
+        await this.refreshTokenRepository.revokeToken(token.id);
+      }
+    }
+    
     // In production, add token to blacklist
     console.log(`User ${userId} logged out`);
   }

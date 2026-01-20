@@ -3,8 +3,8 @@ import { FormSettings } from '../../../database/entities/form-settings.entity';
 import { FormSettingsRepository } from '../../../database/repositories/forms/form-settings.repository';
 import { FormRepository } from '../../../database/repositories/forms/form.repository';
 import { AppError } from '../../../shared/middleware/error.middleware';
+import { cacheService } from '../../../shared/utils/cache';
 import { AuditLogService } from '../../../shared/utils/form-audit';
-import { CacheService } from '../../../shared/utils/forms-cache';
 import { NotificationService } from '../../../shared/utils/forms-notification';
 import { Logger } from '../../../shared/utils/forms-settings.logger';
 import {
@@ -29,8 +29,7 @@ export class FormSettingsService {
     private readonly formSettingsRepository: FormSettingsRepository,
     private readonly formRepository: FormRepository,
     private readonly notificationService: NotificationService,
-    private readonly auditLogService: AuditLogService,
-    private readonly cacheService: CacheService
+    private readonly auditLogService: AuditLogService
   ) {
     this.logger = new Logger('FormSettingsService');
   }
@@ -66,7 +65,7 @@ export class FormSettingsService {
       const formSettings = await this.formSettingsRepository.create(data);
 
       // Clear cache
-      await this.cacheService.delete(`form-settings:${data.formId}`);
+      await cacheService.del(`form-settings:${data.formId}`);
 
       // Log audit event
       if (formSettings.enableAuditLog) {
@@ -74,7 +73,7 @@ export class FormSettingsService {
           action: 'CREATE_FORM_SETTINGS',
           resourceType: 'FormSettings',
           resourceId: formSettings.id,
-          adminId,
+          userId: adminId,
           details: { formId: data.formId },
         });
       }
@@ -126,12 +125,12 @@ export class FormSettingsService {
     try {
       // Try cache first
       const cacheKey = `form-settings:id:${id}`;
-      let formSettings = await this.cacheService.get<FormSettings>(cacheKey);
+      let formSettings = await cacheService.get<FormSettings>(cacheKey);
 
       if (!formSettings) {
         formSettings = await this.formSettingsRepository.findWithFormDetails(id);
         if (formSettings) {
-          await this.cacheService.set(cacheKey, formSettings, 300); // 5 minutes
+          await cacheService.set(cacheKey, formSettings, { ttl: 300 }); // 5 minutes
         }
       }
 
@@ -167,12 +166,12 @@ export class FormSettingsService {
     try {
       // Try cache first
       const cacheKey = `form-settings:${formId}`;
-      let formSettings = await this.cacheService.get<FormSettings>(cacheKey);
+      let formSettings = await cacheService.get<FormSettings>(cacheKey);
 
       if (!formSettings) {
         formSettings = await this.formSettingsRepository.findByFormId(formId);
         if (formSettings) {
-          await this.cacheService.set(cacheKey, formSettings, 300); // 5 minutes
+          await cacheService.set(cacheKey, formSettings, { ttl: 300 }); // 5 minutes
         }
       }
 
@@ -233,8 +232,8 @@ export class FormSettingsService {
       }
 
       // Clear cache
-      await this.cacheService.delete(`form-settings:${updatedSettings.formId}`);
-      await this.cacheService.delete(`form-settings:id:${id}`);
+      await cacheService.del(`form-settings:${updatedSettings.formId}`);
+      await cacheService.del(`form-settings:id:${id}`);
 
       // Log audit event
       if (updatedSettings.enableAuditLog) {
@@ -242,7 +241,7 @@ export class FormSettingsService {
           action: 'UPDATE_FORM_SETTINGS',
           resourceType: 'FormSettings',
           resourceId: id,
-          adminId,
+          userId: adminId,
           details: { changes: data },
         });
       }
@@ -294,8 +293,8 @@ export class FormSettingsService {
       }
 
       // Clear cache
-      await this.cacheService.delete(`form-settings:${existingSettings.formId}`);
-      await this.cacheService.delete(`form-settings:id:${id}`);
+      await cacheService.del(`form-settings:${existingSettings.formId}`);
+      await cacheService.del(`form-settings:id:${id}`);
 
       // Log audit event
       if (existingSettings.enableAuditLog) {
@@ -303,7 +302,7 @@ export class FormSettingsService {
           action: 'DELETE_FORM_SETTINGS',
           resourceType: 'FormSettings',
           resourceId: id,
-          adminId,
+          userId: adminId,
           details: { formId: existingSettings.formId },
         });
       }
