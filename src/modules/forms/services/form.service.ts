@@ -13,7 +13,7 @@ import {
   FormSubmissionDto,
   UpdateFormDto,
 } from '../../../shared/types/form.types';
-import { AuditLogService } from '../../../shared/utils/form-audit.ts';
+import { AuditLogService } from '../../../shared/utils/form-audit';
 import { FormNotificationService } from './form-notification.service';
 
 @Injectable()
