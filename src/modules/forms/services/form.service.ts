@@ -7,20 +7,27 @@ import { Category } from '../../../database/entities/category.entity';
 import { Form, FormStatus } from '../../../database/entities/form.entity';
 import { Question } from '../../../database/entities/question.entity';
 import {
-    CreateCategoryDto,
-    CreateFormDto,
-    FormQueryDto,
-    FormSubmissionDto,
-    UpdateFormDto,
+  CreateCategoryDto,
+  CreateFormDto,
+  FormQueryDto,
+  FormSubmissionDto,
+  UpdateFormDto,
 } from '../../../shared/types/form.types';
-import { FormNotificationService } from './form-notification.service'; // ADD THIS
+import { AuditLogService } from '../../../shared/utils/form-audit.ts';
+import { FormNotificationService } from './form-notification.service';
 
 @Injectable()
 export class FormService {
   constructor(
     private readonly repo: Repository<Form>,
-    private formNotificationService?: FormNotificationService // ADD THIS
-  ) {}
+    private formNotificationService?: FormNotificationService,
+    private auditLogService?: AuditLogService,
+  ) {
+    // If not injected (e.g. manually instantiated), try manual instantiation or rely on fallback
+    if (!this.auditLogService) {
+        this.auditLogService = new AuditLogService(); 
+    }
+  }
 
   /* ============================================================================ */
   /* Basic Form CRUD Operations                                                   */
@@ -30,7 +37,21 @@ export class FormService {
     // Validate form data before creation
     await this.validateFormDto(dto);
 
-    return this.repo.createForm(dto);
+    const form = await this.repo.createForm(dto);
+
+    // Audit Log: Form Created
+    if (this.auditLogService) {
+      await this.auditLogService.log({
+        action: 'FORM_CREATED',
+        resourceType: 'Form',
+        resourceId: form.id,
+        userId: dto.createdBy, // Assuming createdBy is passed in DTO
+        details: { title: form.title, slug: form.slug },
+        isSuccess: true,
+      });
+    }
+
+    return form;
   }
 
   async update(dto: UpdateFormDto): Promise<Form> {
@@ -1569,7 +1590,46 @@ export class FormService {
       }
     }
 
-    return this.repo.submitFormData(dto.formId, dto.data, dto.submittedBy);
+    const submission = await this.repo.submitFormData(dto.formId, dto.data, dto.submittedBy);
+
+    // Trigger Notification
+    if (this.formNotificationService) {
+      this.formNotificationService.onFormSubmissionReceived(
+        form,
+        submission,
+        dto.submittedBy,
+        submission.isUpdate || false
+      ).catch(err => console.error('Error triggering notification:', err));
+    }
+
+    // Audit Log: Form Submission
+    if (this.auditLogService) {
+        // Prepare details
+        const details = {
+            formTitle: form.title,
+            isUpdate: submission.isUpdate
+        };
+
+        // Determine if user or member
+        // submittedBy is usually the ID. Audit log supports userId and memberId.
+        // We will assume it's a memberId for now if coming from data collection app, or userId if admin.
+        // But AuditLogService.log logic is generic. 
+        // Let's pass it as userId for now or memberId if we can distinguish.
+        // Given typical usage: internal users are Users, external data collectors might be Members.
+        // Safe bet: Pass to userId if it looks like a UUID (it is).
+        // Actually, let's try to be smart or just pass to userId.
+        
+        await this.auditLogService.log({
+            action: submission.isUpdate ? 'FORM_SUBMISSION_UPDATED' : 'FORM_SUBMISSION',
+            resourceType: 'FormSubmission',
+            resourceId: submission.id || 'N/A', // Submission ID
+            userId: dto.submittedBy, // Log the submitter ID
+            details: details,
+            isSuccess: true
+        });
+    }
+
+    return submission;
   }
 
   async getUserSubmission(formId: string, minigrid_siteId?: string): Promise<any | null> {

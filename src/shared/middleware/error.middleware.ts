@@ -93,21 +93,22 @@ export const errorHandler = (
     userAgent: req.get('User-Agent'),
   });
 
-  // Log error to database audit log
-  // Extract user ID safely if available
-  const userId = (req as any).user?.id || (req as any).user?.userId;
-  
-  // We don't await here to avoid delaying the response
-  auditLogService.logError(error instanceof Error ? error : new Error(message), {
-    statusCode,
-    url: req.url,
-    method: req.method,
-    body: req.body, // Be careful with sensitive data here, maybe sanitize
-    query: req.query,
-    params: req.params,
-  }, userId).catch(err => {
-    logger.error('Failed to write to audit log in error handler', err);
-  });
+  // Log error to database audit log (Only for system errors)
+  if (statusCode >= 500) {
+    const userId = (req as any).user?.id || (req as any).user?.userId;
+    
+    // We don't await here to avoid delaying the response
+    auditLogService.logError(error instanceof Error ? error : new Error(message), {
+      statusCode,
+      url: req.url,
+      method: req.method,
+      body: req.body,
+      query: req.query,
+      params: req.params,
+    }, userId).catch(err => {
+      logger.error('Failed to write to audit log in error handler', err);
+    });
+  }
 
   // Send error response
   ResponseHelper.error(res, message, statusCode, error.message, code);

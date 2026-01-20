@@ -28,6 +28,8 @@ export interface NotificationRequest {
 export interface NotificationEvent {
   type: string;
   recipientId: string;
+  recipientEmail?: string;  // Direct email, bypasses lookup
+  recipientPhone?: string;  // Direct phone, bypasses lookup
   channel?: NotificationChannel | NotificationChannel[];
   data?: Record<string, any>;
   priority?: NotificationPriority;

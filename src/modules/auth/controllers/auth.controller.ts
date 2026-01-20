@@ -95,7 +95,17 @@ export class AuthController {
         return ResponseHelper.error(res, 'Authentication required', 404);
       }
 
-      await this.authService.logout(userId);
+      const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+
+      await this.authService.logout(userId, refreshToken);
+
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        path: '/auth/refresh'
+      });
+
       ResponseHelper.success(res, null, 'Logged out successfully');
     } catch (error: any) {
       ResponseHelper.error(res, error.message, 404);

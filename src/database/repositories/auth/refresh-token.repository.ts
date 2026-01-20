@@ -7,6 +7,7 @@ export class RefreshTokenRepository extends Repository<RefreshToken> {
   }
 
   async createRefreshToken(data: Partial<RefreshToken>): Promise<RefreshToken> {
+
     const token = this.create(data);
     return this.save(token);
   }
@@ -14,7 +15,7 @@ export class RefreshTokenRepository extends Repository<RefreshToken> {
   async findByTokenHash(tokenHash: string): Promise<RefreshToken | null> {
     return this.findOne({ where: { tokenHash } });
   }
-
+// 
   async revokeToken(id: string): Promise<void> {
     await this.update(id, { revokedAt: new Date() });
   }

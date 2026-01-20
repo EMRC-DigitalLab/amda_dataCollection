@@ -8,6 +8,7 @@ export interface AuditLogEntry {
   resourceType: string;
   resourceId?: string;
   userId?: string;
+  memberId?: string;
   details?: any;
   ipAddress?: string;
   userAgent?: string;
@@ -30,13 +31,14 @@ export class AuditLogService {
    * Log an audit event
    */
   async log(entry: AuditLogEntry): Promise<void> {
-    console.log(entry, "this is the entrty")
     try {
+
       const logEntry = this.repository.create({
         action: entry.action,
         resourceType: entry.resourceType,
         resourceId: entry.resourceId,
         userId: entry.userId,
+        memberId: entry.memberId,
         details: entry.details,
         ipAddress: entry.ipAddress,
         userAgent: entry.userAgent,
@@ -45,11 +47,13 @@ export class AuditLogService {
         errorMessage: entry.errorMessage,
       });
 
+
       await this.repository.save(logEntry);
 
       // Also log to console for immediate visibility
       this.logger.info(`AUDIT: ${entry.action}`, {
         userId: entry.userId,
+        memberId: entry.memberId,
         resource: `${entry.resourceType}:${entry.resourceId}`,
         success: entry.isSuccess,
       });
@@ -62,18 +66,33 @@ export class AuditLogService {
   /**
    * Helper to log login events
    */
-  async logLogin(userId: string, isSuccess: boolean, ipAddress?: string, userAgent?: string, error?: string) {
-    await this.log({
+  async logLogin(
+    id: string,
+    userType: 'admin' | 'member',
+    isSuccess: boolean,
+    ipAddress?: string,
+    userAgent?: string,
+    error?: string
+  ) {
+
+    const entry: AuditLogEntry = {
       action: 'LOGIN',
       resourceType: 'Auth',
-      userId,
       ipAddress,
       userAgent,
       isSuccess,
       errorMessage: error,
       severity: isSuccess ? AuditLogSeverity.INFO : AuditLogSeverity.WARNING,
       details: { timestamp: new Date() },
-    });
+    };
+
+    if (userType === 'admin') {
+      entry.userId = id;
+    } else {
+      entry.memberId = id;
+    }
+
+    await this.log(entry);
   }
 
   /**
@@ -93,12 +112,14 @@ export class AuditLogService {
       },
     });
   }
+
   /**
    * Get audit logs
    */
   async getAuditLogs(
     filters: {
       userId?: string;
+      memberId?: string;
       action?: string;
       resourceType?: string;
       startDate?: Date;
@@ -111,12 +132,16 @@ export class AuditLogService {
     try {
       const query = this.repository.createQueryBuilder('log')
         .leftJoinAndSelect('log.user', 'user')
+        .leftJoinAndSelect('log.member', 'member')
         .orderBy('log.createdAt', 'DESC')
         .skip((page - 1) * limit)
         .take(limit);
 
       if (filters.userId) {
         query.andWhere('log.userId = :userId', { userId: filters.userId });
+      }
+      if (filters.memberId) {
+        query.andWhere('log.memberId = :memberId', { memberId: filters.memberId });
       }
       if (filters.action) {
         query.andWhere('log.action = :action', { action: filters.action });

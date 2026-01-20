@@ -1,0 +1,10 @@
+{
+  "name": "submission_reminder",
+  "type": "submission_reminder",
+  "channel": "email",
+  "subject": "You have {{pendingCount}} incomplete forms",
+  "content": "Dear {{userName}},<br><br>You have {{pendingCount}} pending form submission(s) that are still in draft status:<br><br>{{draftList}}<br><br>Please log in to your dashboard to complete them.<br><br><a href=\"{{dashboardUrl}}\" style=\"padding: 10px 20px; background-color: #007bff; color: check; text-decoration: none; border-radius: 5px;\">Go to Dashboard</a>",
+  "defaultData": {},
+  "variables": ["userName", "pendingCount", "draftList", "dashboardUrl"],
+  "isActive": true
+}

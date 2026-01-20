@@ -102,11 +102,15 @@ export class NotificationHelper {
       channel?: NotificationChannel | NotificationChannel[];
       priority?: NotificationPriority;
       scheduledAt?: Date;
+      recipientEmail?: string;
+      recipientPhone?: string;
     }
   ): Promise<void> {
     notificationEmitter.emitNotification({
       type: notificationType,
       recipientId: userId,
+      recipientEmail: options?.recipientEmail,
+      recipientPhone: options?.recipientPhone,
       data: templateData,
       channel: options?.channel,
       priority: options?.priority,

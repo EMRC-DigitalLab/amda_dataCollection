@@ -75,7 +75,6 @@ export class MinigridSiteService implements IMinigridSiteService {
       this.minigridSiteRepository.countByUserId(userId),
     ]);
 
-    console.log(data, total, 'sites');
 
     return {
       data,
@@ -260,7 +259,6 @@ export class MinigridSiteService implements IMinigridSiteService {
     const userSites = await this.minigridSiteRepository.findByUserId(userId);
     const userSiteIds = userSites.map(site => site.id);
 
-    console.log(userSiteIds, ids, 'these are the sites id coming');
 
     const validIds = ids.filter(id => userSiteIds.includes(id));
 

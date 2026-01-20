@@ -1,21 +1,22 @@
 // src/database/entities/notification-template.entity.ts
 import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-  Index,
+    Column,
+    CreateDateColumn,
+    Entity,
+    Index,
+    PrimaryGeneratedColumn,
+    UpdateDateColumn,
 } from 'typeorm';
 import { NotificationChannel } from './notification.entity';
 
 @Entity('notification_templates')
 @Index(['type', 'channel'])
+@Index(['name', 'channel'], { unique: true }) // Composite unique constraint
 export class NotificationTemplate {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar', length: 255, unique: true })
+  @Column({ type: 'varchar', length: 255 }) // Removed unique: true
   name!: string;
 
   @Column({ type: 'varchar', length: 255 })

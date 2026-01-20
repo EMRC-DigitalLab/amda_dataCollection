@@ -4,6 +4,7 @@ import moduleAlias from 'module-alias';
 import 'module-alias/register';
 import path from 'path';
 // import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
@@ -109,6 +110,7 @@ class Application {
     this.app.use(compression());
     this.app.use(express.json({ limit: config.upload.limit }));
     this.app.use(express.urlencoded({ extended: true, limit: config.upload.limit }));
+    this.app.use(cookieParser());
 
     // Logging
     if (config.environment !== 'test') {
@@ -326,6 +328,11 @@ class Application {
       (global as any).webSocketService = this.webSocketService;
       logger.info(`🔌 WebSocket server initialized`);
       logger.info(`🔌 WebSocket server stored globally for routes`);
+
+      // Initialize Periodic Services
+      const { SubmissionReminderService } = await import('@/modules/notifications/services/submission-reminder.service');
+      new SubmissionReminderService();
+      logger.info(`⏰ Submission Reminder Service initialized`);
     } catch (error) {
       logger.error('❌ Failed to start application:', error);
       process.exit(1);

@@ -1,10 +1,12 @@
 // src/events/handlers/notification.handler.ts
-import { NotificationService } from '@/modules/notifications/services/notification.service';
-import {
-  NotificationEvent,
-  BulkNotificationEvent,
-} from '@/modules/notifications/interfaces/notification.interface';
+import { AppDataSource } from '@/config';
 import { NotificationChannel, NotificationPriority } from '@/database/entities/notification.entity';
+import { User } from '@/database/entities/user.entity';
+import {
+  BulkNotificationEvent,
+  NotificationEvent,
+} from '@/modules/notifications/interfaces/notification.interface';
+import { NotificationService } from '@/modules/notifications/services/notification.service';
 import { logger } from '@/shared/utils/logger';
 
 export class NotificationEventHandler {
@@ -26,8 +28,19 @@ export class NotificationEventHandler {
         channels.length > 0 ? channels : await this.getDefaultChannelsForType(event.type);
 
       for (const channel of targetChannels) {
-        // Get user's email/phone based on recipientId
-        const recipient = await this.getRecipientInfo(event.recipientId);
+        // Use provided email/phone if available, otherwise lookup
+        let recipient: { email: string; phone?: string };
+        
+        if (event.recipientEmail) {
+          // Use directly provided email (bypasses lookup)
+          recipient = {
+            email: event.recipientEmail,
+            phone: event.recipientPhone,
+          };
+        } else {
+          // Get user's email/phone based on recipientId
+          recipient = await this.getRecipientInfo(event.recipientId);
+        }
 
         await this.notificationService.sendNotification({
           type: event.type,
@@ -87,17 +100,40 @@ export class NotificationEventHandler {
 
   /**
    * Get recipient information by ID
-   * This would typically fetch from your user/customer database
    */
-  private async getRecipientInfo(_recipientId: string): Promise<{
+  private async getRecipientInfo(recipientId: string): Promise<{
     email: string;
     phone?: string;
   }> {
-    // Placeholder - implement actual user lookup
-    // const user = await userRepository.findOne({ where: { id: recipientId } });
-    return {
-      email: 'user@example.com', // Replace with actual lookup
-      phone: '+1234567890', // Replace with actual lookup
-    };
+    try {
+      // First try to find as User
+      const userRepo = AppDataSource.getRepository(User);
+      const user = await userRepo.findOne({ where: { id: recipientId } });
+      
+      if (user) {
+        return {
+          email: user.email,
+          phone: user.phoneNumber || undefined,
+        };
+      }
+      
+      // If not found, try to find as Member
+      const { Member } = await import('@/database/entities/member.entity');
+      const memberRepo = AppDataSource.getRepository(Member);
+      const member = await memberRepo.findOne({ where: { id: recipientId } });
+      
+      if (member) {
+        return {
+          email: member.primaryContactEmail!,
+          phone: member.contact1Phone || undefined,
+        };
+      }
+
+      logger.warn(`Notification handler: User/Member not found for ID ${recipientId}`);
+      return { email: '', phone: '' }; 
+    } catch (error) {
+       logger.error(`Error fetching recipient info for ${recipientId}:`, error);
+       return { email: '', phone: '' };
+    }
   }
 }

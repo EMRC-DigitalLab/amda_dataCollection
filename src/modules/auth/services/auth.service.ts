@@ -10,9 +10,10 @@ import { AuditLogSeverity } from '../../../database/entities/audit-log.entity';
 import { Member } from '../../../database/entities/member.entity';
 import { User, UserRole, UserStatus } from '../../../database/entities/user.entity';
 import { MemberRepository } from '../../../database/repositories/auth/member.repository';
+import { RefreshTokenRepository } from '../../../database/repositories/auth/refresh-token.repository';
 import { UserRepository } from '../../../database/repositories/auth/user.repository';
 import { VerificationResult } from '../../../shared/types/auth.types';
-import { AuditLogService } from '../../../shared/utils/form-audit'; // Import AuditLogService
+import { AuditLogService } from '../../../shared/utils/form-audit';
 import { logger } from '../../../shared/utils/logger';
 import { LoginDto } from '../dtos/login.dto';
 import {
@@ -23,20 +24,21 @@ import {
   RegisterRequest,
   ResetPasswordRequest,
 } from '../interfaces/auth.interface';
-
 export class AuthService {
   private userRepository: UserRepository;
   private memberRepository: MemberRepository;
   private auditLogService: AuditLogService;
+  private refreshTokenRepository: RefreshTokenRepository;
 
   constructor(private dataSource: DataSource) {
     this.userRepository = new UserRepository(dataSource);
     this.memberRepository = new MemberRepository(dataSource);
     this.auditLogService = new AuditLogService(dataSource);
+    this.refreshTokenRepository = new RefreshTokenRepository(dataSource);
   }
 
   /**
-   * Login for both admin and member
+  //  * Login for both admin and member
    */
   async login(loginDto: LoginDto): Promise<LoginResponse> {
     try {
@@ -78,10 +80,13 @@ export class AuthService {
         passwordMatch = await bcrypt.compare(password, user.password);
 
         if (!passwordMatch) {
+          // Log failed login
+          await this.auditLogService.logLogin(user.id, 'admin', false, loginDto.ipAddress, loginDto.userAgent, 'Invalid credentials');
           throw new Error('Invalid credentials');
         }
 
         if (user.status !== UserStatus.ACTIVE) {
+          await this.auditLogService.logLogin(user.id, 'admin', false, loginDto.ipAddress, loginDto.userAgent, 'Account disabled');
           throw new Error('Account is disabled');
         }
 
@@ -104,6 +109,7 @@ export class AuthService {
         passwordMatch = await bcrypt.compare(password, member.password);
 
         if (!passwordMatch) {
+          await this.auditLogService.logLogin(member.id, 'member', false, loginDto.ipAddress, loginDto.userAgent, 'Invalid credentials');
           throw new Error('Invalid credentials');
         }
 
@@ -140,9 +146,24 @@ export class AuthService {
         expiresIn: config.jwt.refreshExpiresIn,
       });
 
+      // Store refresh token
+      const decodedRefreshToken = jwt.decode(refreshToken) as any;
+      const expiresAt = new Date(decodedRefreshToken.exp * 1000);
+      const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+      await this.refreshTokenRepository.createRefreshToken({
+        userId: loginUser.id,
+        tokenHash,
+        expiresAt,
+        ipAddress: undefined, // Would need to be passed from controller
+        userAgent: undefined, // Would need to be passed from controller
+      });
+
+
       // Log successful login
       await this.auditLogService.logLogin(
         loginUser.id,
+        loginUser.role as 'admin' | 'member',
         true,
         undefined, // IP address would need to be passed from controller
         undefined  // User agent would need to be passed from controller
@@ -302,8 +323,26 @@ export class AuthService {
     const { refreshToken } = refreshTokenData;
 
     try {
-      // Verify refresh token
+      // Verify refresh token signature
       const decoded = jwt.verify(refreshToken, config.jwt.refreshSecret) as any;
+
+      // Check database for token
+      const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+      const storedToken = await this.refreshTokenRepository.findByTokenHash(tokenHash);
+
+      if (!storedToken) {
+        throw new Error('Invalid refresh token');
+      }
+
+      if (storedToken.revokedAt) {
+        // Token Reuse Detection: Revoke all user tokens if a revoked token is used (optional security measure)
+        // await this.refreshTokenRepository.revokeUserTokens(decoded.userId);
+        logger.warn(`Revoked token reuse attempt for user ${decoded.userId}`);
+        throw new Error('Refresh token has been revoked');
+      }
+
+      // Revoke the used token (Rotation)
+      await this.refreshTokenRepository.revokeToken(storedToken.id);
 
       // Get user
       const user = await this.userRepository.findOne({
@@ -315,8 +354,25 @@ export class AuthService {
       }
 
       // Generate new tokens
-      return this.generateTokens(user);
+      const tokens = this.generateTokens(user, decoded.role === 'member');
+
+      // Store new refresh token
+      const decodedNewRefreshToken = jwt.decode(tokens.refreshToken) as any;
+      const newExpiresAt = new Date(decodedNewRefreshToken.exp * 1000);
+      const newTokenHash = crypto.createHash('sha256').update(tokens.refreshToken).digest('hex');
+
+      await this.refreshTokenRepository.createRefreshToken({
+        userId: user.id,
+        tokenHash: newTokenHash,
+        expiresAt: newExpiresAt,
+        // We could pass IP/UA here if available via context
+      });
+
+      return tokens;
     } catch (error) {
+      if (error instanceof Error && error.message.includes('revoked')) {
+        throw error;
+      }
       throw new Error('Invalid or expired refresh token');
     }
   }
@@ -324,7 +380,16 @@ export class AuthService {
   /**
    * Logout
    */
-  async logout(userId: string): Promise<void> {
+  async logout(userId: string, refreshToken?: string): Promise<void> {
+    if (refreshToken) {
+      const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+      const token = await this.refreshTokenRepository.findByTokenHash(tokenHash);
+      
+      if (token) {
+        await this.refreshTokenRepository.revokeToken(token.id);
+      }
+    }
+    
     // In production, add token to blacklist
     console.log(`User ${userId} logged out`);
   }

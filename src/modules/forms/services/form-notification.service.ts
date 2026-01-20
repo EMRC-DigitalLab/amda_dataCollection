@@ -1,12 +1,16 @@
 import { AppDataSource } from '@/config';
 import { Form } from '@/database/entities/form.entity';
+import { Member } from '@/database/entities/member.entity';
 import { NotificationChannel, NotificationPriority } from '@/database/entities/notification.entity';
 import { User, UserRole } from '@/database/entities/user.entity';
 import { logger } from '@/shared/utils/logger';
 import { NotificationHelper } from '@/shared/utils/notification-helper';
 import { WebSocketService } from '@/shared/websocket/websocket.service';
-import { In } from 'typeorm'; // ADDED
+import { In } from 'typeorm';
 
+import { Injectable } from 'injection-js';
+
+@Injectable()
 export class FormNotificationService {
   constructor(private webSocketService?: WebSocketService) {}
 
@@ -33,18 +37,26 @@ export class FormNotificationService {
       }
     }
 
-    // 3. Fallback: Notify Form Admin
-    if (form.admin) {
-      return [form.admin];
-    } else if (form.adminId) {
-       // Fetch admin if not loaded
+    // 3. Notify Form Admin AND All System Admins
+    // We want to ensure all admins are notified, not just the form owner
+    
+    // Fetch all admins
+    const allAdmins = await this.getAdminUsers();
+
+    // If form has specific assigned admin, make sure they are included (deduplicated by ID)
+    if (form.adminId) {
        const userRepo = AppDataSource.getRepository(User);
-       const admin = await userRepo.findOneBy({ id: form.adminId });
-       if (admin) return [admin];
+       const specificAdmin = await userRepo.findOneBy({ id: form.adminId });
+       
+       if (specificAdmin) {
+          const exists = allAdmins.find(a => a.id === specificAdmin.id);
+          if (!exists) {
+            allAdmins.push(specificAdmin);
+          }
+       }
     }
 
-    // 4. Ultimate Fallback: All Admins (Old behavior, safeguard)
-    return this.getAdminUsers();
+    return allAdmins;
   }
 
   // Helper to get all admins (Keep as fallback)
@@ -54,8 +66,6 @@ export class FormNotificationService {
     return users.filter((user) => user.role.includes(UserRole.ADMIN));
   }
 
-  // ... (onFormPublished remains same)
-
   /**
    * Notify when new form submission is received or updated
    */
@@ -64,39 +74,70 @@ export class FormNotificationService {
     try {
       const adminUsers = await this.getNotificationRecipients(form);
       console.log(`[DEBUG] Found ${adminUsers.length} recipients to notify.`);
-
+      
       if (adminUsers.length === 0) {
-         console.warn('[DEBUG] No recipients found. Notification will not be sent.');
          return;
       }
+
+
+
+      // ---------------------------------------------------------
+      // Fetch Submitter Details (Company Name / User Name)
+      // ---------------------------------------------------------
+      let submitterDisplayName = 'Anonymous';
+      if (submittedBy) {
+        try {
+            const userRepo = AppDataSource.getRepository(User); 
+            const user = await userRepo.findOne({ where: { id: submittedBy } });
+
+            if (user) {
+                // Default to user's full name
+                submitterDisplayName = user.fullName;
+
+                // Try to find associated member profile for Company Name
+                if (user.memberId) {
+                    const memberRepo = AppDataSource.getRepository(Member);
+                    const member = await memberRepo.findOne({ where: { id: user.memberId } });
+                    
+                    if (member && member.companyName) {
+                        submitterDisplayName = `${member.companyName} (${user.fullName})`;
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('[DEBUG] Error fetching submitter details:', err);
+        }
+      }
+
+      // ---------------------------------------------------------
+      // Prepare Notification Payload
+      // ---------------------------------------------------------
+      // Ensure submission ID is captured. Some DB drivers return id in different casing or structure.
+      const submissionId = submission.id || submission.ID || 'N/A';
 
       // Notify each admin
       await Promise.all(
         adminUsers.map(async (admin) => {
-          console.log(`[DEBUG] Preparing notification for admin: ${admin.email} (${admin.id})`);
-          
-          // Real-time notification
+          // Real-time
           if (this.webSocketService) {
             await this.webSocketService.sendNotificationToUser(admin.id, {
               id: 'submission-received-' + Date.now(),
               type: 'form_submission',
               subject: isUpdate ? 'Form Submission Updated' : 'New Form Submission',
-              content: isUpdate 
-                ? `Submission updated for form "${form.title}"`
-                : `New submission received for form "${form.title}"`,
+              content: `Received from: ${submitterDisplayName}`,
               priority: 'normal',
               createdAt: new Date(),
               metadata: {
                 formId: form.id,
                 formTitle: form.title,
-                submissionId: submission.id,
-                submittedBy: submittedBy || 'Anonymous',
+                submissionId: submissionId,
+                submittedBy: submitterDisplayName,
                 submittedAt: submission.submitted_at,
               },
             });
           }
 
-          // Persistent notification (Email/In-App)
+          // Persistent (Email/In-App)
           await NotificationHelper.sendCustomNotification(
             admin.id,
             'form_submission_received',
@@ -105,10 +146,10 @@ export class FormNotificationService {
               title: isUpdate ? 'Form Submission Updated' : 'New Form Submission',
               formTitle: form.title,
               formId: form.id,
-              submissionId: submission.id,
-              submitterName: submittedBy || 'Anonymous user',
+              submissionId: submissionId,
+              submitterName: submitterDisplayName,
               submittedAt: new Date().toISOString(),
-              reviewUrl: `https://admin.amda.com/forms/${form.id}/submissions/${submission.id}`,
+              reviewUrl: `https://admin.amda.com/forms/${form.id}/submissions/${submissionId}`,
             },
             {
               channel: [NotificationChannel.EMAIL, NotificationChannel.IN_APP],
@@ -118,7 +159,7 @@ export class FormNotificationService {
         })
       );
 
-       logger.info(`Form submission notification sent to ${adminUsers.length} recipients for form: ${form.title}`);
+       logger.info(`Form submission notification sent to ${adminUsers.length} recipients`);
     } catch (error) {
       logger.error('Error sending form submission notification:', error);
     }
