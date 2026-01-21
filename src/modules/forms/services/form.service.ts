@@ -259,6 +259,22 @@ export class FormService {
 
     const result = await this.repo.submitFormData(dto.formId, dto.data, dto.submittedBy);
 
+    // LOG AUDIT EVENT
+    if (this.auditLogService) {
+      this.auditLogService.log({
+        action: result.isUpdate ? 'FORM_SUBMISSION_UPDATED' : 'FORM_SUBMISSION',
+        resourceType: 'FormSubmission',
+        resourceId: result.id || 'N/A',
+        memberId: dto.submittedBy, // Use memberId for submissions
+        userId: undefined, // Explicitly undefined to avoid FK error
+        details: {
+          formTitle: form.title,
+          isUpdate: result.isUpdate,
+        },
+        isSuccess: true,
+      });
+    }
+
     // ADD SUBMISSION RECEIVED NOTIFICATION
     if (this.formNotificationService) {
       try {

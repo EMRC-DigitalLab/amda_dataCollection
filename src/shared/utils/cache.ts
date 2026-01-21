@@ -52,9 +52,11 @@ export class CacheService {
       } else {
         await redisClient.set(key, finalValue);
       }
-    } catch (error) {
-      console.error(`Cache SET error for key ${key}:`, error);
-      // Don't throw error to prevent cache failures from breaking app
+    } catch (error: any) {
+      const isConnectionError = error?.message?.includes('closed') || error?.message?.includes('ECONNREFUSED');
+      if (!isConnectionError) {
+        console.error(`Cache SET error for key ${key}:`, error);
+      }
     }
   }
 
@@ -63,6 +65,8 @@ export class CacheService {
    */
   async get<T>(key: string, options: CacheOptions = {}): Promise<T | null> {
     try {
+      if (!redisClient.isOpen) return null; // Fast exit if closed
+
       const { serialize = true } = options;
 
       const value = await redisClient.get(key);
@@ -70,8 +74,11 @@ export class CacheService {
       if (value === null) return null;
 
       return serialize ? JSON.parse(value) : (value as T);
-    } catch (error) {
-      console.error(`Cache GET error for key ${key}:`, error);
+    } catch (error: any) {
+      const isConnectionError = error?.message?.includes('closed') || error?.message?.includes('ECONNREFUSED');
+      if (!isConnectionError) {
+        console.error(`Cache GET error for key ${key}:`, error);
+      }
       return null;
     }
   }
@@ -104,9 +111,13 @@ export class CacheService {
    */
   async del(key: string): Promise<void> {
     try {
+      if (!redisClient.isOpen) return;
       await redisClient.del(key);
-    } catch (error) {
-      console.error(`Cache DEL error for key ${key}:`, error);
+    } catch (error: any) {
+      const isConnectionError = error?.message?.includes('closed') || error?.message?.includes('ECONNREFUSED');
+      if (!isConnectionError) {
+        console.error(`Cache DEL error for key ${key}:`, error);
+      }
     }
   }
 
@@ -115,12 +126,16 @@ export class CacheService {
    */
   async delPattern(pattern: string): Promise<void> {
     try {
+      if (!redisClient.isOpen) return;
       const keys = await redisClient.keys(pattern);
       if (keys.length > 0) {
         await redisClient.del(keys);
       }
-    } catch (error) {
-      console.error(`Cache DEL PATTERN error for pattern ${pattern}:`, error);
+    } catch (error: any) {
+      const isConnectionError = error?.message?.includes('closed') || error?.message?.includes('ECONNREFUSED');
+      if (!isConnectionError) {
+        console.error(`Cache DEL PATTERN error for pattern ${pattern}:`, error);
+      }
     }
   }
 
@@ -129,10 +144,10 @@ export class CacheService {
    */
   async exists(key: string): Promise<boolean> {
     try {
+      if (!redisClient.isOpen) return false;
       const result = await redisClient.exists(key);
       return result === 1;
-    } catch (error) {
-      console.error(`Cache EXISTS error for key ${key}:`, error);
+    } catch (error: any) {
       return false;
     }
   }
@@ -142,9 +157,10 @@ export class CacheService {
    */
   async expire(key: string, ttl: number): Promise<void> {
     try {
+      if (!redisClient.isOpen) return;
       await redisClient.expire(key, ttl);
     } catch (error) {
-      console.error(`Cache EXPIRE error for key ${key}:`, error);
+       // Silent fail
     }
   }
 
@@ -153,9 +169,9 @@ export class CacheService {
    */
   async incr(key: string, by: number = 1): Promise<number> {
     try {
+      if (!redisClient.isOpen) return 0;
       return await redisClient.incrBy(key, by);
     } catch (error) {
-      console.error(`Cache INCR error for key ${key}:`, error);
       return 0;
     }
   }
@@ -165,6 +181,8 @@ export class CacheService {
    */
   async mSet<T>(keyValues: Record<string, T>, options: CacheOptions = {}): Promise<void> {
     try {
+      if (!redisClient.isOpen) return;
+      
       const { serialize = true } = options;
 
       const pipeline = redisClient.multi();
@@ -180,7 +198,7 @@ export class CacheService {
 
       await pipeline.exec();
     } catch (error) {
-      console.error('Cache MSET error:', error);
+       // Silent fail
     }
   }
 
@@ -189,6 +207,8 @@ export class CacheService {
    */
   async mGet<T>(keys: string[], options: CacheOptions = {}): Promise<(T | null)[]> {
     try {
+      if (!redisClient.isOpen) return new Array(keys.length).fill(null);
+
       const { serialize = true } = options;
 
       const values = await redisClient.mGet(keys);
@@ -198,7 +218,6 @@ export class CacheService {
         return serialize ? JSON.parse(value) : (value as T);
       });
     } catch (error) {
-      console.error('Cache MGET error:', error);
       return new Array(keys.length).fill(null);
     }
   }
@@ -208,10 +227,11 @@ export class CacheService {
    */
   async sAdd(key: string, members: string | string[]): Promise<void> {
     try {
+      if (!redisClient.isOpen) return;
       const memberArray = Array.isArray(members) ? members : [members];
       await redisClient.sAdd(key, memberArray);
     } catch (error) {
-      console.error(`Cache SADD error for key ${key}:`, error);
+       // Silent fail
     }
   }
 
@@ -220,9 +240,9 @@ export class CacheService {
    */
   async sMembers(key: string): Promise<string[]> {
     try {
+      if (!redisClient.isOpen) return [];
       return await redisClient.sMembers(key);
     } catch (error) {
-      console.error(`Cache SMEMBERS error for key ${key}:`, error);
       return [];
     }
   }
@@ -232,9 +252,9 @@ export class CacheService {
    */
   async sIsMember(key: string, member: string): Promise<boolean> {
     try {
+      if (!redisClient.isOpen) return false;
       return await redisClient.sIsMember(key, member);
     } catch (error) {
-      console.error(`Cache SISMEMBER error for key ${key}:`, error);
       return false;
     }
   }
@@ -244,10 +264,11 @@ export class CacheService {
    */
   async lPush(key: string, values: string | string[]): Promise<void> {
     try {
+      if (!redisClient.isOpen) return;
       const valueArray = Array.isArray(values) ? values : [values];
       await redisClient.lPush(key, valueArray);
     } catch (error) {
-      console.error(`Cache LPUSH error for key ${key}:`, error);
+       // Silent fail
     }
   }
 
@@ -256,9 +277,9 @@ export class CacheService {
    */
   async lRange(key: string, start: number = 0, stop: number = -1): Promise<string[]> {
     try {
+      if (!redisClient.isOpen) return [];
       return await redisClient.lRange(key, start, stop);
     } catch (error) {
-      console.error(`Cache LRANGE error for key ${key}:`, error);
       return [];
     }
   }
@@ -268,9 +289,10 @@ export class CacheService {
    */
   async hSet(key: string, field: string, value: string): Promise<void> {
     try {
+      if (!redisClient.isOpen) return;
       await redisClient.hSet(key, field, value);
     } catch (error) {
-      console.error(`Cache HSET error for key ${key}:`, error);
+       // Silent fail
     }
   }
 
@@ -279,9 +301,9 @@ export class CacheService {
    */
   async hGet(key: string, field: string): Promise<string | null | undefined> {
     try {
+      if (!redisClient.isOpen) return null;
       return await redisClient.hGet(key, field);
     } catch (error) {
-      console.error(`Cache HGET error for key ${key}:`, error);
       return null;
     }
   }
@@ -291,9 +313,9 @@ export class CacheService {
    */
   async hGetAll(key: string): Promise<Record<string, string>> {
     try {
+      if (!redisClient.isOpen) return {};
       return await redisClient.hGetAll(key);
     } catch (error) {
-      console.error(`Cache HGETALL error for key ${key}:`, error);
       return {};
     }
   }
@@ -303,20 +325,21 @@ export class CacheService {
    */
   async flushAll(): Promise<void> {
     try {
+      if (!redisClient.isOpen) return;
       await redisClient.flushAll();
     } catch (error) {
-      console.error('Cache FLUSH ALL error:', error);
+       // Silent fail
     }
   }
 
   /**
-   * Get cache statistics
+   * Get cache stats 
    */
   async getStats(): Promise<any> {
     try {
+      if (!redisClient.isOpen) return null;
       return await redisClient.info('memory');
     } catch (error) {
-      console.error('Cache STATS error:', error);
       return null;
     }
   }
@@ -325,6 +348,9 @@ export class CacheService {
     const cacheKey = this.CACHE_KEYS.DASHBOARD_OVERVIEW(JSON.stringify(filters || {}));
 
     try {
+      // Fast exit if closed
+      if (!redisClient.isOpen) return fetchFn();
+
       // Try to get from cache
       const cached = await redisClient.get(cacheKey);
       if (cached) {
@@ -338,18 +364,26 @@ export class CacheService {
       await redisClient.setEx(cacheKey, 300, JSON.stringify(data));
 
       return data;
-    } catch (error) {
-      console.error('Cache error:', error);
+    } catch (error: any) {
+      const isConnectionError = error?.message?.includes('closed') || error?.message?.includes('ECONNREFUSED');
+      if (!isConnectionError) {
+        console.error('Cache error:', error);
+      }
       // Fallback to direct query if Redis fails
       return fetchFn();
     }
   }
 
   static async invalidateDashboardCache(): Promise<void> {
-    const pattern = 'dashboard:overview:*';
-    const keys = await redisClient.keys(pattern);
-    if (keys.length > 0) {
-      await redisClient.del(keys);
+    try {
+        if (!redisClient.isOpen) return;
+        const pattern = 'dashboard:overview:*';
+        const keys = await redisClient.keys(pattern);
+        if (keys.length > 0) {
+          await redisClient.del(keys);
+        }
+    } catch (e) {
+        // Silent
     }
   }
 }

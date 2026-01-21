@@ -2991,9 +2991,7 @@ export class FormRepository extends Repository<Form> implements IFormRepository 
       matchScore: number;
     }>
   > {
-    console.log('\n=== GET SUGGESTIONS BY KPI START ===');
-    console.log('Looking for questions similar to:', questionKPI);
-
+   
     const currentForm = await this.findFormById(currentFormId);
 
     if (!currentForm || !currentForm.formTypeId) {
