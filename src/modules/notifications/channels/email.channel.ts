@@ -4,9 +4,9 @@ import { NotificationChannel } from '@/database/entities/notification.entity';
 import { logger } from '@/shared/utils/logger';
 import nodemailer from 'nodemailer';
 import {
-    INotificationChannel,
-    NotificationRequest,
-    NotificationResult,
+  INotificationChannel,
+  NotificationRequest,
+  NotificationResult,
 } from '../interfaces/notification.interface';
 
 export class EmailChannel implements INotificationChannel {
@@ -18,8 +18,8 @@ export class EmailChannel implements INotificationChannel {
       port: config.email.port,
       secure: config.email.secure, // true for 465, false for other ports
       auth: {
-         user: "emrctechteam@gmail.com",
-         pass: "opbt usvu waos huzg",
+         user: config.email.user,
+         pass: config.email.password,
       },
     });
   }
