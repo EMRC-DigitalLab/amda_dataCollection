@@ -303,26 +303,6 @@ class Application {
         logger.info('Notification templates loaded');
       }
       
-      // DIAGNOSTIC: Verify Redis Connection
-      try {
-         const { createClient } = require('redis');
-         const redisUrl = `redis://${config.redis.password ? ':' + config.redis.password + '@' : ''}${config.redis.host}:${config.redis.port}`;
-         const client = createClient({ url: redisUrl });
-         
-         client.on('error', (err: any) => {
-            logger.error(`[DIAGNOSTIC] Redis Connection FAILED: ${err.message} (Host: ${config.redis.host})`);
-            client.disconnect();
-         });
-
-         client.on('connect', () => {
-            logger.info(`[DIAGNOSTIC] Redis Connection SUCCESS (Host: ${config.redis.host})`);
-            client.disconnect();
-         });
-         
-         await client.connect();
-      } catch (err: any) {
-         logger.error(`[DIAGNOSTIC] Failed to init Redis check: ${err.message}`);
-      }
 
       // Start server FIRST
       const server = this.app.listen(config.port, () => {
