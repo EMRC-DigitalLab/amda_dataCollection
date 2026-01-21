@@ -103,6 +103,13 @@ export class FormNotificationService {
                         submitterDisplayName = `${member.companyName} (${user.fullName})`;
                     }
                 }
+            } else {
+                // Return generic Member name if User not found but Member exists (Direct member ID)
+                const memberRepo = AppDataSource.getRepository(Member);
+                const member = await memberRepo.findOne({ where: { id: submittedBy } });
+                if (member) {
+                     submitterDisplayName = member.companyName || member.contact1Name || 'Member';
+                }
             }
         } catch (err) {
             console.error('[DEBUG] Error fetching submitter details:', err);
@@ -143,7 +150,7 @@ export class FormNotificationService {
             'form_submission_received',
             {
               isUpdate,
-              title: isUpdate ? 'Form Submission Updated' : 'New Form Submission',
+              title: 'Form Submission', // Standardized for threading
               formTitle: form.title,
               formId: form.id,
               submissionId: submissionId,

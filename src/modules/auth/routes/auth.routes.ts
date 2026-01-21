@@ -50,6 +50,13 @@ export function createAuthRoutes(dataSource: DataSource): Router {
     authController.createMember
   );
 
+  router.get(
+    '/admin/users/admins',
+    authMiddleware,
+    adminMiddleware,
+    authController.getAdmins
+  );
+
   // =================================================================
   // MEMBER VERIFICATION ROUTES (Admin only)
   // =================================================================

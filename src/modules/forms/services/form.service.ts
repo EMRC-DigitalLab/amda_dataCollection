@@ -985,7 +985,7 @@ export class FormService {
           COUNT(*) FILTER (WHERE submitted_at >= $1) as today_count,
           COUNT(*) FILTER (WHERE submitted_at >= $2) as week_count,
           COUNT(*) FILTER (WHERE submitted_at >= $3) as month_count,
-          COUNT(*) FILTER (WHERE lastLoginAt = 'PENDING') as pending_count,
+          COUNT(*) FILTER (WHERE status = 'SUBMITTED') as pending_count,
           AVG(EXTRACT(EPOCH FROM (reviewed_at - submitted_at)) / 3600) FILTER (WHERE reviewed_at IS NOT NULL) as avg_review_hours,
           COUNT(DISTINCT submitted_by) FILTER (WHERE submitted_at >= $2) as active_members
         FROM "${form.tableName}"
