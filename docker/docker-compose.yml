@@ -14,6 +14,8 @@ services:
       - NODE_ENV=production
     env_file:
       - ../.env.production
+    depends_on:
+      - redis
     volumes:
       - uploads_data:/app/uploads
       - logs_data:/app/logs
@@ -42,10 +44,32 @@ services:
     networks:
       - amda-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: amda-redis
+    restart: unless-stopped
+    env_file:
+      - ../.env.production
+    # Fix: Use shell to expand variable properly and prevent crash if empty
+    command: /bin/sh -c "redis-server --requirepass $${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - amda-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   uploads_data:
     driver: local
   logs_data:
+    driver: local
+  redis_data:
     driver: local
 
 networks:
