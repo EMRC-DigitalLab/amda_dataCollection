@@ -28,6 +28,15 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+  redis:
+    image: redis:7-alpine
+    container_name: amda-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+    - redis_data:/data
+    networks:
+    - amda-network
 
   nginx:
     image: nginx:alpine
