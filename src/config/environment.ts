@@ -21,7 +21,7 @@ const envVarsSchema = joi
     NODE_ENV: joi.string().valid('development', 'production', 'test').default('development'),
     PORT: joi.number().default(3000),
     API_PREFIX: joi.string().default('/api/v1'),
-    FRONTEND_URL: joi.string().default('http://localhost:5173'), // ADD THIS LINE
+    FRONTEND_URL: joi.string().default('https://amda.energymrc.ng/'), // ADD THIS LINE
 
     // Database
     DATABASE_HOST: joi.string().required(),
@@ -87,7 +87,7 @@ export const config = {
   environment: envVars.NODE_ENV,
   port: envVars.PORT,
   apiPrefix: envVars.API_PREFIX,
-  frontendUrl: envVars.FRONTEND_URL || 'http://localhost:5173', // ADD THIS LINE
+  frontendUrl: envVars.FRONTEND_URL || 'https://amda.energymrc.ng/', // ADD THIS LINE
 
   database: {
     host: envVars.DATABASE_HOST,
