@@ -5,14 +5,19 @@ import { MemberRepository } from '../../../database/repositories/auth/member.rep
 import { UserRepository } from '../../../database/repositories/auth/user.repository';
 import { FormRepository } from '../../../database/repositories/forms/form.repository';
 import { AppError } from '../../../shared/middleware/error.middleware';
+import { AuditLogService } from '../../../shared/utils/form-audit';
 import { IMember, IMemberService } from '../interfaces/member.interface';
 
 export class MemberService implements IMemberService {
+  private auditLogService: AuditLogService;
+
   constructor(
     private readonly memberRepository: MemberRepository,
     private readonly userRepository: UserRepository,
     private readonly formRepository: FormRepository
-  ) {}
+  ) {
+    this.auditLogService = new AuditLogService();
+  }
 
   async getAllMembers(): Promise<Member[]> {
     return await this.memberRepository.findAll();
@@ -64,7 +69,15 @@ export class MemberService implements IMemberService {
       // membershipStartDate: new Date(memberData.membershipStartDate),
     };
 
-    return await this.memberRepository.create(memberToCreate);
+    const member = await this.memberRepository.create(memberToCreate);
+
+    // Audit Log: Member Created
+    await this.auditLogService.logMemberCreated(member.id, undefined, {
+      companyName: member.companyName,
+      email: member.email,
+    });
+
+    return member;
   }
 
   async updateMember(id: string, memberData: Partial<IMember>): Promise<IMember> {
@@ -105,6 +118,9 @@ export class MemberService implements IMemberService {
       throw new AppError(`Member with ID ${id} not found`, 404);
     }
 
+    // Audit Log: Member Updated
+    await this.auditLogService.logMemberUpdated(id, undefined, Object.keys(memberData));
+
     return updatedMember;
   }
 
@@ -114,6 +130,9 @@ export class MemberService implements IMemberService {
     if (!deleted) {
       throw new AppError(`Failed to delete member with ID ${id}`, 500);
     }
+
+    // Audit Log: Member Deleted
+    await this.auditLogService.logMemberDeleted(id);
   }
 
   async getMembersByStatus(status: MembershipStatus): Promise<Member[]> {
@@ -148,6 +167,9 @@ export class MemberService implements IMemberService {
     if (!updatedMember) {
       throw new AppError(`Failed to verify member with ID ${id}`, 500);
     }
+
+    // Audit Log: Member Verified
+    await this.auditLogService.logMemberVerified(id, adminId);
 
     return updatedMember;
   }

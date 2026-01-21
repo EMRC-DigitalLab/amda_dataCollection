@@ -114,6 +114,146 @@ export class AuditLogService {
   }
 
   /**
+   * Helper to log member creation
+   */
+  async logMemberCreated(memberId: string, adminId?: string, details?: any) {
+    await this.log({
+      action: 'MEMBER_CREATED',
+      resourceType: 'Member',
+      resourceId: memberId,
+      userId: adminId,
+      memberId,
+      details,
+      isSuccess: true,
+    });
+  }
+
+  /**
+   * Helper to log member updates
+   */
+  async logMemberUpdated(memberId: string, adminId?: string, changes?: any) {
+    await this.log({
+      action: 'MEMBER_UPDATED',
+      resourceType: 'Member',
+      resourceId: memberId,
+      userId: adminId,
+      memberId,
+      details: { changes },
+      isSuccess: true,
+    });
+  }
+
+  /**
+   * Helper to log member verification
+   */
+  async logMemberVerified(memberId: string, adminId?: string) {
+    await this.log({
+      action: 'MEMBER_VERIFIED',
+      resourceType: 'Member',
+      resourceId: memberId,
+      userId: adminId,
+      memberId,
+      isSuccess: true,
+    });
+  }
+
+  /**
+   * Helper to log member deletion
+   */
+  async logMemberDeleted(memberId: string, adminId?: string) {
+    await this.log({
+      action: 'MEMBER_DELETED',
+      resourceType: 'Member',
+      resourceId: memberId,
+      userId: adminId,
+      severity: AuditLogSeverity.WARNING,
+      isSuccess: true,
+    });
+  }
+
+  /**
+   * Helper to log minigrid site creation
+   */
+  async logSiteCreated(siteId: string, memberId: string, siteName: string) {
+    await this.log({
+      action: 'SITE_CREATED',
+      resourceType: 'MinigridSite',
+      resourceId: siteId,
+      memberId,
+      details: { siteName },
+      isSuccess: true,
+    });
+  }
+
+  /**
+   * Helper to log minigrid site updates
+   */
+  async logSiteUpdated(siteId: string, memberId?: string, changes?: any) {
+    await this.log({
+      action: 'SITE_UPDATED',
+      resourceType: 'MinigridSite',
+      resourceId: siteId,
+      memberId,
+      details: { changes },
+      isSuccess: true,
+    });
+  }
+
+  /**
+   * Helper to log minigrid site deletion
+   */
+  async logSiteDeleted(siteId: string, memberId?: string) {
+    await this.log({
+      action: 'SITE_DELETED',
+      resourceType: 'MinigridSite',
+      resourceId: siteId,
+      memberId,
+      severity: AuditLogSeverity.WARNING,
+      isSuccess: true,
+    });
+  }
+
+  /**
+   * Helper to log form submission
+   */
+  async logFormSubmission(
+    formId: string,
+    submissionId: string,
+    memberId: string,
+    formTitle: string,
+    isUpdate: boolean = false
+  ) {
+    await this.log({
+      action: isUpdate ? 'FORM_SUBMISSION_UPDATED' : 'FORM_SUBMISSION',
+      resourceType: 'FormSubmission',
+      resourceId: submissionId,
+      memberId,
+      details: { formId, formTitle, isUpdate },
+      isSuccess: true,
+    });
+  }
+
+  /**
+   * Helper to log logout
+   */
+  async logLogout(id: string, userType: 'admin' | 'member', ipAddress?: string) {
+    const entry: AuditLogEntry = {
+      action: 'LOGOUT',
+      resourceType: 'Auth',
+      ipAddress,
+      isSuccess: true,
+    };
+
+    if (userType === 'admin') {
+      entry.userId = id;
+    } else {
+      entry.memberId = id;
+    }
+
+    await this.log(entry);
+  }
+
+  /**
    * Get audit logs
    */
   async getAuditLogs(

@@ -2,12 +2,17 @@ import { Injectable } from 'injection-js';
 import { MinigridSite } from '../../../database/entities/minigrid-site.entity';
 import { MinigridSiteRepository } from '../../../database/repositories/forms/minigrid-site.repository';
 import { AppError } from '../../../shared/middleware/error.middleware';
+import { AuditLogService } from '../../../shared/utils/form-audit';
 import { CreateMinigridSiteDto, UpdateMinigridSiteDto } from '../dtos/minigrid-site.dto';
 import { IMinigridSiteService, MinigridSiteStats } from '../interfaces/minigrid-site.interface';
 
 @Injectable()
 export class MinigridSiteService implements IMinigridSiteService {
-  constructor(private readonly minigridSiteRepository: MinigridSiteRepository) {}
+  private auditLogService: AuditLogService;
+
+  constructor(private readonly minigridSiteRepository: MinigridSiteRepository) {
+    this.auditLogService = new AuditLogService();
+  }
 
   async createMinigridSite(data: CreateMinigridSiteDto): Promise<MinigridSite> {
     const existingMinigridSite = await this.minigridSiteRepository.findByName(data.name);
@@ -15,7 +20,12 @@ export class MinigridSiteService implements IMinigridSiteService {
       throw new AppError('Minigrid site with this name already exists', 409);
     }
 
-    return await this.minigridSiteRepository.create(data);
+    const site = await this.minigridSiteRepository.create(data);
+
+    // Audit Log: Site Created
+    await this.auditLogService.logSiteCreated(site.id, site.memberId || '', site.name);
+
+    return site;
   }
 
   async getAllMinigridSites(
@@ -207,6 +217,9 @@ export class MinigridSiteService implements IMinigridSiteService {
       throw new AppError('Failed to update minigrid site', 500);
     }
 
+    // Audit Log: Site Updated
+    await this.auditLogService.logSiteUpdated(id, existingMinigridSite.memberId, Object.keys(data));
+
     return updatedMinigridSite;
   }
 
@@ -220,6 +233,9 @@ export class MinigridSiteService implements IMinigridSiteService {
     if (!deleted) {
       throw new AppError('Failed to delete minigrid site', 500);
     }
+
+    // Audit Log: Site Deleted
+    await this.auditLogService.logSiteDeleted(id, existingMinigridSite.memberId);
   }
 
   async bulkDeleteMinigridSites(
