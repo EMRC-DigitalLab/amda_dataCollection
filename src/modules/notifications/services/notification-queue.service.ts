@@ -14,6 +14,7 @@ export class NotificationQueueService {
         host: config.redis.host,
         port: config.redis.port,
         password: config.redis.password,
+         connectTimeout: 30000,
       },
       defaultJobOptions: {
         removeOnComplete: 100,

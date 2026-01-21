@@ -6,12 +6,12 @@ const redisConfig = {
   socket: {
     host: config.redis.host,
     port: config.redis.port,
-    reconnectStrategy: (retries: number) => {
-      // Exponential backoff with cap
-      const delay = Math.min(retries * 50, 2000);
-      console.log(`Redis reconnecting in ${delay}ms (attempt ${retries})`);
-      return delay;
-    },
+     connectTimeout: 30000,
+ 
+      retryStrategy: (times: number) => {
+        const delay = Math.min(times * 50, 2000);
+        return delay;
+      },
   },
   password: config.redis.password || undefined,
   // Removed custom retry options as they might conflict with built-in strategy
