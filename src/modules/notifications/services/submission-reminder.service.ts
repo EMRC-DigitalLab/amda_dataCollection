@@ -11,6 +11,7 @@ export class SubmissionReminderService {
 
   constructor() {
     this.scheduleReminders();
+    this.startCountdownLogger();
   }
 
   /**
@@ -23,6 +24,34 @@ export class SubmissionReminderService {
       await this.sendDailyReminders();
     });
     logger.info('✅ Daily submission reminder scheduled for 8:00 AM');
+  }
+
+  /**
+   * Log time remaining until next run
+   */
+  private startCountdownLogger() {
+    const logTimeRemaining = () => {
+      const now = new Date();
+      let nextRun = new Date();
+      nextRun.setHours(8, 0, 0, 0);
+
+      // If 8 AM has passed today, next run is tomorrow
+      if (now > nextRun) {
+        nextRun.setDate(nextRun.getDate() + 1);
+      }
+
+      const diffMs = nextRun.getTime() - now.getTime();
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+      logger.info(`⏳ Next submission reminder in ${hours} hours and ${minutes} minutes (${nextRun.toLocaleString()})`);
+    };
+
+    // Log immediately
+    logTimeRemaining();
+
+    // Log every hour
+    setInterval(logTimeRemaining, 1000 * 60 * 60);
   }
 
   /**

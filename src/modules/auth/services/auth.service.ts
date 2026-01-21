@@ -440,7 +440,7 @@ export class AuthService {
     }
 
     // Generate reset URL
-    const resetUrl = `${config.frontendUrl}/reset-password?token=${resetToken}`;
+    const resetUrl = `${config.frontendUrl}/auth/reset-password?token=${resetToken}`;
 
     try {
       await NotificationHelper.sendCustomNotification(
