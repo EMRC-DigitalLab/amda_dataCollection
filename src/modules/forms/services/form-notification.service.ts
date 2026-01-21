@@ -61,9 +61,31 @@ export class FormNotificationService {
 
   // Helper to get all admins (Keep as fallback)
   private async getAdminUsers(): Promise<User[]> {
-    const userRepo = AppDataSource.getRepository(User);
-    const users = await userRepo.find();
-    return users.filter((user) => user.role.includes(UserRole.ADMIN));
+    try {
+      const userRepo = AppDataSource.getRepository(User);
+      // Fetch users with ADMIN role directly from DB for efficiency
+      const admins = await userRepo.find({
+        where: { role: UserRole.ADMIN }
+      });
+      
+      console.log(`[DEBUG] getAdminUsers found ${admins.length} admins directly via DB query.`);
+
+      if (admins.length === 0) {
+        // Fallback: Fetch all and filter (in case of casing issues)
+        const allUsers = await userRepo.find();
+        const filteredAdmins = allUsers.filter(u => 
+          u.role === UserRole.ADMIN || 
+          (typeof u.role === 'string' && u.role.toLowerCase() === 'admin')
+        );
+        console.log(`[DEBUG] Fallback filter found ${filteredAdmins.length} admins from ${allUsers.length} total users.`);
+        return filteredAdmins;
+      }
+
+      return admins;
+    } catch (error) {
+      console.error('[DEBUG] Error fetching admins:', error);
+      return [];
+    }
   }
 
   /**

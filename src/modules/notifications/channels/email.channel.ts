@@ -19,7 +19,7 @@ export class EmailChannel implements INotificationChannel {
       secure: config.email.secure, // true for 465, false for other ports
       auth: {
          user: config.email.user,
-         pass: config.email.password,
+         pass: config.email.password?.replace(/\s/g, ''),
       },
     });
   }
