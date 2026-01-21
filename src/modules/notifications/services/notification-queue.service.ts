@@ -26,6 +26,22 @@ export class NotificationQueueService {
       },
     });
 
+    this.notificationQueue.on('error', (error) => {
+      logger.error('Notification Queue Redis Connection Error:', error);
+    });
+
+    this.notificationQueue.on('active', () => {
+      logger.info('Notification Queue: Worker is active and processing');
+    });
+
+    this.notificationQueue.client.on('ready', () => {
+      logger.info(`Notification Queue Redis Client Ready (Host: ${config.redis.host})`);
+    });
+
+    this.notificationQueue.client.on('error', (err) => {
+      logger.error('Notification Queue Redis Client Error:', err);
+    });
+
     this.setupProcessors();
   }
 
