@@ -16,8 +16,6 @@ services:
       - NODE_ENV=production
     env_file:
       - ../.env.production
-    depends_on:
-      - redis
     volumes:
       - uploads_data:/app/uploads
       - logs_data:/app/logs
