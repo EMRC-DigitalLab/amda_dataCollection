@@ -261,7 +261,7 @@ export class FormService {
 
     // LOG AUDIT EVENT
     if (this.auditLogService) {
-      this.auditLogService.log({
+      await this.auditLogService.log({
         action: result.isUpdate ? 'FORM_SUBMISSION_UPDATED' : 'FORM_SUBMISSION',
         resourceType: 'FormSubmission',
         resourceId: result.id || 'N/A',
