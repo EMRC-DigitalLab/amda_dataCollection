@@ -2,7 +2,7 @@
   "name": "form_submission_received",
   "type": "form_submission_received",
   "channel": "email",
-  "subject": "New Submission: {{formTitle}}",
+  "subject": "Form Submission: {{formTitle}}",
   "content": "A new submission has been received for {{formTitle}} from {{submitterName}}. View details: {{reviewUrl}}",
   "htmlContent": "<!DOCTYPE html><html><head><style>body{font-family:'Segoe UI',San-Serif;color:#333;line-height:1.6}.container{max-width:600px;margin:0 auto;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}.header{background:#2563eb;color:#fff;padding:20px;text-align:center}.content{padding:20px}.field{margin-bottom:12px}.label{font-weight:600;color:#4b5563;font-size:0.875rem}.value{color:#1f2937}.button{display:inline-block;background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;margin-top:20px}.footer{background:#f9fafb;padding:15px;text-align:center;font-size:0.75rem;color:#6b7280}</style></head><body><div class=\"container\"><div class=\"header\"><h2>New Form Submission</h2></div><div class=\"content\"><p>Hello Admin,</p><p>A new submission has been received for the form <strong>{{formTitle}}</strong>.</p><div class=\"field\"><div class=\"label\">Submitter</div><div class=\"value\">{{submitterName}}</div></div><div class=\"field\"><div class=\"label\">Submission Date</div><div class=\"value\">{{submittedAt}}</div></div><div class=\"field\"><div class=\"label\">Submission ID</div><div class=\"value\">{{submissionId}}</div></div><a href=\"{{reviewUrl}}\" class=\"button\">Review Submission</a></div><div class=\"footer\"><p>AMDA Data Collection Platform © 2026</p></div></div></body></html>",
   "defaultData": {},

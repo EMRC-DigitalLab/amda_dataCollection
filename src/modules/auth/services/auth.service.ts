@@ -609,6 +609,32 @@ export class AuthService {
   }
 
   /**
+   * Get all admins with search and pagination
+   */
+  async getAdmins(
+    searchTerm: string = '',
+    page: number = 1,
+    limit: number = 10
+  ): Promise<{
+    admins: User[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    const { users: admins, total } = await this.userRepository.searchUsers(
+      searchTerm,
+      page,
+      limit,
+      { role: UserRole.ADMIN }
+    );
+
+    return {
+      admins,
+      total,
+      hasMore: (page - 1) * limit + admins.length < total,
+    };
+  }
+
+  /**
    * Verify or unverify a member (Admin only)
    */
   async verifyMember(

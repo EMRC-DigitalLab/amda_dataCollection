@@ -397,4 +397,39 @@ export class AuthController {
       }
     }
   );
+
+  /**
+   * Get all admins
+   * GET /admin/users/admins
+   */
+  getAdmins = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const adminId = req.user?.id;
+      if (!adminId) {
+        return ResponseHelper.error(res, 'Admin authentication required', 401);
+      }
+
+      const searchTerm = (req.query.q as string) || '';
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+
+      const result = await this.authService.getAdmins(searchTerm, page, limit);
+
+      ResponseHelper.success(
+        res,
+        {
+          ...result,
+          pagination: {
+            page,
+            limit,
+            total: result.total,
+            hasMore: result.hasMore,
+          },
+        },
+        'Admins retrieved successfully'
+      );
+    } catch (error: any) {
+      ResponseHelper.error(res, error.message, 400);
+    }
+  });
 }
